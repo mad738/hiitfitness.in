@@ -81,6 +81,17 @@ body {
     animation: marquee 35s linear infinite;
   }
 
+  /* Scroll-into-view ease-in pop */
+  .animate-in-scroll-placeholder {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  }
+  .animate-in-scroll-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   /* Small boom at end-lap icon when scroll reaches end (silent) */
   @keyframes end-lap-boom {
     0% {

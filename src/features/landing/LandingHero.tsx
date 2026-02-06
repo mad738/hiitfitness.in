@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { MatterButton } from "@/components/ui/matter-button";
+import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
 
 const HERO_IMAGE_SRC =
   "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=800&q=80";
@@ -10,7 +11,7 @@ export function LandingHero() {
     <section className="relative min-h-[92vh] flex items-center justify-center px-4 sm:px-6 pt-[calc(var(--header-height)+var(--header-content-gap)+3.25rem)] md:pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden">
       {/* No top/side gradients – global interactive grid shows through as hero background */}
 
-      <div className="relative z-10 w-full max-w-6xl mx-auto">
+      <AnimateOnScroll rootMargin="0px 0px -20px 0px" className="relative z-10 w-full max-w-6xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           {/* Copy + CTA */}
           <div className="text-center lg:text-left">
@@ -92,7 +93,7 @@ export function LandingHero() {
             ))}
           </div>
         </div>
-      </div>
+      </AnimateOnScroll>
     </section>
   );
 }

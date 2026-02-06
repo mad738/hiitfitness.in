@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
 
 export function LandingFooter() {
   return (
     <footer className="border-t border-stone-800 py-10 sm:py-12 px-4 sm:px-6">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <AnimateOnScroll className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         <p className="text-stone-500 text-sm">
           © {new Date().getFullYear()} HIIT Gym. All rights reserved.
         </p>
@@ -27,7 +28,7 @@ export function LandingFooter() {
             Staff
           </Link>
         </div>
-      </div>
+      </AnimateOnScroll>
     </footer>
   );
 }
