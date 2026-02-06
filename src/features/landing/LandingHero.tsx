@@ -7,23 +7,23 @@ const HERO_IMAGE_SRC =
 
 export function LandingHero() {
   return (
-    <section className="relative min-h-[92vh] flex items-center justify-center px-4 sm:px-6 pt-20 overflow-hidden">
+    <section className="relative min-h-[92vh] flex items-center justify-center px-4 sm:px-6 pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden">
       {/* No top/side gradients – global interactive grid shows through as hero background */}
 
       <div className="relative z-10 w-full max-w-6xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           {/* Copy + CTA */}
           <div className="text-center lg:text-left">
-            <p className="text-lime-300 font-mono text-sm uppercase tracking-widest mb-4">
+            <p className="text-red-400 font-mono text-sm uppercase tracking-widest mb-4">
               Built for gym rats & grinders
             </p>
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-stone-50 tracking-tight mb-6">
               Earn your
               <br />
-              <span className="text-lime-300">next PR</span>{" "}
+              <span className="text-red-400">next PR</span>{" "}
               <span className="text-stone-200/90">—</span>{" "}
-              <span className="text-cyan-300">every</span>{" "}
-              <span className="text-orange-300">session</span>.
+              <span className="text-stone-200">every</span>{" "}
+              <span className="text-red-300">session</span>.
             </h1>
             <p className="text-stone-300/85 text-base sm:text-lg md:text-xl max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
               HIIT Gym is a no-excuses training space with serious equipment, focused
@@ -31,7 +31,7 @@ export function LandingHero() {
               Stay for the strength.
             </p>
             <div className="flex flex-wrap justify-center lg:justify-start gap-[clamp(0.5rem,2vw,1rem)]">
-              <MatterButton asChild size="lg" hoverGlowColor="orange" className="shrink-0">
+              <MatterButton asChild size="lg" hoverGlowColor="red" className="shrink-0">
                 <a href="#plans" className="inline-flex items-center justify-center">
                   View plans
                 </a>
@@ -67,20 +67,20 @@ export function LandingHero() {
             {[...Array(2)].map((_, set) => (
               <div key={set} className="flex gap-3 shrink-0">
                 {[
-                  { title: "Strength zone", desc: "Racks, platforms, cables — the real stuff.", accent: "lime" },
-                  { title: "HIIT studio", desc: "Circuits that spike intensity safely.", accent: "cyan" },
-                  { title: "Recovery corner", desc: "Cool down, mobility, reset.", accent: "orange" },
-                  { title: "Open 7 days", desc: "Train when it suits you.", accent: "lime" },
-                  { title: "No long-term contracts", desc: "Cancel anytime.", accent: "cyan" },
-                  { title: "Drop-in welcome", desc: "Try before you commit.", accent: "orange" },
-                  { title: "Expert coaching", desc: "Form, programming, support.", accent: "lime" },
-                  { title: "24/7 access", desc: "Some plans round the clock.", accent: "cyan" },
+                  { title: "Strength zone", desc: "Racks, platforms, cables — the real stuff.", accent: "red" },
+                  { title: "HIIT studio", desc: "Circuits that spike intensity safely.", accent: "red" },
+                  { title: "Recovery corner", desc: "Cool down, mobility, reset.", accent: "red" },
+                  { title: "Open 7 days", desc: "Train when it suits you.", accent: "red" },
+                  { title: "No long-term contracts", desc: "Cancel anytime.", accent: "red" },
+                  { title: "Drop-in welcome", desc: "Try before you commit.", accent: "red" },
+                  { title: "Expert coaching", desc: "Form, programming, support.", accent: "red" },
+                  { title: "24/7 access", desc: "Some plans round the clock.", accent: "red" },
                 ].map((chip) => (
                   <div
                     key={`${set}-${chip.title}`}
                     className="liquid-glass shrink-0 rounded-2xl px-4 py-3 min-w-[180px] sm:min-w-[200px]"
                   >
-                    <p className={`font-semibold text-stone-100 text-sm sm:text-base ${chip.accent === "lime" ? "text-lime-300/90" : chip.accent === "cyan" ? "text-cyan-300/90" : "text-orange-300/90"}`}>
+                    <p className="font-semibold text-stone-100 text-sm sm:text-base text-red-400/90">
                       {chip.title}
                     </p>
                     <p className="text-stone-400 text-xs sm:text-sm mt-0.5 truncate max-w-[220px]">

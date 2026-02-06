@@ -23,7 +23,7 @@ const facilities = [
 
 export function LandingFacilities() {
   return (
-    <section id="facilities" className="py-16 sm:py-24 px-4 sm:px-6 scroll-mt-20">
+    <section id="facilities" className="py-16 sm:py-24 px-4 sm:px-6 scroll-mt-[var(--header-height)]">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-10 sm:mb-16">
           <h2 className="text-3xl md:text-4xl font-extrabold text-stone-50 mb-4">

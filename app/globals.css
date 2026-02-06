@@ -3,15 +3,26 @@
 @tailwind utilities;
 
 :root {
-  /* Palette: charcoal base + neon lime + electric cyan + warm punch */
+  /* Palette: black + red + white (logo) */
   --bg: 10 10 10; /* near-black */
   --panel: 20 20 20;
-  --text: 245 245 244; /* stone-100-ish */
+  --text: 245 245 244; /* stone-100 / white-ish */
   --muted: 168 162 158; /* stone-400-ish */
 
-  --neon: 163 230 53; /* lime-400 */
-  --neon-2: 34 211 238; /* cyan-400 */
-  --punch: 251 146 60; /* orange-400 */
+  --accent: 239 68 68; /* red-500 – logo red */
+  --accent-2: 220 38 38; /* red-600 – darker red */
+  --accent-light: 248 113 113; /* red-400 */
+
+  /* Header: compact on mobile, taller on desktop */
+  --header-height: 3.5rem; /* 56px mobile */
+  --header-content-gap: 1rem; /* 16px */
+}
+
+@media (min-width: 768px) {
+  :root {
+    --header-height: 5.5rem; /* 88px desktop */
+    --header-content-gap: 1.25rem;
+  }
 }
 
 body {

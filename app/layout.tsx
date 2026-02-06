@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "HIIT Gym – Train Hard. Live Strong.",
   description:
     "High-intensity training, premium equipment, and a community that pushes you. Join HIIT Gym.",
+  icons: {
+    icon: "/images/icon.png",
+    apple: "/images/icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -31,7 +35,7 @@ export default function RootLayout({
       >
         <InteractiveGridPattern
           cellSize={50}
-          glowColor="rgba(163, 230, 53, 0.35)"
+          glowColor="rgba(239, 68, 68, 0.35)"
           borderColor="rgba(63, 63, 70, 0.35)"
           proximity={120}
           className="bg-stone-950"

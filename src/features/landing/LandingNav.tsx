@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 export function LandingNav() {
@@ -52,15 +53,16 @@ export function LandingNav() {
 
   const linkClass = (id: string) =>
     [
-      "text-sm font-semibold transition relative",
+      "text-sm md:text-base font-semibold transition relative",
       active === id ? "text-stone-100" : "text-stone-400 hover:text-stone-100",
     ].join(" ");
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-stone-800/80 bg-stone-950/90 backdrop-blur-md">
-      <nav className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        <Link href="/" className="text-xl font-bold text-stone-100 tracking-tight">
-          HIIT <span className="text-lime-300">GYM</span>
+      <nav className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[var(--header-height)]">
+        <Link href="/" className="flex items-center gap-2 md:gap-3 text-lg md:text-2xl font-bold text-stone-100 tracking-tight">
+          <Image src="/images/icon.png" alt="HIIT Gym" width={48} height={48} className="h-9 w-9 md:h-12 md:w-12 shrink-0" />
+          <span>HIIT <span className="text-red-400">GYM</span></span>
         </Link>
         {/* Desktop */}
         <div className="hidden md:flex items-center gap-8">
@@ -68,13 +70,13 @@ export function LandingNav() {
             <a key={s.id} href={`#${s.id}`} className={linkClass(s.id)}>
               {s.label}
               {active === s.id && (
-                <span className="absolute -bottom-2 left-0 right-0 h-[2px] rounded-full bg-lime-300 shadow-[0_0_18px_rgba(163,230,53,0.35)]" />
+                <span className="absolute -bottom-2 left-0 right-0 h-[2px] rounded-full bg-red-500 shadow-[0_0_18px_rgba(239,68,68,0.4)]" />
               )}
             </a>
           ))}
           <Link
             href="/admin/login"
-            className="text-stone-500 hover:text-stone-300 text-sm"
+            className="text-stone-500 hover:text-stone-300 text-base"
           >
             Staff
           </Link>
@@ -82,7 +84,7 @@ export function LandingNav() {
 
         {/* Mobile */}
         <div className="md:hidden flex items-center gap-3">
-          <Link href="/admin/login" className="text-stone-500 hover:text-stone-300 text-sm">
+          <Link href="/admin/login" className="text-stone-500 hover:text-stone-300 text-base">
             Staff
           </Link>
           <button
@@ -110,7 +112,7 @@ export function LandingNav() {
                 key={s.id}
                 href={`#${s.id}`}
                 className={[
-                  "flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition",
+                  "flex items-center justify-between rounded-xl px-3 py-2 text-base font-semibold transition",
                   active === s.id
                     ? "bg-stone-900/50 text-stone-100 border border-stone-800"
                     : "text-stone-300 hover:bg-stone-900/30",
@@ -118,7 +120,7 @@ export function LandingNav() {
               >
                 {s.label}
                 {active === s.id && (
-                  <span className="h-2 w-2 rounded-full bg-lime-300 shadow-[0_0_18px_rgba(163,230,53,0.35)]" />
+                  <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_18px_rgba(239,68,68,0.4)]" />
                 )}
               </a>
             ))}

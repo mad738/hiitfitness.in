@@ -31,7 +31,7 @@ export function LandingContact() {
     `&layer=mapnik&marker=${encodeURIComponent(`${gym.lat},${gym.lng}`)}`;
 
   return (
-    <section id="contact" className="py-16 sm:py-24 px-4 sm:px-6 scroll-mt-20">
+    <section id="contact" className="py-16 sm:py-24 px-4 sm:px-6 scroll-mt-[var(--header-height)]">
       <div className="max-w-6xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-10 items-start">
           <div>
@@ -45,21 +45,21 @@ export function LandingContact() {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="liquid-glass p-5">
-                <p className="text-lime-300 font-bold mb-1">Phone</p>
+                <p className="text-red-400 font-bold mb-1">Phone</p>
                 <p className="text-stone-200 font-semibold">{gym.phone}</p>
                 <p className="text-stone-500 text-sm mt-1">
                   Call for class times & tours
                 </p>
               </div>
               <div className="liquid-glass p-5">
-                <p className="text-cyan-300 font-bold mb-1">Email</p>
+                <p className="text-red-400 font-bold mb-1">Email</p>
                 <p className="text-stone-200 font-semibold">hello@hiitgym.com</p>
                 <p className="text-stone-500 text-sm mt-1">
                   We reply within 24 hours
                 </p>
               </div>
               <div className="liquid-glass p-5 sm:col-span-2">
-                <p className="text-orange-300 font-bold mb-2">Hours</p>
+                <p className="text-red-400 font-bold mb-2">Hours</p>
                 <div className="grid sm:grid-cols-2 gap-2 text-sm">
                   <p className="text-stone-300">
                     Mon–Fri: <span className="text-stone-100 font-semibold">5am–10pm</span>
@@ -80,7 +80,7 @@ export function LandingContact() {
             <div className="mt-8 flex flex-wrap gap-4 justify-center items-center">
               <a
                 href="#plans"
-                className="inline-flex items-center justify-center px-7 py-3 rounded-xl bg-lime-400 hover:bg-lime-300 text-stone-950 font-extrabold transition"
+                className="inline-flex items-center justify-center px-7 py-3 rounded-xl bg-red-500 hover:bg-red-400 text-white font-extrabold transition"
               >
                 Pick a plan
               </a>
@@ -108,7 +108,7 @@ export function LandingContact() {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_20%,rgba(34,211,238,0.08),transparent)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_20%,rgba(239,68,68,0.08),transparent)]" />
               <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-stone-800" />
             </div>
             <div className="p-6 space-y-4">
@@ -116,7 +116,7 @@ export function LandingContact() {
                 Parking available. First visit? Come 10 minutes early and we’ll
                 get you set up.
               </p>
-              <Button asChild size="lg" className="w-full sm:w-auto bg-lime-400 text-stone-950 hover:bg-lime-300 font-semibold shadow-[0_0_20px_rgba(163,230,53,0.25)]">
+              <Button asChild size="lg" className="w-full sm:w-auto bg-red-500 text-white hover:bg-red-400 font-semibold shadow-[0_0_20px_rgba(239,68,68,0.35)]">
                 <a
                   href={gym.googleMapsDirectionsUrl}
                   target="_blank"

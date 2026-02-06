@@ -20,7 +20,7 @@ export function InteractiveGridPattern({
   className,
   children,
   cellSize = 50,
-  glowColor = "rgba(34, 211, 238, 0.4)",
+  glowColor = "rgba(239, 68, 68, 0.4)",
   borderColor = "rgba(63, 63, 70, 0.4)",
   proximity = 100,
 }: InteractiveGridPatternProps) {
@@ -29,6 +29,44 @@ export function InteractiveGridPattern({
   const [grid, setGrid] = useState({ rows: 0, cols: 0, scale: 1 })
   const [hoveredCell, setHoveredCell] = useState<number | null>(null)
   const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 })
+  const [patternPos, setPatternPos] = useState({ x: -1000, y: -1000 })
+  const [enableGlow, setEnableGlow] = useState(false)
+
+  // Enable cursor-following glow only on devices with a fine pointer (mouse); mobile/tablet use pattern animation
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: fine)")
+    const update = () => setEnableGlow(mq.matches)
+    update()
+    mq.addEventListener("change", update)
+    return () => mq.removeEventListener("change", update)
+  }, [])
+
+  // On mobile/tablet: animate a glow position along a smooth pattern (Lissajous-style) so the grid feels alive
+  useEffect(() => {
+    if (enableGlow) return
+    const container = containerRef.current
+    if (!container) return
+
+    let rafId: number
+    const start = performance.now()
+
+    const tick = () => {
+      const rect = container.getBoundingClientRect()
+      const { width, height } = rect
+      const centerX = width / 2
+      const centerY = height / 2
+      const radiusX = width * 0.32
+      const radiusY = height * 0.22
+      const t = (performance.now() - start) / 1000
+      const x = centerX + radiusX * Math.sin(t * 0.45)
+      const y = centerY + radiusY * Math.sin(t * 0.65 + 0.5)
+      setPatternPos({ x, y })
+      rafId = requestAnimationFrame(tick)
+    }
+
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [enableGlow])
 
   // Keep ref in sync so global listener always has latest dimensions
   gridRef.current = grid
@@ -57,13 +95,13 @@ export function InteractiveGridPattern({
     return () => ro.disconnect()
   }, [updateGrid])
 
-  // Global pointer listeners so the grid reacts to cursor anywhere on the page
-  // (content layer sits on top and would otherwise block grid mouse events)
+  // Global pointer listeners so the grid reacts to cursor anywhere (desktop only; disabled on mobile)
   useEffect(() => {
+    if (!enableGlow) return
     const container = containerRef.current
     if (!container) return
 
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       const rect = container.getBoundingClientRect()
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
@@ -87,17 +125,25 @@ export function InteractiveGridPattern({
       setHoveredCell(null)
     }
 
-    window.addEventListener("mousemove", onMove, { passive: true })
+    // pointerdown: show effect immediately on touch/mouse down (no need to drag first)
+    window.addEventListener("pointerdown", onMove, { passive: true })
+    window.addEventListener("pointermove", onMove, { passive: true })
     document.documentElement.addEventListener("pointerleave", onLeave)
+    document.documentElement.addEventListener("pointercancel", onLeave)
+    document.documentElement.addEventListener("pointerup", onLeave)
 
     return () => {
-      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("pointerdown", onMove)
+      window.removeEventListener("pointermove", onMove)
       document.documentElement.removeEventListener("pointerleave", onLeave)
+      document.documentElement.removeEventListener("pointercancel", onLeave)
+      document.documentElement.removeEventListener("pointerup", onLeave)
     }
-  }, [cellSize])
+  }, [cellSize, enableGlow])
 
   const scaledCellSize = cellSize * grid.scale
   const scaledProximity = proximity * grid.scale
+  const glowPos = enableGlow ? mousePos : patternPos
 
   return (
     <div
@@ -113,11 +159,11 @@ export function InteractiveGridPattern({
               const index = rowIndex * grid.cols + colIndex
               const cellX = colIndex * scaledCellSize + scaledCellSize / 2
               const cellY = rowIndex * scaledCellSize + scaledCellSize / 2
-              const dx = mousePos.x - cellX
-              const dy = mousePos.y - cellY
+              const dx = glowPos.x - cellX
+              const dy = glowPos.y - cellY
               const distance = Math.sqrt(dx * dx + dy * dy)
               const proximityFactor = Math.max(0, 1 - distance / scaledProximity)
-              const isHovered = hoveredCell === index
+              const isHovered = enableGlow && hoveredCell === index
 
               return (
                 <div
@@ -137,8 +183,8 @@ export function InteractiveGridPattern({
                       : "none",
                     transitionDuration: isHovered ? "0ms" : "1000ms",
                   }}
-                  onMouseEnter={() => setHoveredCell(index)}
-                  onMouseLeave={() => setHoveredCell(null)}
+                  onPointerEnter={enableGlow ? () => setHoveredCell(index) : undefined}
+                  onPointerLeave={enableGlow ? () => setHoveredCell(null) : undefined}
                 />
               )
             })}
