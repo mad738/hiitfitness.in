@@ -7,7 +7,7 @@ const HERO_IMAGE_SRC =
 
 export function LandingHero() {
   return (
-    <section className="relative min-h-[92vh] flex items-center justify-center px-4 sm:px-6 pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden">
+    <section className="relative min-h-[92vh] flex items-center justify-center px-4 sm:px-6 pt-[calc(var(--header-height)+var(--header-content-gap)+3.25rem)] md:pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden">
       {/* No top/side gradients – global interactive grid shows through as hero background */}
 
       <div className="relative z-10 w-full max-w-6xl mx-auto">

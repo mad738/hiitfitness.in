@@ -7,7 +7,7 @@ const seededPlans: MembershipPlan[] = [
     name: "Starter – Sweat & Go",
     description:
       "Perfect if you’re just getting back into training. Full gym access + a simple weekly HIIT program to build momentum.",
-    price_monthly: 39,
+    price_monthly: 2999,
     duration_days: 30,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -18,7 +18,7 @@ const seededPlans: MembershipPlan[] = [
     name: "Core – Strength & Conditioning",
     description:
       "Most popular. Unlimited HIIT classes, strength zone access, and monthly progress check-ins to keep you honest.",
-    price_monthly: 69,
+    price_monthly: 6999,
     duration_days: 30,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -29,7 +29,7 @@ const seededPlans: MembershipPlan[] = [
     name: "Elite – Athlete Mode",
     description:
       "For gym rats chasing performance. Priority class slots, recovery zone access, and personalized programming support.",
-    price_monthly: 99,
+    price_monthly: 9999,
     duration_days: 30,
     is_active: true,
     created_at: new Date().toISOString(),
