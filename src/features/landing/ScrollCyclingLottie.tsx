@@ -7,6 +7,11 @@ import { Play, Flag } from "lucide-react";
 const SCROLL_IDLE_MS = 280;
 const LOTTIE_SIZE = 44;
 const BOOM_DURATION_MS = 500;
+const ICON_SIZE = 24; /* w-6 */
+const TRACK_PAD = 12; /* px-3 */
+const ICON_GAP = -6; /* gap so cycle doesn't touch icons */
+const CYCLIST_START_LEFT = TRACK_PAD + ICON_SIZE + ICON_GAP; /* after Start icon */
+const CYCLIST_END_LEFT = `calc(100% - ${TRACK_PAD + ICON_SIZE + ICON_GAP + LOTTIE_SIZE}px)`; /* before Finish icon */
 
 type LottieAnimationData = object;
 
@@ -106,14 +111,22 @@ export function ScrollCyclingLottie() {
         style={{ top: "var(--header-height)" }}
         aria-hidden
       >
-      {/* Horizontal track: full line (stone) + filled portion (red) */}
-      <div className="absolute inset-0 flex items-center px-3">
+      {/* Layer 1: Lap line only – positioned under the wheels, not centre of cycle */}
+      <div
+        className="absolute inset-x-0 flex px-3 z-0"
+        style={{ top: "calc(50% + 14px)", height: 0 }}
+        aria-hidden
+      >
         <div className="flex-1 relative h-[2px] rounded-full bg-stone-700/80 overflow-visible">
-          {/* Filled (covered) track in red */}
           <div
             className="absolute left-0 top-0 h-full rounded-full bg-red-500 transition-[width] duration-75 ease-out"
             style={{ width: `${scrollProgress * 100}%` }}
           />
+        </div>
+      </div>
+      {/* Layer 2: All cycle UI above the lap line – cyclist + Start/Finish */}
+      <div className="absolute inset-0 flex items-center px-3 z-10 pointer-events-none">
+        <div className="flex-1 relative h-[2px]">
           {/* Start lap icon */}
           <span
             className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 flex items-center justify-center w-6 h-6 rounded-full bg-stone-800 border border-stone-600/80 text-red-400/90 shadow-inner"
@@ -125,7 +138,7 @@ export function ScrollCyclingLottie() {
           <span className="absolute left-0 top-1/2 -translate-y-1/2 translate-y-4 text-[9px] font-mono font-bold text-stone-500 uppercase">
             Start
           </span>
-          {/* Finish lap icon with small boom on lap complete */}
+          {/* Finish lap icon */}
           <span
             className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 flex items-center justify-center w-6 h-6 rounded-full bg-stone-800 border border-stone-600/80 text-red-400/90 shadow-inner overflow-visible"
             title="Finish lap"
@@ -141,11 +154,12 @@ export function ScrollCyclingLottie() {
           </span>
         </div>
       </div>
-      {/* Cyclist moves along track by scroll % */}
+      {/* Cyclist Lottie – above lap line, between Start and Finish (no overlap with icons) */}
       <div
-        className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center transition-[left] duration-75 ease-out"
+        className="absolute -translate-y-1/2 z-20 flex items-center justify-center transition-[left] duration-75 ease-out"
         style={{
-          left: `calc(12px + (100% - 24px - ${LOTTIE_SIZE}px) * ${scrollProgress})`,
+          top: "calc(60% - 10px)",
+          left: `calc(${CYCLIST_START_LEFT}px + (100% - ${CYCLIST_START_LEFT + TRACK_PAD + ICON_SIZE + ICON_GAP + LOTTIE_SIZE}px) * ${scrollProgress})`,
           width: LOTTIE_SIZE,
           height: LOTTIE_SIZE,
         }}
