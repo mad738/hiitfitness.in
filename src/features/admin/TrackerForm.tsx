@@ -13,6 +13,7 @@ import {
   TRACKER_STATUS_OPTIONS,
 } from "@/config/tracker-options";
 import { PLAN_OPTIONS } from "@/data/plans";
+import { AdminDatePicker } from "@/components/ui/admin-date-picker";
 
 function toForm(row: Tracker): TrackerInsert {
   return {
@@ -218,24 +219,20 @@ export function TrackerForm({
         </div>
         <div>
           <label className={labelClass}>Start Date</label>
-          <input
-            type="date"
+          <AdminDatePicker
             value={form.start_date ?? ""}
-            onChange={(e) =>
-              update("start_date", e.target.value ? e.target.value : null)
-            }
+            onChange={(v) => update("start_date", v || null)}
             className={inputClass}
+            aria-label="Start date"
           />
         </div>
         <div>
           <label className={labelClass}>End Date</label>
-          <input
-            type="date"
+          <AdminDatePicker
             value={form.end_date ?? ""}
-            onChange={(e) =>
-              update("end_date", e.target.value ? e.target.value : null)
-            }
+            onChange={(v) => update("end_date", v || null)}
             className={inputClass}
+            aria-label="End date"
           />
         </div>
         <div>
@@ -285,13 +282,11 @@ export function TrackerForm({
         </div>
         <div>
           <label className={labelClass}>Pay Date</label>
-          <input
-            type="date"
+          <AdminDatePicker
             value={form.pay_date ?? ""}
-            onChange={(e) =>
-              update("pay_date", e.target.value ? e.target.value : null)
-            }
+            onChange={(v) => update("pay_date", v || null)}
             className={inputClass}
+            aria-label="Pay date"
           />
         </div>
         <div>

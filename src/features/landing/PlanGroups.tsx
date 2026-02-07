@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import type { MembershipPlan } from "@/models/membership_plan";
 import {
   PLAN_CATEGORIES,
@@ -8,6 +9,8 @@ import {
   getPlanGroup,
   type PlanCategory,
 } from "@/data/plans";
+
+const CONTACT_PHONE = { display: "999 666 7714", tel: "tel:+919996667714" };
 
 type GroupedPlans = Record<PlanCategory, MembershipPlan[]>;
 
@@ -52,8 +55,24 @@ const CheckIcon = () => (
 type Props = { plans: MembershipPlan[] };
 
 export function PlanGroups({ plans }: Props) {
+  const [showCallPrompt, setShowCallPrompt] = useState(false);
   const grouped = groupPlans(plans);
   const categoriesToShow = PLAN_CATEGORIES.filter((c) => grouped[c].length > 0);
+
+  const handleGetStarted = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
+    setShowCallPrompt(true);
+  }, []);
+
+  const handleCallNow = useCallback(() => {
+    setShowCallPrompt(false);
+    window.location.href = CONTACT_PHONE.tel;
+  }, []);
+
+  const handleViewContact = useCallback(() => {
+    setShowCallPrompt(false);
+  }, []);
 
   return (
     <div
@@ -119,8 +138,9 @@ export function PlanGroups({ plans }: Props) {
                 ))}
               </ul>
 
-              <a
-                href="#contact"
+              <button
+                type="button"
+                onClick={handleGetStarted}
                 className={`block w-full text-center py-3 rounded-xl font-semibold text-sm transition ${
                   isPopular
                     ? "bg-brand-red text-white hover:opacity-90"
@@ -128,11 +148,50 @@ export function PlanGroups({ plans }: Props) {
                 }`}
               >
                 Get started
-              </a>
+              </button>
             </div>
           </article>
         );
       })}
+
+      {/* Call / contact prompt when coming from Get started */}
+      {showCallPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="get-started-prompt-title"
+          onClick={() => setShowCallPrompt(false)}
+        >
+          <div
+            className="liquid-glass rounded-2xl border border-white/10 p-6 max-w-sm w-full shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="get-started-prompt-title" className="text-lg font-bold text-stone-100 mb-2">
+              Get started
+            </h3>
+            <p className="text-stone-300 text-sm mb-4">
+              Call us now to join or ask about plans. You can also use the contact section below.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <a
+                href={CONTACT_PHONE.tel}
+                onClick={handleCallNow}
+                className="flex-1 text-center py-3 rounded-xl font-semibold text-sm bg-brand-red text-white hover:opacity-90 transition"
+              >
+                Call {CONTACT_PHONE.display}
+              </a>
+              <button
+                type="button"
+                onClick={handleViewContact}
+                className="flex-1 py-3 rounded-xl font-semibold text-sm border border-stone-600 text-stone-100 hover:border-brand-red/50 hover:text-brand-red transition"
+              >
+                View contact
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

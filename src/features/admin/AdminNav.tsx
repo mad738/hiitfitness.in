@@ -9,11 +9,11 @@ import { useAdminDemo } from "./AdminDemoContext";
 
 const navLinks = [
   { href: "/admin", label: "Dashboard" },
-  { href: "/admin/tracker", label: "Tracker" },
-  { href: "/admin/credentials", label: "Admin users" },
   { href: "/admin/customers", label: "Customers" },
+  { href: "/admin/trainers", label: "Trainers" },
   { href: "/admin/plans", label: "Plans" },
   { href: "/admin/subscriptions", label: "Subscriptions" },
+  { href: "/admin/credentials", label: "Admin users" },
 ] as const;
 
 export function AdminNav() {

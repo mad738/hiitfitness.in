@@ -138,6 +138,27 @@ body {
     animation: lap-boom-fullscreen 1s ease-out forwards;
   }
 
+  /* Themed scrollbar – dark track, subtle thumb (admin trainer cards, modals) */
+  .scrollbar-theme {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(120 113 108) rgb(41 37 36);
+  }
+  .scrollbar-theme::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-theme::-webkit-scrollbar-track {
+    background: rgb(41 37 36);
+    border-radius: 3px;
+  }
+  .scrollbar-theme::-webkit-scrollbar-thumb {
+    background: rgb(120 113 108);
+    border-radius: 3px;
+  }
+  .scrollbar-theme::-webkit-scrollbar-thumb:hover {
+    background: rgb(168 162 158);
+  }
+
   /* Admin filter dropdowns – dark options list */
   .admin-select {
     @apply rounded-xl border border-white/10 bg-stone-900/90 text-stone-100;
@@ -148,6 +169,96 @@ body {
   }
   .admin-select:focus {
     @apply border-brand-red ring-1 ring-brand-red outline-none;
+  }
+
+  /* Admin date / calendar inputs – dark theme, brand-red focus, visible picker icon */
+  .admin-date {
+    @apply w-full px-3 py-2.5 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100 text-sm transition;
+    min-height: 2.75rem;
+  }
+  .admin-date::placeholder {
+    @apply text-stone-500;
+  }
+  .admin-date:hover {
+    @apply border-white/20;
+  }
+  .admin-date:focus {
+    @apply border-brand-red ring-1 ring-brand-red outline-none;
+    box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.15);
+  }
+  /* Calendar picker icon – white on dark background */
+  .admin-date::-webkit-calendar-picker-indicator {
+    filter: brightness(0) invert(1);
+    opacity: 0.9;
+    cursor: pointer;
+    margin-left: 4px;
+    padding: 2px;
+  }
+  .admin-date::-webkit-date-and-time-value {
+    @apply text-stone-100;
+  }
+  /* Firefox – calendar icon */
+  .admin-date::-moz-calendar-picker-indicator {
+    filter: brightness(0) invert(1);
+    opacity: 0.9;
+    cursor: pointer;
+  }
+  .admin-date::-moz-focus-inner {
+    border: 0;
+  }
+
+  /* Themed calendar popover (red & black) – used by .admin-date-popover */
+  .admin-calendar-popover {
+    @apply rounded-xl border border-white/10 shadow-xl overflow-hidden;
+    background: linear-gradient(145deg, rgb(28 25 23) 0%, rgb(12 10 9) 100%);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+  .admin-calendar-popover .calendar-header {
+    @apply flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/30;
+  }
+  .admin-calendar-popover .calendar-month-nav {
+    @apply p-1.5 rounded-lg text-stone-300 hover:text-stone-100 hover:bg-white/10 transition;
+  }
+  .admin-calendar-popover .calendar-month-nav:hover {
+    @apply text-brand-red;
+  }
+  .admin-calendar-popover .calendar-month-select,
+  .admin-calendar-popover .calendar-year-select {
+    @apply rounded-lg border border-white/20 bg-stone-900 text-stone-100 text-sm font-medium py-1.5 px-2 cursor-pointer;
+    @apply focus:outline-none focus:ring-2 focus:ring-brand-red/60 focus:border-brand-red/50;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a8a29e'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1rem;
+    padding-right: 1.75rem;
+  }
+  .admin-calendar-popover .calendar-month-select:hover,
+  .admin-calendar-popover .calendar-year-select:hover {
+    @apply border-white/30 bg-stone-800;
+  }
+  .admin-calendar-popover .calendar-month-select option,
+  .admin-calendar-popover .calendar-year-select option {
+    background: rgb(28 25 23);
+    color: rgb(250 250 249);
+  }
+  .admin-calendar-popover .calendar-weekday {
+    @apply text-stone-500 text-xs font-medium py-1;
+  }
+  .admin-calendar-popover .calendar-day {
+    @apply w-9 h-9 flex items-center justify-center rounded-lg text-sm text-stone-300 hover:bg-white/10 hover:text-stone-100 transition;
+  }
+  .admin-calendar-popover .calendar-day.today {
+    @apply border border-brand-red/50 text-brand-red;
+  }
+  .admin-calendar-popover .calendar-day.selected {
+    @apply bg-brand-red text-white hover:bg-red-600 hover:text-white;
+  }
+  .admin-calendar-popover .calendar-day.other-month {
+    @apply text-stone-600;
+  }
+  .admin-calendar-popover .calendar-day:disabled {
+    @apply opacity-50 cursor-not-allowed hover:bg-transparent;
   }
 }
 

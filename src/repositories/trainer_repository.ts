@@ -1,21 +1,20 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import type { Customer, CustomerInsert, CustomerUpdate } from "@/models/customer";
+import type { Trainer, TrainerInsert, TrainerUpdate } from "@/models/trainer";
 
-const TABLE = "customers";
-const COLS =
-  "id, name, image, plan, total_fee, paid_fee, balance, trainer_id, start_date, end_date, pay_date, payment_mode, remarks, duration, created_at, updated_at";
+const TABLE = "trainers";
+const COLS = "id, name, image, phone_number, address, created_at, updated_at";
 
-export async function listCustomers(): Promise<Customer[]> {
+export async function listTrainers(): Promise<Trainer[]> {
   const supabase = await createServiceRoleClient();
   const { data, error } = await supabase
     .from(TABLE)
     .select(COLS)
-    .order("created_at", { ascending: false });
+    .order("name", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as Customer[];
+  return (data ?? []) as Trainer[];
 }
 
-export async function findCustomerById(id: string): Promise<Customer | null> {
+export async function findTrainerById(id: string): Promise<Trainer | null> {
   const supabase = await createServiceRoleClient();
   const { data, error } = await supabase
     .from(TABLE)
@@ -23,10 +22,10 @@ export async function findCustomerById(id: string): Promise<Customer | null> {
     .eq("id", id)
     .single();
   if (error && error.code !== "PGRST116") throw error;
-  return data as Customer | null;
+  return data as Trainer | null;
 }
 
-export async function insertCustomer(row: CustomerInsert): Promise<Customer> {
+export async function insertTrainer(row: TrainerInsert): Promise<Trainer> {
   const supabase = await createServiceRoleClient();
   const { data, error } = await supabase
     .from(TABLE)
@@ -34,13 +33,13 @@ export async function insertCustomer(row: CustomerInsert): Promise<Customer> {
     .select(COLS)
     .single();
   if (error) throw error;
-  return data as Customer;
+  return data as Trainer;
 }
 
-export async function updateCustomer(
+export async function updateTrainer(
   id: string,
-  updates: CustomerUpdate
-): Promise<Customer> {
+  updates: TrainerUpdate
+): Promise<Trainer> {
   const supabase = await createServiceRoleClient();
   const { data, error } = await supabase
     .from(TABLE)
@@ -49,10 +48,10 @@ export async function updateCustomer(
     .select(COLS)
     .single();
   if (error) throw error;
-  return data as Customer;
+  return data as Trainer;
 }
 
-export async function deleteCustomer(id: string): Promise<void> {
+export async function deleteTrainer(id: string): Promise<void> {
   const supabase = await createServiceRoleClient();
   const { error } = await supabase.from(TABLE).delete().eq("id", id);
   if (error) throw error;

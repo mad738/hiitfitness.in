@@ -80,12 +80,31 @@ const DATE_COLS = ["start_date", "end_date", "pay_date"];
 const NUM_COLS = ["total_fee", "paid_fee", "due_fee"];
 const BOOL_COLS = ["paid_flag"];
 
-function rowToTracker(row, headers) {
+/** Get cell value; if cell is in a merge range, return the top-left cell's value (handles merged Client Name). */
+function getMergedCellValue(ws, sheetRow, colIndex) {
+  const merges = ws["!merges"] || [];
+  for (const m of merges) {
+    if (sheetRow >= m.s.r && sheetRow <= m.e.r && colIndex >= m.s.c && colIndex <= m.e.c) {
+      const topLeft = ws[XLSX.utils.encode_cell(m.s)];
+      if (topLeft && topLeft.v != null && String(topLeft.v).trim() !== "") return topLeft.v;
+      return undefined;
+    }
+  }
+  const cell = ws[XLSX.utils.encode_cell({ r: sheetRow, c: colIndex })];
+  return cell && cell.v != null ? cell.v : undefined;
+}
+
+function rowToTracker(row, headers, ws, sheetRowIndex) {
   const out = {};
+  const clientNameColIndex = headers.findIndex((h) => h === "Client Name" || h === "Client name");
   headers.forEach((h, i) => {
     const col = COL_MAP[h];
     if (!col) return;
-    const raw = row[i];
+    let raw = row[i];
+    if (col === "client_name" && (raw == null || String(raw).trim() === "") && clientNameColIndex >= 0 && ws) {
+      const mergedVal = getMergedCellValue(ws, sheetRowIndex, clientNameColIndex);
+      if (mergedVal != null) raw = mergedVal;
+    }
     if (DATE_COLS.includes(col)) {
       out[col] = excelDateToISO(raw);
     } else if (NUM_COLS.includes(col)) {
@@ -106,7 +125,7 @@ async function main() {
   const headers = (rows[0] || []).map((h) => (h != null ? String(h).trim() : ""));
   const dataRows = rows.slice(1).filter((row) => row.some((c) => c != null && String(c).trim() !== ""));
 
-  const records = dataRows.map((row) => rowToTracker(row, headers)).filter((r) => Object.keys(r).length > 0);
+  const records = dataRows.map((row, i) => rowToTracker(row, headers, ws, i + 1)).filter((r) => Object.keys(r).length > 0);
 
   if (records.length === 0) {
     console.log("No data rows to import.");

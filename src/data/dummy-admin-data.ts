@@ -348,13 +348,13 @@ export const DUMMY_SUBSCRIPTIONS: DummySubscription[] = [
   },
 ];
 
-/** Dashboard aggregate dummy stats (derived from DUMMY_TRACKER_LIST) */
+/** Dashboard aggregate dummy stats (customers-based) */
 export const DUMMY_DASHBOARD = {
-  trackerCount: 48,
+  customerCount: 48,
   gtCount: 32,
   ptCount: 16,
   adminCount: 3,
-  newEntriesThisMonth: 24,
+  newCustomersThisMonth: 24,
   revenueThisMonth: 147800,
 };
 

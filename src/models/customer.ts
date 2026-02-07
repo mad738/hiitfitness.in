@@ -1,8 +1,18 @@
 export type Customer = {
   id: string;
-  email: string;
-  full_name: string;
-  phone: string | null;
+  name: string;
+  image: string | null;
+  plan: string;
+  total_fee: number;
+  paid_fee: number;
+  balance: number;
+  trainer_id: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  pay_date: string | null;
+  payment_mode: string | null;
+  remarks: string | null;
+  duration: string | null;
   created_at: string;
   updated_at: string;
 };
