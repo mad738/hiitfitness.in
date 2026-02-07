@@ -68,7 +68,7 @@ export function LandingHero() {
               <div key={set} className="flex gap-3 shrink-0">
                 {[
                   { title: "Strength zone", desc: "Racks, platforms, cables — the real stuff.", accent: "red" },
-                  { title: "HIIT studio", desc: "Circuits that spike intensity safely.", accent: "red" },
+                  { title: "HIIT Fitness", desc: "Circuits that spike intensity safely.", accent: "red" },
                   { title: "Recovery corner", desc: "Cool down, mobility, reset.", accent: "red" },
                   { title: "Open 7 days", desc: "Train when it suits you.", accent: "red" },
                   { title: "No long-term contracts", desc: "Cancel anytime.", accent: "red" },

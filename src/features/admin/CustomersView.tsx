@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { Customer } from "@/models/customer";
@@ -98,15 +98,29 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (showFilterDropdown && filterButtonRef.current) {
+  const updateDropdownPosition = useCallback(() => {
+    if (filterButtonRef.current) {
       const rect = filterButtonRef.current.getBoundingClientRect();
       setDropdownPosition({
         top: rect.bottom + 8,
         left: Math.max(8, rect.right - 320),
       });
     }
-  }, [showFilterDropdown]);
+  }, []);
+
+  useEffect(() => {
+    if (showFilterDropdown) updateDropdownPosition();
+  }, [showFilterDropdown, updateDropdownPosition]);
+
+  useEffect(() => {
+    if (!showFilterDropdown) return;
+    window.addEventListener("scroll", updateDropdownPosition, true);
+    window.addEventListener("resize", updateDropdownPosition);
+    return () => {
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+      window.removeEventListener("resize", updateDropdownPosition);
+    };
+  }, [showFilterDropdown, updateDropdownPosition]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -309,8 +323,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Search bar + filter */}
-      <div className="rounded-2xl border border-white/10 bg-stone-900/40 shadow-inner">
+      {/* Search bar + filter - sticky so it stays visible when scrolling */}
+      <div className="sticky top-0 z-10 rounded-2xl border border-white/10 bg-stone-900/95 backdrop-blur-sm shadow-inner">
         <div className="flex items-stretch gap-0">
           <div className="flex-1 min-w-0 flex items-center pl-1 pb-1 pt-1">
             <input
