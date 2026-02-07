@@ -16,7 +16,7 @@ const ethnocentric = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "HIIT Fitness – Train Hard. Live Strong.",
+  title: "HIIT Fitness – High Intensity Interval Training.",
   description:
     "High-intensity interval training, premium equipment, and a community that pushes you. Join HIIT Fitness.",
   icons: {

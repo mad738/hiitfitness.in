@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getTrackerList } from "@app/actions/tracker";
 import { TrackerView } from "@/features/admin/TrackerView";
 import type { TrackerFilters } from "@/repositories/tracker_repository";
+import { getPublicPlans } from "@/services/membership_service";
 
 function parseFilters(
   searchParams: { [key: string]: string | string[] | undefined }
@@ -26,7 +27,10 @@ export default async function AdminTrackerPage({
 }) {
   const params = await searchParams;
   const filters = parseFilters(params);
-  const initialList = await getTrackerList(filters);
+  const [initialList, plans] = await Promise.all([
+    getTrackerList(filters),
+    getPublicPlans(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -42,6 +46,7 @@ export default async function AdminTrackerPage({
         <TrackerView
           initialList={initialList}
           initialFilters={filters}
+          initialPlans={plans}
         />
       </Suspense>
     </div>

@@ -12,7 +12,8 @@ import {
   TRACKER_PAID_FLAG_OPTIONS,
   TRACKER_STATUS_OPTIONS,
 } from "@/config/tracker-options";
-import { PLAN_OPTIONS } from "@/data/plans";
+import { planToTrackerOption } from "@/data/plans";
+import type { MembershipPlan } from "@/models/membership_plan";
 import { AdminDatePicker } from "@/components/ui/admin-date-picker";
 
 function toForm(row: Tracker): TrackerInsert {
@@ -58,6 +59,8 @@ const emptyRow: TrackerInsert = {
 };
 
 type Props = {
+  /** Plans from Supabase membership_plans (for "Plan from fee structure" dropdown) */
+  plans?: MembershipPlan[];
   onSuccess: () => void;
   editRow?: Tracker | null;
   onCancelEdit: () => void;
@@ -68,6 +71,7 @@ type Props = {
 };
 
 export function TrackerForm({
+  plans = [],
   onSuccess,
   editRow,
   onCancelEdit,
@@ -133,28 +137,30 @@ export function TrackerForm({
           <select
             value=""
             onChange={(e) => {
-              const key = e.target.value;
-              if (!key) return;
-              const opt = PLAN_OPTIONS.find(
-                (o) => `${o.plan}-${o.frequency}` === key
-              );
-              if (opt) {
+              const planId = e.target.value;
+              if (!planId) return;
+              const plan = plans.find((p) => p.id === planId);
+              if (plan) {
+                const { plan: cat, frequency, totalFee } = planToTrackerOption(plan);
                 setForm((prev) => ({
                   ...prev,
-                  plan: opt.plan,
-                  frequency: opt.frequency,
-                  total_fee: opt.totalFee,
+                  plan: cat,
+                  frequency,
+                  total_fee: totalFee,
                 }));
               }
             }}
             className={inputClass}
           >
             <option value="">— Select plan to auto-fill fee —</option>
-            {PLAN_OPTIONS.map((o) => (
-              <option key={`${o.plan}-${o.frequency}`} value={`${o.plan}-${o.frequency}`}>
-                {o.label} — ₹{o.totalFee.toLocaleString("en-IN")}
-              </option>
-            ))}
+            {plans.map((p) => {
+              const { totalFee } = planToTrackerOption(p);
+              return (
+                <option key={p.id} value={p.id}>
+                  {p.name} — ₹{totalFee.toLocaleString("en-IN")}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div>

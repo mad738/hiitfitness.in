@@ -6,6 +6,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { getTrackerList, deleteTrackerEntry } from "@app/actions/tracker";
 import type { Tracker } from "@/models/tracker";
 import type { TrackerFilters } from "@/repositories/tracker_repository";
+import type { MembershipPlan } from "@/models/membership_plan";
 import { TrackerForm } from "./TrackerForm";
 import {
   TRACKER_PLAN_OPTIONS,
@@ -17,9 +18,10 @@ import { DUMMY_TRACKER_LIST } from "@/data/dummy-admin-data";
 type Props = {
   initialList: Tracker[];
   initialFilters?: TrackerFilters;
+  initialPlans?: MembershipPlan[];
 };
 
-export function TrackerView({ initialList, initialFilters = {} }: Props) {
+export function TrackerView({ initialList, initialFilters = {}, initialPlans = [] }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -345,6 +347,7 @@ export function TrackerView({ initialList, initialFilters = {} }: Props) {
             {editing ? "Edit client" : "New client"}
           </h2>
           <TrackerForm
+            plans={initialPlans}
             editRow={editing}
             onCancelEdit={() => {
               setEditing(null);

@@ -1,6 +1,9 @@
 import { PlansView } from "@/features/admin/PlansView";
+import { listAllPlans } from "@/repositories/membership_plan_repository";
 
-export default function AdminPlansPage() {
+export default async function AdminPlansPage() {
+  const plans = await listAllPlans();
+
   return (
     <div className="space-y-6">
       <section>
@@ -8,10 +11,10 @@ export default function AdminPlansPage() {
           Membership plans
         </h1>
         <p className="text-stone-400 text-sm">
-          Membership plans and pricing.
+          Plans from membership_plans. Used on landing and in tracker.
         </p>
       </section>
-      <PlansView />
+      <PlansView plans={plans} />
     </div>
   );
 }

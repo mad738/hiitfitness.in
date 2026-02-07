@@ -6,6 +6,9 @@ import { LandingNav } from "@/features/landing/LandingNav";
 import { LandingFooter } from "@/features/landing/LandingFooter";
 import { ScrollCyclingLottie } from "@/features/landing/ScrollCyclingLottie";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function HomePage() {
   return (
     <>

@@ -1,9 +1,12 @@
-import { fetchPublicPlans } from "@app/actions/plans";
+import { unstable_noStore as noStore } from "next/cache";
+import { getPublicPlans } from "@/services/membership_service";
 import { PlanGroups } from "@/features/landing/PlanGroups";
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
 
+/** Plans from membership_plans table; always fetched fresh (no cache). */
 export async function LandingPlans() {
-  const plans = await fetchPublicPlans();
+  noStore();
+  const plans = await getPublicPlans();
 
   return (
     <section id="plans" className="py-16 sm:py-24 px-4 sm:px-6 scroll-mt-[var(--header-height)]">

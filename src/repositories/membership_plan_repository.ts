@@ -7,7 +7,7 @@ import type {
 
 const TABLE = "membership_plans";
 const COLS =
-  "id, name, description, price_monthly, duration_days, is_active, created_at, updated_at";
+  "id, name, description, price_monthly, duration_days, total_fee, is_active, created_at, updated_at";
 
 export async function findPlanById(id: string): Promise<MembershipPlan | null> {
   const supabase = await createServiceRoleClient();

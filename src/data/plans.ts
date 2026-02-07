@@ -1,11 +1,9 @@
 /**
- * HIIT Fitness fee structure (poster). Single source for landing plan cards,
- * membership_plan seed data, and tracker dropdown options.
+ * Plan categories, frequencies, and grouping for landing/tracker.
+ * Plan rows come from Supabase membership_plans table only.
  */
 
 import type { MembershipPlan } from "@/models/membership_plan";
-
-const now = new Date().toISOString();
 
 /** Plan category for tracker: GT = General, PT = Personal, FT = Functional */
 export const PLAN_CATEGORIES = ["GT", "PT", "FT"] as const;
@@ -23,66 +21,23 @@ export const PLAN_FREQUENCIES = [
 ] as const;
 export type PlanFrequency = (typeof PLAN_FREQUENCIES)[number];
 
-export type PlanOption = {
+/** Derive tracker plan + frequency from a membership plan (from Supabase) */
+export function planToTrackerOption(plan: MembershipPlan): {
   plan: PlanCategory;
   frequency: PlanFrequency;
-  label: string;
   totalFee: number;
-  durationDays: number;
-};
-
-/** All plan options for tracker add-entry dropdown (plan + frequency + fee) */
-export const PLAN_OPTIONS: PlanOption[] = [
-  // General Membership
-  { plan: "GT", frequency: "1M", label: "General 1 Month", totalFee: 4000, durationDays: 30 },
-  { plan: "GT", frequency: "3M", label: "General 3 Months", totalFee: 8000, durationDays: 90 },
-  { plan: "GT", frequency: "6M", label: "General 6 Months", totalFee: 13000, durationDays: 180 },
-  { plan: "GT", frequency: "12M", label: "General 12 Months", totalFee: 18000, durationDays: 365 },
-  // Personal Training
-  { plan: "PT", frequency: "1M", label: "Personal 1 Month", totalFee: 6000, durationDays: 30 },
-  { plan: "PT", frequency: "3M", label: "Personal 3 Months", totalFee: 15000, durationDays: 90 },
-  { plan: "PT", frequency: "6M", label: "Personal 6 Months", totalFee: 30000, durationDays: 180 },
-  { plan: "PT", frequency: "12M", label: "Personal 12 Months", totalFee: 50000, durationDays: 365 },
-  // Functional Training
-  { plan: "FT", frequency: "FC", label: "Functional Classes", totalFee: 5000, durationDays: 30 },
-  { plan: "FT", frequency: "GC", label: "Group Classes (3 Members)", totalFee: 13000, durationDays: 30 },
-];
-
-/** Build membership_plan records for landing cards and DB seed */
-export function getMembershipPlansForDisplay(): MembershipPlan[] {
-  const plans: MembershipPlan[] = [];
-  let id = 0;
-  for (const opt of PLAN_OPTIONS) {
-    const priceMonthly = Math.round(opt.totalFee / (opt.durationDays / 30));
-    const durationLabel =
-      opt.durationDays >= 365
-        ? "12 months"
-        : opt.durationDays >= 180
-          ? "6 months"
-          : opt.durationDays >= 90
-            ? "3 months"
-            : opt.frequency === "FC"
-              ? "Functional classes"
-              : opt.frequency === "GC"
-                ? "Group (3 members)"
-                : "1 month";
-    plans.push({
-      id: `plan-${++id}`,
-      name: opt.label,
-      description: `₹${opt.totalFee.toLocaleString("en-IN")} total · ${durationLabel}`,
-      price_monthly: priceMonthly,
-      duration_days: opt.durationDays,
-      is_active: true,
-      created_at: now,
-      updated_at: now,
-    });
-  }
-  return plans;
-}
-
-/** Seeded plans used when DB has no plans (matches poster) */
-export function getSeededPlans(): MembershipPlan[] {
-  return getMembershipPlansForDisplay();
+} {
+  const category = getPlanGroup(plan.name);
+  const days = plan.duration_days;
+  const totalFee = plan.total_fee ?? Math.round(plan.price_monthly * (days / 30));
+  let frequency: PlanFrequency = "1M";
+  if (plan.name.includes("Functional") && !plan.name.includes("Group")) frequency = "FC";
+  else if (plan.name.includes("Group")) frequency = "GC";
+  else if (days >= 365) frequency = "12M";
+  else if (days >= 180) frequency = "6M";
+  else if (days >= 90) frequency = "3M";
+  else if (days >= 30) frequency = "1M";
+  return { plan: category, frequency, totalFee };
 }
 
 /** Display labels for plan groups on landing */

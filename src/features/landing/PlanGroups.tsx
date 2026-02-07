@@ -42,6 +42,7 @@ function getDurationLabel(plan: MembershipPlan): string {
 }
 
 function getTotalPrice(plan: MembershipPlan): number {
+  if (plan.total_fee != null) return plan.total_fee;
   const months = plan.duration_days / 30;
   return Math.round(plan.price_monthly * months);
 }

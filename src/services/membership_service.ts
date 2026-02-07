@@ -1,11 +1,12 @@
+import { unstable_noStore as noStore } from "next/cache";
 import * as planRepo from "@/repositories/membership_plan_repository";
-import { getSeededPlans } from "@/data/plans";
 
+/** Plans from Supabase membership_plans table only. Returns [] when empty or on error. */
 export async function getPublicPlans() {
+  noStore();
   try {
-    const plans = await planRepo.listActivePlans();
-    return plans.length > 0 ? plans : getSeededPlans();
+    return await planRepo.listActivePlans();
   } catch {
-    return getSeededPlans();
+    return [];
   }
 }

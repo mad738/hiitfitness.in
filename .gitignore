@@ -8,7 +8,7 @@ node_modules
 out
 dist
 build
-
+supabase
 # env (never commit secrets)
 .env
 .env.local
