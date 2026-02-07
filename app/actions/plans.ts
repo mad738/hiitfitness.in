@@ -56,7 +56,7 @@ export async function updatePlan(id: string, input: UpdatePlanInput): Promise<{ 
     if (input.description !== undefined) updates.description = input.description?.trim() || null;
     if (input.price_monthly !== undefined) updates.price_monthly = input.price_monthly;
     if (input.duration_days !== undefined) updates.duration_days = input.duration_days;
-    if (input.total_fee !== undefined) updates.total_fee = input.total_fee;
+    if (input.total_fee !== undefined) updates.total_fee = input.total_fee ?? undefined;
     if (input.is_active !== undefined) updates.is_active = input.is_active;
     await planRepo.updatePlan(id, updates);
     revalidatePath("/admin/plans");

@@ -16,6 +16,11 @@ function formatINR(value: number): string {
   }).format(value);
 }
 
+function formatTotalFeeCell(p: unknown): string {
+  const fee = (p as { total_fee?: number | null }).total_fee;
+  return fee != null && typeof fee === "number" ? formatINR(fee) : "—";
+}
+
 const inputClass =
   "w-full px-3 py-2.5 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100 placeholder:text-stone-500 focus:border-brand-red focus:ring-1 focus:ring-brand-red outline-none text-sm";
 const labelClass = "block text-sm text-stone-400 mb-1.5";
@@ -107,7 +112,7 @@ export function PlansView(props: PlansViewProps) {
                   <td className="py-2.5 px-4 text-stone-100 font-medium">{p.name}</td>
                   <td className="py-2.5 px-4 text-stone-300 max-w-xs truncate">{p.description ?? "—"}</td>
                   <td className="py-2.5 px-4 text-stone-300">{formatINR(p.price_monthly)}</td>
-                  <td className="py-2.5 px-4 text-stone-300">{"total_fee" in p && p.total_fee != null ? formatINR(p.total_fee) : "—"}</td>
+                  <td className="py-2.5 px-4 text-stone-300">{formatTotalFeeCell(p)}</td>
                   <td className="py-2.5 px-4 text-stone-300">{p.duration_days} days</td>
                   <td className="py-2.5 px-4 text-stone-300">{p.is_active ? "Yes" : "No"}</td>
                 </tr>
@@ -253,13 +258,13 @@ export function PlansView(props: PlansViewProps) {
                   <td className="py-2.5 px-4 text-stone-100 font-medium">{p.name}</td>
                   <td className="py-2.5 px-4 text-stone-300 max-w-xs truncate">{p.description ?? "—"}</td>
                   <td className="py-2.5 px-4 text-stone-300">{formatINR(p.price_monthly)}</td>
-                  <td className="py-2.5 px-4 text-stone-300">{p.total_fee != null ? formatINR(p.total_fee) : "—"}</td>
+                  <td className="py-2.5 px-4 text-stone-300">{formatTotalFeeCell(p)}</td>
                   <td className="py-2.5 px-4 text-stone-300">{p.duration_days} days</td>
                   <td className="py-2.5 px-4 text-stone-300">{p.is_active ? "Yes" : "No"}</td>
                   <td className="py-2.5 px-4">
                     <button
                       type="button"
-                      onClick={() => openEdit(p)}
+                      onClick={() => openEdit(p as MembershipPlan)}
                       className="text-brand-red hover:underline text-sm font-medium"
                     >
                       Edit
