@@ -64,7 +64,7 @@ export function LandingNav() {
           <Image src="/images/99558_FLAT_JP_AC_03-nobg-cropped.svg" alt="" width={80} height={80} className="h-11 w-11 min-h-11 min-w-11 sm:h-14 sm:w-14 md:h-20 md:w-20 shrink-0 object-contain" aria-hidden />
           <span className="flex flex-col justify-center leading-tight text-center min-w-0 flex-1 overflow-hidden">
             <span className="font-display text-base sm:text-lg md:text-2xl lg:text-3xl font-bold uppercase text-white tracking-tight">HIIT FITNESS</span>
-            <span className="font-display text-[9px] lg:text-xs font-bold uppercase text-brand-red tracking-tight mt-0.5 sm:mt-1 whitespace-nowrap">HIGH INTENSITY INTERVAL TRAINING</span>
+            <span className="font-sans text-[9px] lg:text-xs font-bold uppercase text-brand-red tracking-tight mt-0.5 sm:mt-1 whitespace-nowrap">HIGH INTENSITY INTERVAL TRAINING</span>
           </span>
         </Link>
         {/* Desktop */}

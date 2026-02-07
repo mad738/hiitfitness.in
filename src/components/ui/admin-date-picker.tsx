@@ -265,8 +265,9 @@ export function AdminDatePicker({
                 const isSelected = value === dateStr;
                 const isToday = dateStr === today;
                 const dateObj = new Date(year, month, d);
-                const isDisabled =
-                  (minDate && dateObj < minDate) || (maxDate && dateObj > maxDate);
+                const isDisabled = Boolean(
+                  (minDate && dateObj < minDate) || (maxDate && dateObj > maxDate)
+                );
                 const isOtherMonth = false;
                 return (
                   <button

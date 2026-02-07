@@ -53,7 +53,7 @@ export function AdminNav() {
               <span className="font-display text-lg font-bold uppercase text-white tracking-tight">
                 HIIT FITNESS
               </span>
-              <span className="font-display text-[10px] font-bold uppercase text-brand-red tracking-tight mt-0.5 leading-tight">
+              <span className="font-sans text-[10px] font-bold uppercase text-brand-red tracking-tight mt-0.5 leading-tight">
                 HIGH INTENSITY INTERVAL TRAINING
               </span>
             </span>
@@ -124,7 +124,7 @@ export function AdminNav() {
               <span className="font-display text-base sm:text-lg font-bold uppercase text-white tracking-tight">
                 HIIT FITNESS
               </span>
-              <span className="font-display text-[9px] sm:text-[10px] font-bold uppercase text-brand-red tracking-tight mt-0.5 sm:mt-1 whitespace-nowrap">
+              <span className="font-sans text-[9px] sm:text-[10px] font-bold uppercase text-brand-red tracking-tight mt-0.5 sm:mt-1 whitespace-nowrap">
                 HIGH INTENSITY INTERVAL TRAINING
               </span>
             </span>

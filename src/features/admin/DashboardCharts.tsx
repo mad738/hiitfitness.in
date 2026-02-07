@@ -61,7 +61,7 @@ export function DashboardCharts({ data, formatINR }: Props) {
                   borderRadius: "12px",
                 }}
                 labelStyle={{ color: "#d6d3d1" }}
-                formatter={(value: number) => [value, "Entries"]}
+                formatter={(value: number | undefined) => [value ?? 0, "Entries"]}
                 labelFormatter={(label) => label}
               />
               <Area
@@ -119,7 +119,7 @@ export function DashboardCharts({ data, formatINR }: Props) {
                   borderRadius: "12px",
                 }}
                 labelStyle={{ color: "#d6d3d1" }}
-                formatter={(value: number) => [formatINR(value), "Revenue"]}
+                formatter={(value: number | undefined) => [formatINR(value ?? 0), "Revenue"]}
                 labelFormatter={(label) => label}
               />
               <Area
