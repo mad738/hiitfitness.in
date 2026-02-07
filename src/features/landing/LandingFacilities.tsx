@@ -3,28 +3,25 @@ import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
 
 const facilities = [
   {
-    title: "Strength floor",
+    title: "Cardio & training floor",
     description:
-      "Platforms, racks, dumbbells, cables, and space to actually lift — no waiting, no excuses.",
-    imageSrc:
-      "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
-    alt: "Strength floor with power racks and dumbbells",
+      "Treadmills, ellipticals, and cardio machines in a spacious layout. Linear LED lighting and dedicated zones so you can focus — morning or evening slots, no crowding.",
+    imageSrc: "/images/HIIT_GYM.jpg",
+    alt: "Gym cardio section with treadmills and ellipticals, strength area in background, modern LED lighting",
   },
   {
-    title: "HIIT studio",
+    title: "Functional training station",
     description:
-      "Intervals done right: sleds, assault bikes, rowers, and circuits that turn effort into results.",
-    imageSrc:
-      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=800&q=80",
-    alt: "HIIT studio with assault bikes and rowers",
+      "Multi-station cable machine with adjustable pulleys and weight stacks. Versatile for rows, presses, and cable work — plus on-machine exercise guides so you train right.",
+    imageSrc: "/images/HIIT_GYM3.jpg",
+    alt: "Functional trainer cable machine with pulleys and weight stacks in modern gym",
   },
   {
-    title: "Recovery + mobility",
+    title: "Free weights area",
     description:
-      "Stretch, roll, and reset. Train hard today, show up stronger tomorrow.",
-    imageSrc:
-      "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80",
-    alt: "Recovery zone with stretching and foam rolling",
+      "Full range of dumbbells from light to heavy, neatly racked. Rubber flooring for grip and safety, with mirrors and focused lighting so you can train with confidence.",
+    imageSrc: "/images/HIIT_GYM4.jpg",
+    alt: "Dumbbell racks and free weights section with professional rubber flooring",
   },
 ] as const;
 
@@ -37,8 +34,8 @@ export function LandingFacilities() {
             Infrastructure that hits different
           </h2>
           <p className="text-stone-300/80 max-w-2xl mx-auto">
-            Built for lifters, sprinters, and anyone chasing the next level. Clean
-            layout, serious tools, and a vibe that keeps your foot on the gas.
+            Dark, focused layout with bright linear LED lighting. Cardio zones, cable
+            stations, and a full free-weights floor — serious kit, no excuses.
           </p>
         </div>
 
@@ -48,7 +45,7 @@ export function LandingFacilities() {
               key={f.title}
               className="liquid-glass overflow-hidden"
             >
-              <div className="relative aspect-[16/10] bg-stone-950">
+              <div className="relative aspect-[16/10] bg-black">
                 <Image
                   src={f.imageSrc}
                   alt={f.alt}

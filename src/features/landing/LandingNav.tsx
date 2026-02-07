@@ -58,19 +58,22 @@ export function LandingNav() {
     ].join(" ");
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-stone-800/80 bg-stone-950/90 backdrop-blur-md">
-      <nav className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[var(--header-height)]">
-        <Link href="/" className="flex items-center gap-2 md:gap-3 text-lg md:text-2xl font-bold text-stone-100 tracking-tight">
-          <Image src="/images/icon.png" alt="HIIT Gym" width={48} height={48} className="h-9 w-9 md:h-12 md:w-12 shrink-0" />
-          <span>HIIT <span className="text-red-400">GYM</span></span>
+    <header className="fixed top-0 left-0 right-0 z-50 border-b border-stone-800/80 bg-black/90 backdrop-blur-md">
+      <nav className="max-w-6xl mx-auto px-3 sm:px-6 flex items-center justify-between h-[var(--header-height)] gap-2 min-h-0">
+        <Link href="/" className="flex items-center gap-2 sm:gap-3 tracking-tight min-w-0 flex-1 sm:flex-initial" aria-label="HIIT Fitness – High intensity interval training">
+          <Image src="/images/99558_FLAT_JP_AC_03-nobg-cropped.svg" alt="" width={80} height={80} className="h-11 w-11 min-h-11 min-w-11 sm:h-14 sm:w-14 md:h-20 md:w-20 shrink-0 object-contain" aria-hidden />
+          <span className="flex flex-col justify-center leading-tight text-center min-w-0 flex-1 overflow-hidden">
+            <span className="font-display text-base sm:text-lg md:text-2xl lg:text-3xl font-bold uppercase text-white tracking-tight">HIIT FITNESS</span>
+            <span className="font-display text-[9px] lg:text-xs font-bold uppercase text-brand-red tracking-tight mt-0.5 sm:mt-1 whitespace-nowrap">HIGH INTENSITY INTERVAL TRAINING</span>
+          </span>
         </Link>
         {/* Desktop */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-8 shrink-0">
           {sections.map((s) => (
             <a key={s.id} href={`#${s.id}`} className={linkClass(s.id)}>
               {s.label}
               {active === s.id && (
-                <span className="absolute -bottom-2 left-0 right-0 h-[2px] rounded-full bg-red-500 shadow-[0_0_18px_rgba(239,68,68,0.4)]" />
+                <span className="absolute -bottom-2 left-0 right-0 h-[2px] rounded-full bg-brand-red shadow-[0_0_18px_rgba(255,0,0,0.4)]" />
               )}
             </a>
           ))}
@@ -78,15 +81,12 @@ export function LandingNav() {
             href="/admin/login"
             className="text-stone-500 hover:text-stone-300 text-base"
           >
-            Staff
+            Admin
           </Link>
         </div>
 
         {/* Mobile */}
-        <div className="md:hidden flex items-center gap-3">
-          <Link href="/admin/login" className="text-stone-500 hover:text-stone-300 text-base">
-            Staff
-          </Link>
+        <div className="md:hidden flex items-center shrink-0">
           <button
             type="button"
             aria-label="Open menu"
@@ -105,7 +105,7 @@ export function LandingNav() {
       </nav>
 
       {mobileOpen && (
-        <div className="md:hidden border-t border-stone-800/80 bg-stone-950/95 backdrop-blur-md">
+        <div className="md:hidden border-t border-stone-800/80 bg-black/95 backdrop-blur-md">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col gap-2">
             {sections.map((s) => (
               <a
@@ -120,7 +120,7 @@ export function LandingNav() {
               >
                 {s.label}
                 {active === s.id && (
-                  <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_18px_rgba(239,68,68,0.4)]" />
+                  <span className="h-2 w-2 rounded-full bg-brand-red shadow-[0_0_18px_rgba(255,0,0,0.4)]" />
                 )}
               </a>
             ))}

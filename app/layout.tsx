@@ -1,25 +1,27 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
 
-const spaceGrotesk = Space_Grotesk({
+const aksans = localFont({
+  src: "../public/fonts/aksans-750.otf",
   variable: "--font-sans",
-  subsets: ["latin"],
+  display: "swap",
 });
 
-const jetBrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
+const ethnocentric = localFont({
+  src: "../public/fonts/ethnocentric rg.otf",
+  variable: "--font-display",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "HIIT Gym – Train Hard. Live Strong.",
+  title: "HIIT Fitness – Train Hard. Live Strong.",
   description:
-    "High-intensity training, premium equipment, and a community that pushes you. Join HIIT Gym.",
+    "High-intensity interval training, premium equipment, and a community that pushes you. Join HIIT Fitness.",
   icons: {
-    icon: "/images/icon.png",
-    apple: "/images/icon.png",
+    icon: "/images/facicon.jpg",
+    apple: "/images/facicon.jpg",
   },
 };
 
@@ -31,14 +33,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body
-        className={`${spaceGrotesk.variable} ${jetBrainsMono.variable} antialiased font-sans text-stone-100 min-h-screen`}
+        className={`${aksans.variable} ${ethnocentric.variable} antialiased font-sans text-stone-100 min-h-screen`}
       >
         <InteractiveGridPattern
           cellSize={50}
-          glowColor="rgba(239, 68, 68, 0.35)"
-          borderColor="rgba(63, 63, 70, 0.35)"
+          glowColor="rgba(255, 0, 0, 0.35)"
+          borderColor="rgba(255, 255, 255, 0.12)"
           proximity={120}
-          className="bg-stone-950"
+          className="bg-black"
         />
         <div className="relative z-10 min-h-screen">
           {children}

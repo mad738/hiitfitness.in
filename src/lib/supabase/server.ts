@@ -25,11 +25,16 @@ export async function createClient() {
 }
 
 export async function createServiceRoleClient() {
+  const url = env.getSupabaseUrl();
+  const key = env.getSupabaseServiceRoleKey();
+  if (!key) {
+    throw new Error(
+      "Missing SUPABASE_SERVICE_ROLE_KEY. Add it to .env from Supabase Dashboard → Settings → API → service_role (secret)."
+    );
+  }
   const { createClient: createSupabaseClient } = await import(
     "@supabase/supabase-js"
   );
-  const url = env.getSupabaseUrl();
-  const key = env.getSupabaseServiceRoleKey();
   return createSupabaseClient(url, key, {
     auth: { persistSession: false },
   });

@@ -20,8 +20,8 @@ export function InteractiveGridPattern({
   className,
   children,
   cellSize = 50,
-  glowColor = "rgba(239, 68, 68, 0.4)",
-  borderColor = "rgba(63, 63, 70, 0.4)",
+  glowColor = "rgba(255, 0, 0, 0.4)",
+  borderColor = "rgba(255, 255, 255, 0.12)",
   proximity = 100,
 }: InteractiveGridPatternProps) {
   const containerRef = useRef<HTMLDivElement>(null)

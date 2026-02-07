@@ -47,7 +47,7 @@ function MatterButton({ children, size, className, asChild = false, hoverGlowCol
           isOrangeHover
             ? 'hover:shadow-[inset_0_-10px_32px_-4px_rgba(251,146,60,0.85),inset_0_-5px_16px_-2px_rgba(251,146,60,0.55)] hover:before:shadow-[inset_0_0.5px_1px_0_rgba(255,255,255,0.4)] dark:hover:shadow-[inset_0_-6px_20px_-2px_rgba(251,146,60,0.8),inset_0_-3px_10px_-1px_rgba(251,146,60,0.5)]'
             : isRedHover
-              ? 'hover:shadow-[inset_0_-8px_24px_-4px_rgba(239,68,68,0.7),inset_0_-4px_12px_-2px_rgba(239,68,68,0.45)] hover:before:shadow-[inset_0_0.5px_1px_0_rgba(255,255,255,0.4)] dark:hover:shadow-[inset_0_-6px_18px_-2px_rgba(239,68,68,0.65),inset_0_-3px_10px_-1px_rgba(239,68,68,0.4)]'
+              ? 'hover:shadow-[inset_0_-8px_24px_-4px_rgba(255,0,0,0.7),inset_0_-4px_12px_-2px_rgba(255,0,0,0.45)] hover:before:shadow-[inset_0_0.5px_1px_0_rgba(255,255,255,0.4)] dark:hover:shadow-[inset_0_-6px_18px_-2px_rgba(255,0,0,0.65),inset_0_-3px_10px_-1px_rgba(255,0,0,0.4)]'
               : 'hover:shadow-[inset_0_-8px_20px_-2px_rgba(25,175,253,0.7),inset_0_-4px_10px_-1px_rgba(25,175,253,0.45)] hover:before:shadow-[inset_0_0.5px_1px_0_rgba(255,255,255,0.4)] dark:hover:shadow-[inset_0_-5px_14px_-1px_rgba(25,175,253,0.65)]',
 
           // lg: same font/size as paired outline button (equal sizing)

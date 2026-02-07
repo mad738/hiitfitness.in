@@ -14,7 +14,10 @@ export function LandingContact() {
     label: "HIIT FITNESS",
     address:
       "2nd Floor, Sri Anuja Balaji Square, vi Seshadri street, 3rd Ln, opp. Currency Nagar, Ramavarapadu, Kanuru, Andhra Pradesh 521108",
-    phone: "099966 67714",
+    phones: [
+      { display: "999 666 7714", tel: "tel:+919996667714" },
+      { display: "999 666 5573", tel: "tel:+919996665573" },
+    ],
     lat: 16.5215298,
     lng: 80.6783943,
     googleMapsDirectionsUrl: "https://www.google.com/maps/dir//16.5215298,80.6783943",
@@ -46,33 +49,40 @@ export function LandingContact() {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="liquid-glass p-5">
-                <p className="text-red-400 font-bold mb-1">Phone</p>
-                <p className="text-stone-200 font-semibold">{gym.phone}</p>
+                <p className="text-brand-red font-bold mb-1">Phone</p>
+                <div className="flex flex-col gap-1.5">
+                  {gym.phones.map((p) => (
+                    <a
+                      key={p.tel}
+                      href={p.tel}
+                      className="text-stone-200 font-semibold hover:text-brand-red transition"
+                    >
+                      {p.display}
+                    </a>
+                  ))}
+                </div>
                 <p className="text-stone-500 text-sm mt-1">
-                  Call for class times & tours
+                  Tap to call — class times & tours
                 </p>
               </div>
               <div className="liquid-glass p-5">
-                <p className="text-red-400 font-bold mb-1">Email</p>
+                <p className="text-brand-red font-bold mb-1">Email</p>
                 <p className="text-stone-200 font-semibold">hello@hiitgym.com</p>
                 <p className="text-stone-500 text-sm mt-1">
                   We reply within 24 hours
                 </p>
               </div>
               <div className="liquid-glass p-5 sm:col-span-2">
-                <p className="text-red-400 font-bold mb-2">Hours</p>
+                <p className="text-brand-red font-bold mb-2">Gym timings</p>
                 <div className="grid sm:grid-cols-2 gap-2 text-sm">
                   <p className="text-stone-300">
-                    Mon–Fri: <span className="text-stone-100 font-semibold">5am–10pm</span>
+                    Mon–Sat: <span className="text-stone-100 font-semibold">Morning 6 AM – 10 AM</span>
                   </p>
                   <p className="text-stone-300">
-                    Sat: <span className="text-stone-100 font-semibold">7am–8pm</span>
+                    Mon–Sat: <span className="text-stone-100 font-semibold">Evening 5 PM – 9 PM</span>
                   </p>
                   <p className="text-stone-300">
-                    Sun: <span className="text-stone-100 font-semibold">8am–6pm</span>
-                  </p>
-                  <p className="text-stone-500">
-                    (Edit these anytime in code)
+                    Sun: <span className="text-stone-100 font-semibold">Morning 6 AM – 11 AM</span>
                   </p>
                 </div>
               </div>
@@ -81,7 +91,7 @@ export function LandingContact() {
             <div className="mt-8 flex flex-wrap gap-4 justify-center items-center">
               <a
                 href="#plans"
-                className="inline-flex items-center justify-center px-7 py-3 rounded-xl bg-red-500 hover:bg-red-400 text-white font-extrabold transition"
+                className="inline-flex items-center justify-center px-7 py-3 rounded-xl bg-brand-red hover:opacity-90 text-white font-extrabold transition"
               >
                 Pick a plan
               </a>
@@ -89,7 +99,7 @@ export function LandingContact() {
                 href="/admin/login"
                 className="inline-flex items-center justify-center px-7 py-3 rounded-xl font-semibold text-stone-100 transition backdrop-blur-xl bg-white/[0.06] border border-white/10 hover:bg-white/[0.1] hover:border-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
               >
-                Staff login
+                Admin login
               </Link>
             </div>
           </div>
@@ -109,7 +119,7 @@ export function LandingContact() {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_20%,rgba(239,68,68,0.08),transparent)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_20%,rgba(255,0,0,0.08),transparent)]" />
               <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-stone-800" />
             </div>
             <div className="p-6 space-y-4">
@@ -117,7 +127,7 @@ export function LandingContact() {
                 Parking available. First visit? Come 10 minutes early and we’ll
                 get you set up.
               </p>
-              <Button asChild size="lg" className="w-full sm:w-auto bg-red-500 text-white hover:bg-red-400 font-semibold shadow-[0_0_20px_rgba(239,68,68,0.35)]">
+              <Button asChild size="lg" className="w-full sm:w-auto bg-brand-red text-white hover:opacity-90 font-semibold shadow-[0_0_20px_rgba(255,0,0,0.35)]">
                 <a
                   href={gym.googleMapsDirectionsUrl}
                   target="_blank"

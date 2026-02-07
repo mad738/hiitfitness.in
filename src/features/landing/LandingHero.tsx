@@ -15,19 +15,18 @@ export function LandingHero() {
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           {/* Copy + CTA */}
           <div className="text-center lg:text-left">
-            <p className="text-red-400 font-mono text-sm uppercase tracking-widest mb-4">
+            <p className="text-brand-red font-mono text-xs sm:text-sm uppercase tracking-widest mb-4">
               Built for gym rats & grinders
             </p>
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-stone-50 tracking-tight mb-6">
-              Earn your
-              <br />
-              <span className="text-red-400">next PR</span>{" "}
-              <span className="text-stone-200/90">—</span>{" "}
+            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-stone-50 tracking-tight mb-6 leading-tight">
+              Earn your{" "}
+              <span className="text-brand-red">next PR</span>
+              <span className="text-stone-200/90"> — </span>
               <span className="text-stone-200">every</span>{" "}
-              <span className="text-red-300">session</span>.
+              <span className="text-brand-red">session</span>.
             </h1>
-            <p className="text-stone-300/85 text-base sm:text-lg md:text-xl max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-              HIIT Gym is a no-excuses training space with serious equipment, focused
+            <p className="text-stone-300/85 text-sm sm:text-base md:text-lg max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
+              HIIT Fitness is a no-excuses training space with serious equipment, focused
               programming, and a culture that doesn’t quit. Come for the sweat.
               Stay for the strength.
             </p>
@@ -57,7 +56,7 @@ export function LandingHero() {
                 priority
                 sizes="(max-width: 1024px) 100vw,  min(100%, 480px)"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-stone-950/60 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
             </div>
           </div>
         </div>
@@ -81,7 +80,7 @@ export function LandingHero() {
                     key={`${set}-${chip.title}`}
                     className="liquid-glass shrink-0 rounded-2xl px-4 py-3 min-w-[180px] sm:min-w-[200px]"
                   >
-                    <p className="font-semibold text-stone-100 text-sm sm:text-base text-red-400/90">
+                    <p className="font-semibold text-stone-100 text-sm sm:text-base text-brand-red/90">
                       {chip.title}
                     </p>
                     <p className="text-stone-400 text-xs sm:text-sm mt-0.5 truncate max-w-[220px]">

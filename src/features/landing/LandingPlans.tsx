@@ -1,5 +1,5 @@
 import { fetchPublicPlans } from "@app/actions/plans";
-import { PlanCard } from "@/ui/PlanCard";
+import { PlanGroups } from "@/features/landing/PlanGroups";
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
 
 export async function LandingPlans() {
@@ -13,15 +13,11 @@ export async function LandingPlans() {
             Membership plans
           </h2>
           <p className="text-stone-400 max-w-xl mx-auto">
-            Choose the plan that fits your goals. No hidden fees, cancel anytime.
+            Compare plans and choose what fits your goals. No hidden fees, cancel anytime.
           </p>
         </div>
         {plans.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {plans.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} />
-            ))}
-          </div>
+          <PlanGroups plans={plans} />
         ) : (
           <div className="liquid-glass border-dashed text-center py-12 rounded-xl text-stone-500">
             <p>Plans are being updated. Check back soon.</p>

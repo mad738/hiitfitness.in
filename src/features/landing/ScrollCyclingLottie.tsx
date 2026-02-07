@@ -26,7 +26,7 @@ export function ScrollCyclingLottie() {
   const prevProgressRef = useRef(0);
 
   useEffect(() => {
-    fetch("/cycling.json")
+    fetch("animations/cycling.json")
       .then((res) => res.json())
       .then((data) => setAnimationData(data))
       .catch(() => setAnimationData(null));
@@ -107,7 +107,7 @@ export function ScrollCyclingLottie() {
         </div>
       )}
       <div
-        className="fixed left-0 right-0 z-40 h-[52px] md:hidden border-b border-stone-800/80 bg-stone-950/95 backdrop-blur-sm"
+        className="fixed left-0 right-0 z-40 h-[52px] md:hidden border-b border-stone-800/80 bg-black/95 backdrop-blur-sm"
         style={{ top: "var(--header-height)" }}
         aria-hidden
       >
@@ -119,7 +119,7 @@ export function ScrollCyclingLottie() {
       >
         <div className="flex-1 relative h-[2px] rounded-full bg-stone-700/80 overflow-visible">
           <div
-            className="absolute left-0 top-0 h-full rounded-full bg-red-500 transition-[width] duration-75 ease-out"
+            className="absolute left-0 top-0 h-full rounded-full bg-brand-red transition-[width] duration-75 ease-out"
             style={{ width: `${scrollProgress * 100}%` }}
           />
         </div>
@@ -129,7 +129,7 @@ export function ScrollCyclingLottie() {
         <div className="flex-1 relative h-[2px]">
           {/* Start lap icon */}
           <span
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 flex items-center justify-center w-6 h-6 rounded-full bg-stone-800 border border-stone-600/80 text-red-400/90 shadow-inner"
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 flex items-center justify-center w-6 h-6 rounded-full bg-stone-800 border border-stone-600/80 text-brand-red/90 shadow-inner"
             title="Start lap"
             aria-hidden
           >
@@ -140,7 +140,7 @@ export function ScrollCyclingLottie() {
           </span>
           {/* Finish lap icon */}
           <span
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 flex items-center justify-center w-6 h-6 rounded-full bg-stone-800 border border-stone-600/80 text-red-400/90 shadow-inner overflow-visible"
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 flex items-center justify-center w-6 h-6 rounded-full bg-stone-800 border border-stone-600/80 text-brand-red/90 shadow-inner overflow-visible"
             title="Finish lap"
             aria-hidden
           >

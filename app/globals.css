@@ -3,19 +3,21 @@
 @tailwind utilities;
 
 :root {
-  /* Palette: black + red + white (logo) */
-  --bg: 10 10 10; /* near-black */
-  --panel: 20 20 20;
+  /* Palette: black #000000 + red #ff0000 */
+  --brand-black: #000000;
+  --brand-red: #ff0000;
+  --bg: 0 0 0;
+  --panel: 0 0 0;
   --text: 245 245 244; /* stone-100 / white-ish */
   --muted: 168 162 158; /* stone-400-ish */
-
-  --accent: 239 68 68; /* red-500 – logo red */
-  --accent-2: 220 38 38; /* red-600 – darker red */
-  --accent-light: 248 113 113; /* red-400 */
+  --accent: 0 100% 50%; /* #ff0000 in HSL */
+  --accent-2: 0 100% 40%;
+  --accent-light: 0 100% 50%;
 
   /* Header: compact on mobile, taller on desktop */
   --header-height: 3.5rem; /* 56px mobile */
   --header-content-gap: 1rem; /* 16px */
+  --admin-sidebar-width: 16rem; /* 256px desktop sidebar */
 }
 
 @media (min-width: 768px) {
@@ -26,7 +28,7 @@
 }
 
 body {
-  @apply bg-stone-950 text-stone-100;
+  @apply bg-black text-stone-100;
 }
 
 .bg-grid {
@@ -97,16 +99,16 @@ body {
     0% {
       opacity: 0.9;
       transform: scale(1);
-      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+      box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.5);
     }
     50% {
       opacity: 1;
-      box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.25), 0 0 12px 2px rgba(239, 68, 68, 0.35);
+      box-shadow: 0 0 0 6px rgba(255, 0, 0, 0.25), 0 0 12px 2px rgba(255, 0, 0, 0.35);
     }
     100% {
       opacity: 0;
       transform: scale(1.4);
-      box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+      box-shadow: 0 0 0 10px rgba(255, 0, 0, 0);
     }
   }
   .animate-end-lap-boom {
@@ -117,23 +119,35 @@ body {
   @keyframes lap-boom-fullscreen {
     0% {
       opacity: 0;
-      background-color: rgba(239, 68, 68, 0);
+      background-color: rgba(255, 0, 0, 0);
     }
     20% {
       opacity: 1;
-      background-color: rgba(239, 68, 68, 0.2);
+      background-color: rgba(255, 0, 0, 0.2);
     }
     50% {
-      background-color: rgba(239, 68, 68, 0.15);
+      background-color: rgba(255, 0, 0, 0.15);
     }
     100% {
       opacity: 0;
-      background-color: rgba(239, 68, 68, 0);
+      background-color: rgba(255, 0, 0, 0);
     }
   }
   .animate-lap-boom-fullscreen {
-    background-color: rgba(239, 68, 68, 0.18);
+    background-color: rgba(255, 0, 0, 0.18);
     animation: lap-boom-fullscreen 1s ease-out forwards;
+  }
+
+  /* Admin filter dropdowns – dark options list */
+  .admin-select {
+    @apply rounded-xl border border-white/10 bg-stone-900/90 text-stone-100;
+  }
+  .admin-select option {
+    background: rgb(28 25 23);
+    color: rgb(250 250 249);
+  }
+  .admin-select:focus {
+    @apply border-brand-red ring-1 ring-brand-red outline-none;
   }
 }
 
