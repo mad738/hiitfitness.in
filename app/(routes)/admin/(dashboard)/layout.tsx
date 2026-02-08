@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { AdminNav } from "@/features/admin/AdminNav";
 import { AdminBackLink } from "@/features/admin/AdminBackLink";
-import { AdminDemoProvider } from "@/features/admin/AdminDemoContext";
 import { hasSupabaseConfig } from "@/config/env";
 import { getAdminSession } from "@/lib/admin-session";
 
@@ -41,10 +40,10 @@ export default async function AdminDashboardLayout({
   }
 
   return (
-    <AdminDemoProvider>
+    <div className="flex min-h-screen flex-col">
       <AdminNav />
       <main
-        className="pt-[var(--header-height)] min-h-screen lg:pt-0 lg:pl-[var(--admin-sidebar-width)]"
+        className="flex-1 pt-[var(--header-height)] min-h-0 overflow-auto lg:pt-0 lg:pl-[var(--admin-sidebar-width)]"
         role="main"
       >
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-8 lg:px-8 lg:py-10">
@@ -52,6 +51,6 @@ export default async function AdminDashboardLayout({
           {children}
         </div>
       </main>
-    </AdminDemoProvider>
+    </div>
   );
 }

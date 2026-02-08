@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MembershipPlan } from "@/models/membership_plan";
-import { useDemoMode } from "./AdminDemoContext";
-import { DUMMY_PLANS } from "@/data/dummy-admin-data";
 import { createPlan, updatePlan } from "@app/actions/plans";
 
 function formatINR(value: number): string {
@@ -28,10 +26,8 @@ const labelClass = "block text-sm text-stone-400 mb-1.5";
 type PlansViewProps = { plans: MembershipPlan[] };
 
 export function PlansView(props: PlansViewProps) {
-  const { plans: initialPlans } = props;
+  const { plans: displayPlans } = props;
   const router = useRouter();
-  const useDemo = useDemoMode();
-  const displayPlans = useDemo ? DUMMY_PLANS : initialPlans;
 
   const [editing, setEditing] = useState<MembershipPlan | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -89,39 +85,6 @@ export function PlansView(props: PlansViewProps) {
         setError(res.error);
       }
     }
-  }
-
-  if (useDemo) {
-    return (
-      <div className="space-y-6">
-        <div className="liquid-glass rounded-2xl overflow-hidden">
-          <table className="w-full text-sm text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/10 bg-white/[0.03]">
-                <th className="py-3 px-4 text-stone-400 font-medium">Name</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Description</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Price (monthly)</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Total fee</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Duration</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Active</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DUMMY_PLANS.map((p) => (
-                <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.04]">
-                  <td className="py-2.5 px-4 text-stone-100 font-medium">{p.name}</td>
-                  <td className="py-2.5 px-4 text-stone-300 max-w-xs truncate">{p.description ?? "—"}</td>
-                  <td className="py-2.5 px-4 text-stone-300">{formatINR(p.price_monthly)}</td>
-                  <td className="py-2.5 px-4 text-stone-300">{formatTotalFeeCell(p)}</td>
-                  <td className="py-2.5 px-4 text-stone-300">{p.duration_days} days</td>
-                  <td className="py-2.5 px-4 text-stone-300">{p.is_active ? "Yes" : "No"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
   }
 
   return (

@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import { useState, useEffect } from "react";
+import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Trainer } from "@/models/trainer";
@@ -32,6 +33,10 @@ export function TrainersView({ initialTrainers }: Props) {
   const [address, setAddress] = useState("");
   const [detailsTrainer, setDetailsTrainer] = useState<Trainer | null>(null);
   const [mounted, setMounted] = useState(false);
+  const { tableScrollRef, topScrollRef, headerRef } = useHorizontalScrollTable(
+    [trainers.length],
+    { wheelOnBody: true }
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -325,61 +330,75 @@ export function TrainersView({ initialTrainers }: Props) {
           document.body
         )}
 
-      <div className="liquid-glass rounded-2xl overflow-hidden">
+      <div className="liquid-glass rounded-2xl overflow-hidden border border-white/10">
         {trainers.length === 0 ? (
           <div className="p-8 text-center text-stone-500 text-sm">
             No trainers yet. Add one to get started.
           </div>
         ) : (
-          <table className="w-full text-sm text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/10 bg-white/[0.03]">
-                <th className="py-3 px-4 text-stone-400 font-medium w-14">Photo</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Name</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Phone</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Address</th>
-                <th className="py-3 px-4 text-stone-400 font-medium w-28">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trainers.map((t) => (
-                <tr
-                  key={t.id}
-                  className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer"
-                  onClick={() => setDetailsTrainer(t)}
-                >
-                  <td className="py-2.5 px-4">
-                    <img
-                      src={t.image ?? "/images/profile placeholder.jpg"}
-                      alt=""
-                      className="w-10 h-10 rounded-lg object-cover border border-white/10"
-                    />
-                  </td>
-                  <td className="py-2.5 px-4 text-stone-100 font-medium">{t.name}</td>
-                  <td className="py-2.5 px-4 text-stone-300">{t.phone_number ?? "—"}</td>
-                  <td className="py-2.5 px-4 text-stone-300 max-w-[200px] truncate">
-                    {t.address ?? "—"}
-                  </td>
-                  <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      onClick={() => openEdit(t)}
-                      className="text-brand-red hover:underline text-sm mr-2"
+          <div className="flex flex-col">
+            <div
+              ref={topScrollRef}
+              className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
+              aria-hidden
+            >
+              <div className="min-w-[700px] h-2" />
+            </div>
+            <div
+              ref={tableScrollRef}
+              className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom"
+            >
+              <table className="w-full text-sm text-left border-collapse min-w-[700px]">
+                <thead ref={headerRef} className="select-none cursor-ew-resize">
+                  <tr className="border-b border-white/10 bg-white/[0.04]">
+                    <th className="py-3 px-4 text-stone-400 font-medium w-14">Photo</th>
+                    <th className="py-3 px-4 text-stone-400 font-medium">Name</th>
+                    <th className="py-3 px-4 text-stone-400 font-medium">Phone</th>
+                    <th className="py-3 px-4 text-stone-400 font-medium">Address</th>
+                    <th className="py-3 px-4 text-stone-400 font-medium w-28">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trainers.map((t) => (
+                    <tr
+                      key={t.id}
+                      className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer"
+                      onClick={() => setDetailsTrainer(t)}
                     >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(t)}
-                      className="text-stone-500 hover:text-red-400 text-sm"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <td className="py-2.5 px-4">
+                        <img
+                          src={t.image ?? "/images/profile placeholder.jpg"}
+                          alt=""
+                          className="w-10 h-10 rounded-lg object-cover border border-white/10"
+                        />
+                      </td>
+                      <td className="py-2.5 px-4 text-stone-100 font-medium">{t.name}</td>
+                      <td className="py-2.5 px-4 text-stone-300">{t.phone_number ?? "—"}</td>
+                      <td className="py-2.5 px-4 text-stone-300 max-w-[200px] truncate">
+                        {t.address ?? "—"}
+                      </td>
+                      <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(t)}
+                          className="text-brand-red hover:underline text-sm mr-2"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(t)}
+                          className="text-stone-500 hover:text-red-400 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
     </div>

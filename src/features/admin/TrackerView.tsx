@@ -12,9 +12,6 @@ import {
   TRACKER_PLAN_OPTIONS,
   TRACKER_TRAINER_OPTIONS,
 } from "@/config/tracker-options";
-import { useDemoMode } from "./AdminDemoContext";
-import { DUMMY_TRACKER_LIST } from "@/data/dummy-admin-data";
-
 type Props = {
   initialList: Tracker[];
   initialFilters?: TrackerFilters;
@@ -24,10 +21,7 @@ type Props = {
 export function TrackerView({ initialList, initialFilters = {}, initialPlans = [] }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const useDemo = useDemoMode();
-  const [list, setList] = useState<Tracker[]>(
-    useDemo ? DUMMY_TRACKER_LIST : initialList
-  );
+  const [list, setList] = useState<Tracker[]>(initialList);
   const [editing, setEditing] = useState<Tracker | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -45,19 +39,10 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
-  const prevUseDemoRef = useRef(useDemo);
 
   useEffect(() => {
-    if (!useDemo) {
-      setList(initialList);
-      prevUseDemoRef.current = false;
-    } else {
-      if (!prevUseDemoRef.current) setList(DUMMY_TRACKER_LIST);
-      prevUseDemoRef.current = true;
-    }
-    setEditing(null);
-    setShowForm(false);
-  }, [initialList, useDemo]);
+    setList(initialList);
+  }, [initialList]);
 
   useEffect(() => {
     setMounted(true);
@@ -116,10 +101,7 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
   }
 
   function applyFilters() {
-    if (useDemo) {
-      setShowFilterDropdown(false);
-      return;
-    }
+    setShowFilterDropdown(false);
     window.open(buildFilterUrl(), "_blank", "noopener,noreferrer");
   }
 
@@ -138,32 +120,14 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
     trainerSearch.trim();
 
   const searchLower = clientSearch.trim().toLowerCase();
-  const trainerSearchLower = trainerSearch.trim().toLowerCase();
 
-  const filteredList = useDemo
+  const filteredList = searchLower
     ? list.filter((row) => {
-        if (plan && row.plan !== plan) return false;
-        if (trainer && row.trainer_name !== trainer) return false;
-        if (searchLower) {
-          const client = (row.client_name ?? row.client_id ?? "").toLowerCase();
-          const train = (row.trainer_name ?? "").toLowerCase();
-          if (!client.includes(searchLower) && !train.includes(searchLower))
-            return false;
-        }
-        if (
-          trainerSearchLower &&
-          !(row.trainer_name ?? "").toLowerCase().includes(trainerSearchLower)
-        )
-          return false;
-        return true;
+        const client = (row.client_name ?? row.client_id ?? "").toLowerCase();
+        const train = (row.trainer_name ?? "").toLowerCase();
+        return client.includes(searchLower) || train.includes(searchLower);
       })
-    : searchLower
-      ? list.filter((row) => {
-          const client = (row.client_name ?? row.client_id ?? "").toLowerCase();
-          const train = (row.trainer_name ?? "").toLowerCase();
-          return client.includes(searchLower) || train.includes(searchLower);
-        })
-      : list;
+    : list;
 
   function refresh() {
     startTransition(() => {
@@ -173,11 +137,6 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this entry?")) return;
-    if (useDemo) {
-      setList((prev) => prev.filter((r) => r.id !== id));
-      if (editing?.id === id) setEditing(null);
-      return;
-    }
     await deleteTrackerEntry(id);
     refresh();
     if (editing?.id === id) setEditing(null);
@@ -302,7 +261,7 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
                         onClick={applyFilters}
                         className="px-4 py-2.5 rounded-xl bg-brand-red hover:bg-red-600 text-white font-semibold text-sm transition shadow-md"
                       >
-                        {useDemo ? "Apply" : "Apply (new tab)"}
+                        Apply (new tab)
                       </button>
                       {hasFilters && (
                         <button
@@ -334,7 +293,7 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
           {showForm ? "Hide form" : "Add client"}
         </button>
         <p className="text-stone-500 text-sm">
-          {(useDemo && hasFilters) || clientSearch.trim()
+          {clientSearch.trim()
             ? `Showing ${filteredList.length} of ${list.length} entr${list.length === 1 ? "y" : "ies"}`
             : `Showing ${list.length} entr${list.length === 1 ? "y" : "ies"}`}
         </p>
@@ -352,40 +311,7 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
               setEditing(null);
               setShowForm(false);
             }}
-            onSuccess={useDemo ? () => {} : refresh}
-            onCreateLocal={
-              useDemo
-                ? (data) => {
-                    const now = new Date().toISOString();
-                    const newRow: Tracker = {
-                      ...data,
-                      id: "demo-" + Date.now(),
-                      created_at: now,
-                      updated_at: now,
-                    };
-                    setList((prev) => [newRow, ...prev]);
-                  }
-                : undefined
-            }
-            onUpdateLocal={
-              useDemo
-                ? (id, data) => {
-                    setList((prev) =>
-                      prev.map((r) =>
-                        r.id === id
-                          ? {
-                              ...r,
-                              ...data,
-                              id,
-                              created_at: r.created_at,
-                              updated_at: new Date().toISOString(),
-                            }
-                          : r
-                      )
-                    );
-                  }
-                : undefined
-            }
+            onSuccess={refresh}
           />
         </div>
       )}

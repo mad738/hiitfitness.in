@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useDemoMode } from "./AdminDemoContext";
-import { DUMMY_CREDENTIALS } from "@/data/dummy-admin-data";
 import type { Credential } from "@/models/credential";
 import {
   createCredential,
@@ -23,13 +21,7 @@ const labelClass = "block text-sm text-stone-400 mb-1.5";
 
 export function CredentialsView({ credentials, currentUsername }: Props) {
   const router = useRouter();
-  const useDemo = useDemoMode();
-  const [localList, setLocalList] = useState<Credential[]>(DUMMY_CREDENTIALS);
-  const list = useDemo ? localList : credentials;
-
-  useEffect(() => {
-    if (useDemo) setLocalList([...DUMMY_CREDENTIALS]);
-  }, [useDemo]);
+  const list = credentials;
 
   const [addOpen, setAddOpen] = useState(false);
   const [changePasswordFor, setChangePasswordFor] = useState<Credential | null>(null);
@@ -57,34 +49,6 @@ export function CredentialsView({ credentials, currentUsername }: Props) {
   async function handleAddAdmin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (useDemo) {
-      const trimmed = addUsername.trim();
-      if (!trimmed || addPassword.length < 6) {
-        setError(trimmed ? "Password must be at least 6 characters." : "Username and password are required.");
-        return;
-      }
-      if (localList.some((c) => c.username.toLowerCase() === trimmed.toLowerCase())) {
-        setError("Username already exists.");
-        return;
-      }
-      const now = new Date().toISOString();
-      setLocalList((prev) => [
-        ...prev,
-        {
-          id: "demo-cred-" + Date.now(),
-          username: trimmed,
-          pass: "********",
-          role: addRole.trim() || "staff",
-          created_at: now,
-          updated_at: now,
-        },
-      ]);
-      setAddOpen(false);
-      setAddUsername("");
-      setAddPassword("");
-      setAddRole("staff");
-      return;
-    }
     setLoading(true);
     const res = await createCredential(addUsername, addPassword, addRole);
     setLoading(false);
@@ -111,12 +75,6 @@ export function CredentialsView({ credentials, currentUsername }: Props) {
       setError("Password must be at least 6 characters.");
       return;
     }
-    if (useDemo) {
-      setChangePasswordFor(null);
-      setNewPassword("");
-      setNewPasswordConfirm("");
-      return;
-    }
     setLoading(true);
     const res = await updateCredentialPassword(changePasswordFor.id, newPassword);
     setLoading(false);
@@ -141,13 +99,6 @@ export function CredentialsView({ credentials, currentUsername }: Props) {
       setError("New password must be at least 6 characters.");
       return;
     }
-    if (useDemo) {
-      setOwnPasswordOpen(false);
-      setCurrentPassword("");
-      setOwnNewPassword("");
-      setOwnNewPasswordConfirm("");
-      return;
-    }
     setLoading(true);
     const res = await updateOwnPassword(currentPassword, ownNewPassword);
     setLoading(false);
@@ -165,12 +116,8 @@ export function CredentialsView({ credentials, currentUsername }: Props) {
   async function handleRemove(c: Credential) {
     if (!confirm(`Remove admin "${c.username}"? They will no longer be able to sign in.`)) return;
     setError(null);
-    if (useDemo) {
-      if (isCurrentUser(c)) {
-        setError("You cannot remove your own account.");
-        return;
-      }
-      setLocalList((prev) => prev.filter((x) => x.id !== c.id));
+    if (isCurrentUser(c)) {
+      setError("You cannot remove your own account.");
       return;
     }
     setLoading(true);
@@ -258,7 +205,7 @@ export function CredentialsView({ credentials, currentUsername }: Props) {
                       <button
                         type="button"
                         onClick={() => handleRemove(c)}
-                        disabled={loading && !useDemo}
+                        disabled={loading}
                         className="text-stone-400 hover:text-red-400 hover:underline text-sm disabled:opacity-50"
                       >
                         Remove

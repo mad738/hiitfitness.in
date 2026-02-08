@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "@app/actions/auth";
-import { useAdminDemo } from "./AdminDemoContext";
 
 const navLinks = [
   { href: "/admin", label: "Dashboard" },
@@ -20,7 +19,6 @@ export function AdminNav() {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { useDemo, setUseDemo } = useAdminDemo();
 
   async function handleSignOut() {
     await signOut();
@@ -81,18 +79,6 @@ export function AdminNav() {
           </nav>
 
           <div className="shrink-0 pt-4 mt-4 border-t border-stone-800/80 space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer select-none rounded-xl px-3 py-2 transition-colors duration-200 hover:bg-white/5">
-              <span className="text-stone-400 text-sm font-medium">
-                Sample data
-              </span>
-              <input
-                type="checkbox"
-                checked={useDemo}
-                onChange={(e) => setUseDemo(e.target.checked)}
-                className="h-4 w-4 rounded border-stone-500 bg-stone-800 text-brand-red focus:ring-brand-red focus:ring-offset-0"
-                aria-label="Use sample data for all admin pages"
-              />
-            </label>
             <button
               type="button"
               onClick={handleSignOut}
@@ -171,16 +157,6 @@ export function AdminNav() {
                   </Link>
                 );
               })}
-              <label className="flex items-center justify-between rounded-xl px-3 py-2 text-base font-semibold text-stone-300 border border-stone-800">
-                <span>Sample data</span>
-                <input
-                  type="checkbox"
-                  checked={useDemo}
-                  onChange={(e) => setUseDemo(e.target.checked)}
-                  className="h-4 w-4 rounded border-stone-500 bg-stone-800 text-brand-red focus:ring-brand-red"
-                  aria-label="Use sample data"
-                />
-              </label>
               <button
                 type="button"
                 onClick={() => {

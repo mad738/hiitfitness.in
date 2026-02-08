@@ -2,18 +2,13 @@
 /* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import Link from "next/link";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import dynamic from "next/dynamic";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
 import type { Tracker } from "@/models/tracker";
-import { useDemoMode } from "./AdminDemoContext";
-import {
-  DUMMY_TRACKER_LIST,
-  DUMMY_DASHBOARD,
-  DUMMY_MONTH_WISE,
-} from "@/data/dummy-admin-data";
-import type { MonthWiseRow } from "@/data/dummy-admin-data";
+import type { MonthWiseRow } from "@/data/dashboard-chart-types";
 
 const DashboardCharts = dynamic(
   () => import("./DashboardCharts").then((m) => m.DashboardCharts),
@@ -71,39 +66,6 @@ export type TrainerReport = {
   entries: Customer[] | Tracker[];
 };
 
-function trainerReportsFromDummyList(list: Tracker[]): TrainerReport[] {
-  const byTrainer = list.reduce(
-    (acc, row) => {
-      const trainer = row.trainer_name ?? "—";
-      if (!acc[trainer]) acc[trainer] = [];
-      acc[trainer].push(row);
-      return acc;
-    },
-    {} as Record<string, Tracker[]>
-  );
-  const dedupeTrackerByName = (entries: Tracker[]): Tracker[] => {
-    const byName = new Map<string, Tracker>();
-    for (const e of entries) {
-      const name = e.client_name ?? e.client_id ?? "";
-      const existing = byName.get(name);
-      const eStart = e.start_date ?? "";
-      const existingStart = existing?.start_date ?? "";
-      if (!existing || eStart > existingStart) byName.set(name, e);
-    }
-    return Array.from(byName.values()).sort((a, b) =>
-      getSortDate(b).localeCompare(getSortDate(a))
-    );
-  };
-  return Object.entries(byTrainer)
-    .map(([name, entries]) => ({
-      name,
-      entries: dedupeTrackerByName(entries),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-const DUMMY_TRAINER_REPORTS = trainerReportsFromDummyList(DUMMY_TRACKER_LIST);
-
 type Props = {
   customers: Customer[];
   trainers: Trainer[];
@@ -112,6 +74,7 @@ type Props = {
 
 const PRESETS = [
   { label: "This month", months: 0 },
+  { label: "Last month", months: 1 },
   { label: "Last 3 months", months: 3 },
   { label: "Last 6 months", months: 6 },
   { label: "Last 12 months", months: 12 },
@@ -156,21 +119,25 @@ export function DashboardContent({
   trainers,
   adminCount,
 }: Props) {
-  const useDummy = useDemoMode();
   const [selectedPresetMonths, setSelectedPresetMonths] = useState<
-    0 | 3 | 6 | 12
+    0 | 1 | 3 | 6 | 12
   >(0);
   const { dateFrom, dateTo } = useMemo(() => {
     const now = new Date();
-    const periodEnd = getBusinessMonthEnd(now);
+    const currStart = getBusinessMonthStart(now);
+    const periodEnd =
+      selectedPresetMonths === 1
+        ? getBusinessMonthEnd(new Date(currStart.getFullYear(), currStart.getMonth() - 1, 15))
+        : getBusinessMonthEnd(now);
     const periodStart =
       selectedPresetMonths === 0
-        ? getBusinessMonthStart(now)
-        : (() => {
-            const curr = getBusinessMonthStart(now);
-            const d = new Date(curr.getFullYear(), curr.getMonth() - selectedPresetMonths, 6);
-            return d;
-          })();
+        ? currStart
+        : selectedPresetMonths === 1
+          ? new Date(currStart.getFullYear(), currStart.getMonth() - 1, 6)
+          : (() => {
+              const d = new Date(currStart.getFullYear(), currStart.getMonth() - selectedPresetMonths, 6);
+              return d;
+            })();
     return {
       dateFrom: toDateOnly(periodStart.toISOString()),
       dateTo: toDateOnly(periodEnd.toISOString()),
@@ -179,6 +146,15 @@ export function DashboardContent({
   const [selectedTrainer, setSelectedTrainer] = useState<TrainerReport | null>(
     null
   );
+
+  useEffect(() => {
+    if (!selectedTrainer) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [selectedTrainer]);
 
   const customerCount = customers.length;
   const byPlan = useMemo(
@@ -197,28 +173,6 @@ export function DashboardContent({
   const ptCount = byPlan["PT"] ?? 0;
 
   const { newEntries, revenue, monthWiseData, weekWiseData, trainerReports } = useMemo(() => {
-    if (useDummy) {
-      const dummyWeeks: WeekWiseRow[] = [];
-      const now = new Date();
-      for (let i = 11; i >= 0; i--) {
-        const weekStart = getWeekStart(new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000));
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-        dummyWeeks.push({
-          weekKey: toDateOnly(weekStart.toISOString()),
-          weekLabel: `${weekStart.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short" })}`,
-          entries: 4 + (i % 5),
-          revenue: 25000 + (i % 4) * 8000,
-        });
-      }
-      return {
-        newEntries: DUMMY_DASHBOARD.newCustomersThisMonth,
-        revenue: DUMMY_DASHBOARD.revenueThisMonth,
-        monthWiseData: DUMMY_MONTH_WISE,
-        weekWiseData: dummyWeeks,
-        trainerReports: DUMMY_TRAINER_REPORTS,
-      };
-    }
     const from = dateFrom;
     const to = dateTo;
     const now = new Date();
@@ -334,7 +288,7 @@ export function DashboardContent({
       weekWiseData: weeks,
       trainerReports: trainerReportsList,
     };
-  }, [useDummy, customers, trainers, dateFrom, dateTo]);
+  }, [customers, trainers, dateFrom, dateTo]);
 
   const chartData = monthWiseData;
   const weeklyChartData = weekWiseData.map((w) => ({
@@ -348,23 +302,24 @@ export function DashboardContent({
   const businessMonthStartStr = toDateOnly(getBusinessMonthStart(now).toISOString());
   const businessMonthEndStr = toDateOnly(getBusinessMonthEnd(now).toISOString());
   const isThisMonth = dateFrom === businessMonthStartStr && (dateTo === businessMonthEndStr || dateTo === toDateOnly(now.toISOString()));
+  /** Show month-wise and week-wise charts only when range spans more than one month. */
+  const showMonthWeekAnalytics = selectedPresetMonths >= 3;
 
   const cards = [
     {
       title: "Customers",
-      count: useDummy ? DUMMY_DASHBOARD.customerCount : customerCount,
+      count: customerCount,
       href: "/admin/customers",
       description: "All members with plan, fees, dates, and trainer (PT only).",
       meta: (
         <span className="text-base font-normal text-stone-500">
-          GT: {useDummy ? DUMMY_DASHBOARD.gtCount : gtCount} · PT:{" "}
-          {useDummy ? DUMMY_DASHBOARD.ptCount : ptCount}
+          GT: {gtCount} · PT: {ptCount}
         </span>
       ),
     },
     {
       title: "Admin users",
-      count: useDummy ? DUMMY_DASHBOARD.adminCount : adminCount,
+      count: adminCount,
       href: "/admin/credentials",
       description: "Usernames and roles.",
       meta: null,
@@ -455,38 +410,51 @@ export function DashboardContent({
           </div>
         </div>
 
-        {isThisMonth ? (
-          <>
-            <div>
-              <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
-                This month by week
-              </h3>
-              <p className="text-stone-500 text-sm mb-4">
-                Weekly breakdown (Saturday–Friday) for the current month.
-              </p>
-              <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
-            </div>
-            <div className="mt-10">
-              <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
-                Monthly view
-              </h3>
-              <DashboardCharts data={chartData} formatINR={formatINR} />
-            </div>
-          </>
-        ) : (
-          <>
-            <DashboardCharts data={chartData} formatINR={formatINR} />
-            <div className="mt-10">
-              <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
-                Weekly view
-              </h3>
-              <p className="text-stone-500 text-sm mb-4">
-                Same date range, broken down by week (Saturday–Friday).
-              </p>
-              <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
-            </div>
-          </>
+        {selectedPresetMonths <= 1 && (
+          <div className="mt-6">
+            <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
+              {selectedPresetMonths === 0 ? "This month by week" : "Last month by week"}
+            </h3>
+            <p className="text-stone-500 text-sm mb-4">
+              Weekly breakdown (Saturday–Friday) for the selected period.
+            </p>
+            <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
+          </div>
         )}
+
+        {showMonthWeekAnalytics &&
+          (isThisMonth ? (
+            <>
+              <div className="mt-10">
+                <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
+                  This month by week
+                </h3>
+                <p className="text-stone-500 text-sm mb-4">
+                  Weekly breakdown (Saturday–Friday) for the current month.
+                </p>
+                <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
+              </div>
+              <div className="mt-10">
+                <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
+                  Monthly view
+                </h3>
+                <DashboardCharts data={chartData} formatINR={formatINR} />
+              </div>
+            </>
+          ) : (
+            <>
+              <DashboardCharts data={chartData} formatINR={formatINR} />
+              <div className="mt-10">
+                <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
+                  Weekly view
+                </h3>
+                <p className="text-stone-500 text-sm mb-4">
+                  Same date range, broken down by week (Saturday–Friday).
+                </p>
+                <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
+              </div>
+            </>
+          ))}
       </section>
 
       <section>
@@ -577,9 +545,10 @@ function ClientDetailsModal({
   formatDate: (s: string | null) => string;
 }) {
   const [selectedEntry, setSelectedEntry] = useState<Customer | Tracker | null>(null);
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-  const topScrollRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLTableSectionElement>(null);
+  const { tableScrollRef, topScrollRef, headerRef } = useHorizontalScrollTable(
+    [entries.length, selectedEntry?.id ?? ""],
+    { wheelOnBody: false }
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -591,52 +560,6 @@ function ClientDetailsModal({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, selectedEntry]);
-
-  useEffect(() => {
-    const topEl = topScrollRef.current;
-    const tableEl = tableScrollRef.current;
-    if (!topEl || !tableEl) return;
-    let syncing = false;
-    const syncFromTop = () => {
-      if (syncing) return;
-      syncing = true;
-      tableEl.scrollLeft = topEl.scrollLeft;
-      requestAnimationFrame(() => { syncing = false; });
-    };
-    const syncFromTable = () => {
-      if (syncing) return;
-      syncing = true;
-      topEl.scrollLeft = tableEl.scrollLeft;
-      requestAnimationFrame(() => { syncing = false; });
-    };
-    topEl.addEventListener("scroll", syncFromTop);
-    tableEl.addEventListener("scroll", syncFromTable);
-    return () => {
-      topEl.removeEventListener("scroll", syncFromTop);
-      tableEl.removeEventListener("scroll", syncFromTable);
-    };
-  }, [entries.length]);
-
-  const onTableWheel = useCallback((e: WheelEvent) => {
-    const tableEl = tableScrollRef.current;
-    const topEl = topScrollRef.current;
-    if (!tableEl || e.deltaY === 0) return;
-    const maxScroll = tableEl.scrollWidth - tableEl.clientWidth;
-    if (maxScroll <= 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const next = Math.max(0, Math.min(maxScroll, tableEl.scrollLeft + e.deltaY));
-    tableEl.scrollLeft = next;
-    if (topEl) topEl.scrollLeft = next;
-  }, []);
-
-  useEffect(() => {
-    const header = headerRef.current;
-    const tableEl = tableScrollRef.current;
-    if (!header || !tableEl) return;
-    header.addEventListener("wheel", onTableWheel, { passive: false });
-    return () => header.removeEventListener("wheel", onTableWheel);
-  }, [entries.length, onTableWheel]);
 
   const sortedEntries = useMemo(
     () =>

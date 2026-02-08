@@ -9,7 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import type { MonthWiseRow } from "@/data/dummy-admin-data";
+import type { MonthWiseRow } from "@/data/dashboard-chart-types";
 
 type Props = {
   data: MonthWiseRow[];

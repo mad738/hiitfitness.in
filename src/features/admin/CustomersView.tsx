@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import { createPortal } from "react-dom";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { Customer } from "@/models/customer";
@@ -51,11 +52,20 @@ function getStringParam(
   return typeof v === "string" ? v : "";
 }
 
+function dedupeById<T extends { id: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+}
+
 export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>(() => dedupeById(initialCustomers));
   const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -98,13 +108,23 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-  const topScrollRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLTableSectionElement>(null);
-  const isSyncingScrollRef = useRef(false);
-  const reportTableScrollRef = useRef<HTMLDivElement>(null);
-  const reportTopScrollRef = useRef<HTMLDivElement>(null);
-  const reportHeaderRef = useRef<HTMLTableSectionElement>(null);
+  const { tableScrollRef, topScrollRef, headerRef } = useHorizontalScrollTable(
+    [customers.length],
+    { wheelOnBody: true }
+  );
+  const reportScroll = useHorizontalScrollTable(
+    [!!detailsCustomer],
+    { wheelOnBody: false }
+  );
+
+  useEffect(() => {
+    if (!detailsCustomer) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [detailsCustomer]);
 
   useEffect(() => {
     setSearchQuery(getStringParam(searchParams, "q"));
@@ -125,7 +145,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   }, [showFilterDropdown, filterPlan, filterTrainerId, filterPaymentMode, filterPaidStatus]);
 
   useEffect(() => {
-    setCustomers(initialCustomers);
+    setCustomers(dedupeById(initialCustomers));
   }, [initialCustomers]);
   useEffect(() => {
     setTrainers(initialTrainers);
@@ -205,116 +225,6 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     }
     return true;
   });
-
-  // Sync top horizontal scrollbar with table scroll
-  useEffect(() => {
-    const topEl = topScrollRef.current;
-    const tableEl = tableScrollRef.current;
-    if (!topEl || !tableEl) return;
-    function syncFromTop() {
-      const t = tableScrollRef.current;
-      const top = topScrollRef.current;
-      if (!t || !top || isSyncingScrollRef.current) return;
-      isSyncingScrollRef.current = true;
-      t.scrollLeft = top.scrollLeft;
-      requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
-    }
-    function syncFromTable() {
-      const t = tableScrollRef.current;
-      const top = topScrollRef.current;
-      if (!t || !top || isSyncingScrollRef.current) return;
-      isSyncingScrollRef.current = true;
-      top.scrollLeft = t.scrollLeft;
-      requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
-    }
-    topEl.addEventListener("scroll", syncFromTop);
-    tableEl.addEventListener("scroll", syncFromTable);
-    return () => {
-      topEl.removeEventListener("scroll", syncFromTop);
-      tableEl.removeEventListener("scroll", syncFromTable);
-    };
-  }, [filteredCustomers.length]);
-
-  const onTableWheel = useCallback((e: WheelEvent) => {
-    const tableEl = tableScrollRef.current;
-    const topEl = topScrollRef.current;
-    if (!tableEl || e.deltaY === 0) return;
-    const maxScroll = tableEl.scrollWidth - tableEl.clientWidth;
-    if (maxScroll <= 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const next = Math.max(0, Math.min(maxScroll, tableEl.scrollLeft + e.deltaY));
-    tableEl.scrollLeft = next;
-    if (topEl) topEl.scrollLeft = next;
-  }, []);
-
-  useEffect(() => {
-    const header = headerRef.current;
-    const tableEl = tableScrollRef.current;
-    if (!header || !tableEl) return;
-    header.addEventListener("wheel", onTableWheel, { passive: false });
-    return () => header.removeEventListener("wheel", onTableWheel);
-  }, [filteredCustomers.length, onTableWheel]);
-
-  useEffect(() => {
-    const tableEl = tableScrollRef.current;
-    if (!tableEl) return;
-    tableEl.addEventListener("wheel", onTableWheel, { passive: false });
-    return () => tableEl.removeEventListener("wheel", onTableWheel);
-  }, [filteredCustomers.length, onTableWheel]);
-
-  const onReportTableWheel = useCallback((e: WheelEvent) => {
-    const tableEl = reportTableScrollRef.current;
-    const topEl = reportTopScrollRef.current;
-    if (!tableEl || e.deltaY === 0) return;
-    const maxScroll = tableEl.scrollWidth - tableEl.clientWidth;
-    if (maxScroll <= 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const next = Math.max(0, Math.min(maxScroll, tableEl.scrollLeft + e.deltaY));
-    tableEl.scrollLeft = next;
-    if (topEl) topEl.scrollLeft = next;
-  }, []);
-
-  useEffect(() => {
-    if (!detailsCustomer) return;
-    const topEl = reportTopScrollRef.current;
-    const tableEl = reportTableScrollRef.current;
-    if (!topEl || !tableEl) return;
-    let syncing = false;
-    const syncFromTop = () => {
-      const t = reportTableScrollRef.current;
-      const top = reportTopScrollRef.current;
-      if (!t || !top || syncing) return;
-      syncing = true;
-      t.scrollLeft = top.scrollLeft;
-      requestAnimationFrame(() => { syncing = false; });
-    };
-    const syncFromTable = () => {
-      const t = reportTableScrollRef.current;
-      const top = reportTopScrollRef.current;
-      if (!t || !top || syncing) return;
-      syncing = true;
-      top.scrollLeft = t.scrollLeft;
-      requestAnimationFrame(() => { syncing = false; });
-    };
-    topEl.addEventListener("scroll", syncFromTop);
-    tableEl.addEventListener("scroll", syncFromTable);
-    return () => {
-      topEl.removeEventListener("scroll", syncFromTop);
-      tableEl.removeEventListener("scroll", syncFromTable);
-    };
-  }, [detailsCustomer]);
-
-  useEffect(() => {
-    if (!detailsCustomer) return;
-    const header = reportHeaderRef.current;
-    const tableEl = reportTableScrollRef.current;
-    if (!header || !tableEl) return;
-    const onWheel = (e: WheelEvent) => onReportTableWheel(e);
-    header.addEventListener("wheel", onWheel, { passive: false });
-    return () => header.removeEventListener("wheel", onWheel);
-  }, [detailsCustomer, onReportTableWheel]);
 
   function buildFilterUrlForNewTab(): string {
     const params = new URLSearchParams();
@@ -983,18 +893,18 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                   </h3>
                   <div className="flex flex-col rounded-xl border border-white/10 overflow-hidden">
                     <div
-                      ref={reportTopScrollRef}
+                      ref={reportScroll.topScrollRef}
                       className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
                       aria-hidden
                     >
                       <div className="min-w-[900px] h-2" />
                     </div>
                     <div
-                      ref={reportTableScrollRef}
+                      ref={reportScroll.tableScrollRef}
                       className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom"
                     >
                       <table className="w-full text-sm border-collapse min-w-[900px]">
-                        <thead ref={reportHeaderRef} className="select-none cursor-ew-resize">
+                        <thead ref={reportScroll.headerRef} className="select-none cursor-ew-resize">
                         <tr className="border-b border-white/10 bg-white/[0.04]">
                           <th className="text-left py-2.5 px-3 font-medium text-stone-400">#</th>
                           <th className="text-left py-2.5 px-3 font-medium text-stone-400">Plan</th>
@@ -1019,7 +929,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                           const isCurrent = entry.id === detailsCustomer.id;
                           return (
                             <tr
-                              key={entry.id}
+                              key={`${entry.id}-${idx}`}
                               className={`border-b border-white/5 ${isCurrent ? "bg-brand-red/10" : ""}`}
                             >
                               <td className="py-2 px-3 text-stone-400">{totalEntries - idx}</td>
@@ -1121,11 +1031,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map((c) => {
+                {filteredCustomers.map((c, i) => {
                   const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
                   return (
                     <tr
-                      key={c.id}
+                      key={`${c.id}-${i}`}
                       className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors group"
                       onClick={() => setDetailsCustomer(c)}
                     >
