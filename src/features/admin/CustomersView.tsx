@@ -30,6 +30,19 @@ function formatCurrency(n: number) {
   }).format(n);
 }
 
+function formatDateShort(s: string | null): string {
+  if (!s) return "—";
+  try {
+    return new Date(s).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return s;
+  }
+}
+
 function getStringParam(
   params: URLSearchParams,
   key: string
@@ -64,13 +77,20 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [duration, setDuration] = useState("");
   const [status, setStatus] = useState("");
   const [slotTiming, setSlotTiming] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [paidTo, setPaidTo] = useState("");
+  const [feedback, setFeedback] = useState("");
   const [receipt, setReceipt] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterPlan, setFilterPlan] = useState("");
-  const [filterTrainerId, setFilterTrainerId] = useState("");
-  const [filterPaymentMode, setFilterPaymentMode] = useState("");
-  const [filterPaidStatus, setFilterPaidStatus] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => getStringParam(searchParams, "q"));
+  const [filterPlan, setFilterPlan] = useState(() => getStringParam(searchParams, "plan"));
+  const [filterTrainerId, setFilterTrainerId] = useState(() => getStringParam(searchParams, "trainer"));
+  const [filterPaymentMode, setFilterPaymentMode] = useState(() => getStringParam(searchParams, "payment_mode"));
+  const [filterPaidStatus, setFilterPaidStatus] = useState(() => getStringParam(searchParams, "paid_status"));
+  const [pendingFilterPlan, setPendingFilterPlan] = useState("");
+  const [pendingFilterTrainerId, setPendingFilterTrainerId] = useState("");
+  const [pendingFilterPaymentMode, setPendingFilterPaymentMode] = useState("");
+  const [pendingFilterPaidStatus, setPendingFilterPaidStatus] = useState("");
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
@@ -78,6 +98,13 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLTableSectionElement>(null);
+  const isSyncingScrollRef = useRef(false);
+  const reportTableScrollRef = useRef<HTMLDivElement>(null);
+  const reportTopScrollRef = useRef<HTMLDivElement>(null);
+  const reportHeaderRef = useRef<HTMLTableSectionElement>(null);
 
   useEffect(() => {
     setSearchQuery(getStringParam(searchParams, "q"));
@@ -86,6 +113,16 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setFilterPaymentMode(getStringParam(searchParams, "payment_mode"));
     setFilterPaidStatus(getStringParam(searchParams, "paid_status"));
   }, [searchParams]);
+
+  // When filter dropdown opens, copy current URL params into pending so Apply only affects the new tab
+  useEffect(() => {
+    if (showFilterDropdown) {
+      setPendingFilterPlan(filterPlan);
+      setPendingFilterTrainerId(filterTrainerId);
+      setPendingFilterPaymentMode(filterPaymentMode);
+      setPendingFilterPaidStatus(filterPaidStatus);
+    }
+  }, [showFilterDropdown, filterPlan, filterTrainerId, filterPaymentMode, filterPaidStatus]);
 
   useEffect(() => {
     setCustomers(initialCustomers);
@@ -154,22 +191,123 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     !!filterPlan || !!filterTrainerId || !!filterPaymentMode || !!filterPaidStatus || searchQuery.trim() !== "";
 
   const searchLower = searchQuery.trim().toLowerCase();
-  const filteredCustomers = hasFilterParamsInUrl
-    ? customers.filter((c) => {
-        if (filterPlan && c.plan !== filterPlan) return false;
-        if (filterTrainerId && c.trainer_id !== filterTrainerId) return false;
-        if (filterPaymentMode && (c.payment_mode ?? "") !== filterPaymentMode) return false;
-        if (filterPaidStatus === "paid" && (c.balance ?? 0) !== 0) return false;
-        if (filterPaidStatus === "not_paid" && (c.balance ?? 0) === 0) return false;
-        if (searchLower) {
-          const nameMatch = (c.name ?? "").toLowerCase().includes(searchLower);
-          const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
-          const trainerMatch = trainer?.name?.toLowerCase().includes(searchLower);
-          if (!nameMatch && !trainerMatch) return false;
-        }
-        return true;
-      })
-    : customers;
+  const filteredCustomers = customers.filter((c) => {
+    if (filterPlan && c.plan !== filterPlan) return false;
+    if (filterTrainerId && c.trainer_id !== filterTrainerId) return false;
+    if (filterPaymentMode && (c.payment_mode ?? "") !== filterPaymentMode) return false;
+    if (filterPaidStatus === "paid" && (c.balance ?? 0) !== 0) return false;
+    if (filterPaidStatus === "not_paid" && (c.balance ?? 0) === 0) return false;
+    if (searchLower) {
+      const nameMatch = (c.name ?? "").toLowerCase().includes(searchLower);
+      const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
+      const trainerMatch = trainer?.name?.toLowerCase().includes(searchLower);
+      if (!nameMatch && !trainerMatch) return false;
+    }
+    return true;
+  });
+
+  // Sync top horizontal scrollbar with table scroll
+  useEffect(() => {
+    const topEl = topScrollRef.current;
+    const tableEl = tableScrollRef.current;
+    if (!topEl || !tableEl) return;
+    function syncFromTop() {
+      if (isSyncingScrollRef.current) return;
+      isSyncingScrollRef.current = true;
+      tableEl.scrollLeft = topEl.scrollLeft;
+      requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
+    }
+    function syncFromTable() {
+      if (isSyncingScrollRef.current) return;
+      isSyncingScrollRef.current = true;
+      topEl.scrollLeft = tableEl.scrollLeft;
+      requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
+    }
+    topEl.addEventListener("scroll", syncFromTop);
+    tableEl.addEventListener("scroll", syncFromTable);
+    return () => {
+      topEl.removeEventListener("scroll", syncFromTop);
+      tableEl.removeEventListener("scroll", syncFromTable);
+    };
+  }, [filteredCustomers.length]);
+
+  const onTableWheel = useCallback((e: WheelEvent) => {
+    const tableEl = tableScrollRef.current;
+    const topEl = topScrollRef.current;
+    if (!tableEl || e.deltaY === 0) return;
+    const maxScroll = tableEl.scrollWidth - tableEl.clientWidth;
+    if (maxScroll <= 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const next = Math.max(0, Math.min(maxScroll, tableEl.scrollLeft + e.deltaY));
+    tableEl.scrollLeft = next;
+    if (topEl) topEl.scrollLeft = next;
+  }, []);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    const tableEl = tableScrollRef.current;
+    if (!header || !tableEl) return;
+    header.addEventListener("wheel", onTableWheel, { passive: false });
+    return () => header.removeEventListener("wheel", onTableWheel);
+  }, [filteredCustomers.length, onTableWheel]);
+
+  useEffect(() => {
+    const tableEl = tableScrollRef.current;
+    if (!tableEl) return;
+    tableEl.addEventListener("wheel", onTableWheel, { passive: false });
+    return () => tableEl.removeEventListener("wheel", onTableWheel);
+  }, [filteredCustomers.length, onTableWheel]);
+
+  const onReportTableWheel = useCallback((e: WheelEvent) => {
+    const tableEl = reportTableScrollRef.current;
+    const topEl = reportTopScrollRef.current;
+    if (!tableEl || e.deltaY === 0) return;
+    const maxScroll = tableEl.scrollWidth - tableEl.clientWidth;
+    if (maxScroll <= 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const next = Math.max(0, Math.min(maxScroll, tableEl.scrollLeft + e.deltaY));
+    tableEl.scrollLeft = next;
+    if (topEl) topEl.scrollLeft = next;
+  }, []);
+
+  useEffect(() => {
+    if (!detailsCustomer) return;
+    const topEl = reportTopScrollRef.current;
+    const tableEl = reportTableScrollRef.current;
+    if (!topEl || !tableEl) return;
+    let syncing = false;
+    const syncFromTop = () => {
+      if (syncing) return;
+      syncing = true;
+      tableEl.scrollLeft = topEl.scrollLeft;
+      requestAnimationFrame(() => { syncing = false; });
+    };
+    const syncFromTable = () => {
+      if (syncing) return;
+      syncing = true;
+      topEl.scrollLeft = tableEl.scrollLeft;
+      requestAnimationFrame(() => { syncing = false; });
+    };
+    topEl.addEventListener("scroll", syncFromTop);
+    tableEl.addEventListener("scroll", syncFromTable);
+    return () => {
+      topEl.removeEventListener("scroll", syncFromTop);
+      tableEl.removeEventListener("scroll", syncFromTable);
+    };
+  }, [detailsCustomer]);
+
+  useEffect(() => {
+    if (!detailsCustomer) return;
+    const header = reportHeaderRef.current;
+    const tableEl = reportTableScrollRef.current;
+    const topEl = reportTopScrollRef.current;
+    if (!header || !tableEl) return;
+    const onWheel = (e: WheelEvent) => onReportTableWheel(e);
+    header.addEventListener("wheel", onWheel, { passive: false });
+    return () => header.removeEventListener("wheel", onWheel);
+  }, [detailsCustomer, onReportTableWheel]);
 
   function buildFilterUrl(): string {
     const params = new URLSearchParams();
@@ -182,8 +320,18 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     return q ? `${pathname}?${q}` : pathname;
   }
 
+  function buildFilterUrlForNewTab(): string {
+    const params = new URLSearchParams();
+    if (pendingFilterPlan) params.set("plan", pendingFilterPlan);
+    if (pendingFilterTrainerId) params.set("trainer", pendingFilterTrainerId);
+    if (pendingFilterPaymentMode) params.set("payment_mode", pendingFilterPaymentMode);
+    if (pendingFilterPaidStatus) params.set("paid_status", pendingFilterPaidStatus);
+    const q = params.toString();
+    return q ? `${pathname}?${q}` : pathname;
+  }
+
   function applyFilters() {
-    window.open(buildFilterUrl(), "_blank", "noopener,noreferrer");
+    window.open(buildFilterUrlForNewTab(), "_blank", "noopener,noreferrer");
     setShowFilterDropdown(false);
   }
 
@@ -214,9 +362,19 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setDuration("");
     setStatus("");
     setSlotTiming("");
+    setMobile("");
+    setPaidTo("");
+    setFeedback("");
     setReceipt(false);
     setFormOpen(true);
     setError(null);
+  }
+
+  function openAddEntryFromReport(c: Customer) {
+    openAdd();
+    setName(c.name ?? "");
+    setMobile(c.mobile ?? "");
+    setDetailsCustomer(null);
   }
 
   function openEdit(c: Customer) {
@@ -236,6 +394,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setDuration(c.duration ?? "");
     setStatus(c.status ?? "");
     setSlotTiming(c.slot_timing ?? "");
+    setMobile(c.mobile ?? "");
+    setPaidTo(c.paid_to ?? "");
+    setFeedback(c.feedback ?? "");
     setReceipt(c.receipt ?? false);
     setFormOpen(true);
     setError(null);
@@ -285,6 +446,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         duration: duration.trim() || null,
         status: status.trim() || null,
         slot_timing: slotTiming.trim() || null,
+        mobile: mobile.trim() || null,
+        paid_to: paidTo.trim() || null,
+        feedback: feedback.trim() || null,
         receipt,
       };
       if (editing) {
@@ -328,7 +492,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     }
   }
 
-  const trainerOptions = trainers;
+  const trainerOptions = trainers.filter((t) => (t.name ?? "").trim() !== "");
+  // Filter dropdown: only trainers in use (assigned to ≥1 customer) with valid names, same as Trainers page
+  const trainersInUseForFilter = trainers.filter(
+    (t) => (t.name ?? "").trim() !== "" && customers.some((c) => c.trainer_id === t.id)
+  );
   const searchInputClass =
     "w-full px-3 py-2.5 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100 placeholder:text-stone-500 focus:border-brand-red focus:ring-1 focus:ring-brand-red outline-none text-sm transition shadow-inner";
   const filterSelectClass =
@@ -395,8 +563,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                     <div>
                       <label className="block text-xs font-medium text-stone-400 mb-1.5">Plan</label>
                       <select
-                        value={filterPlan}
-                        onChange={(e) => setFilterPlan(e.target.value)}
+                        value={pendingFilterPlan}
+                        onChange={(e) => setPendingFilterPlan(e.target.value)}
                         className={filterSelectClass}
                       >
                         <option value="">All plans</option>
@@ -408,21 +576,21 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                     <div>
                       <label className="block text-xs font-medium text-stone-400 mb-1.5">Trainer</label>
                       <select
-                        value={filterTrainerId}
-                        onChange={(e) => setFilterTrainerId(e.target.value)}
+                        value={pendingFilterTrainerId}
+                        onChange={(e) => setPendingFilterTrainerId(e.target.value)}
                         className={filterSelectClass}
                       >
                         <option value="">All trainers</option>
-                        {trainers.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
+                        {trainersInUseForFilter.map((t) => (
+                          <option key={t.id} value={t.id}>{(t.name ?? "").trim()}</option>
                         ))}
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-stone-400 mb-1.5">Payment mode</label>
                       <select
-                        value={filterPaymentMode}
-                        onChange={(e) => setFilterPaymentMode(e.target.value)}
+                        value={pendingFilterPaymentMode}
+                        onChange={(e) => setPendingFilterPaymentMode(e.target.value)}
                         className={filterSelectClass}
                       >
                         <option value="">All</option>
@@ -434,8 +602,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                     <div>
                       <label className="block text-xs font-medium text-stone-400 mb-1.5">Paid status</label>
                       <select
-                        value={filterPaidStatus}
-                        onChange={(e) => setFilterPaidStatus(e.target.value)}
+                        value={pendingFilterPaidStatus}
+                        onChange={(e) => setPendingFilterPaidStatus(e.target.value)}
                         className={filterSelectClass}
                       >
                         <option value="">All</option>
@@ -674,6 +842,58 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                 placeholder="e.g. 3M, 6M, 12M + 1M"
               />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Status</label>
+                <input
+                  type="text"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className={inputClass}
+                  placeholder="e.g. Active"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Slot timing</label>
+                <input
+                  type="text"
+                  value={slotTiming}
+                  onChange={(e) => setSlotTiming(e.target.value)}
+                  className={inputClass}
+                  placeholder="e.g. 6–7 AM"
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Mobile</label>
+              <input
+                type="text"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                className={inputClass}
+                placeholder="Phone number"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Paid to</label>
+              <input
+                type="text"
+                value={paidTo}
+                onChange={(e) => setPaidTo(e.target.value)}
+                className={inputClass}
+                placeholder="Paid to (name)"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Feedback</label>
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                className={inputClass + " min-h-[60px] resize-y"}
+                placeholder="Optional feedback"
+                rows={2}
+              />
+            </div>
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -706,23 +926,33 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         </div>
       )}
 
-      {/* Customer details card modal */}
-      {detailsCustomer && mounted && typeof document !== "undefined" &&
-        createPortal(
+      {/* Customer report modal – all entries, renewals, history */}
+      {detailsCustomer && mounted && typeof document !== "undefined" && (() => {
+        const nameKey = (detailsCustomer.name ?? "").trim();
+        const history = customers
+          .filter((c) => (c.name ?? "").trim() === nameKey)
+          .sort((a, b) => {
+            const aStart = a.start_date ?? a.created_at ?? "";
+            const bStart = b.start_date ?? b.created_at ?? "";
+            return bStart.localeCompare(aStart);
+          });
+        const totalPaidAllTime = history.reduce((sum, c) => sum + Number(c.paid_fee ?? 0), 0);
+        const totalEntries = history.length;
+        return createPortal(
           <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
             onClick={() => setDetailsCustomer(null)}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="customer-details-title"
+            aria-labelledby="customer-report-title"
           >
             <div
-              className="liquid-glass rounded-2xl border border-white/10 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+              className="liquid-glass rounded-2xl border border-white/10 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-white/10 flex items-center justify-between">
-                <h2 id="customer-details-title" className="text-lg font-bold text-stone-100">
-                  Customer details
+              <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0">
+                <h2 id="customer-report-title" className="text-lg font-bold text-stone-100">
+                  Customer report – all history
                 </h2>
                 <button
                   type="button"
@@ -735,38 +965,105 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                   </svg>
                 </button>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="flex gap-4">
+              <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-6">
+                <div className="flex gap-4 flex-wrap">
                   <img
                     src={detailsCustomer.image ?? "/images/profile placeholder.jpg"}
                     alt=""
-                    className="w-24 h-24 rounded-xl object-cover border border-white/10 shrink-0"
+                    className="w-20 h-20 rounded-xl object-cover border border-white/10 shrink-0"
                   />
                   <div className="min-w-0">
-                    <p className="text-2xl font-bold text-stone-100">{detailsCustomer.name}</p>
-                    <p className="text-stone-400 text-sm">Plan: {detailsCustomer.plan}</p>
+                    <p className="text-xl font-bold text-stone-100">{detailsCustomer.name}</p>
+                    <p className="text-stone-400 text-sm">{detailsCustomer.mobile ?? "—"}</p>
+                    <p className="text-stone-500 text-sm mt-1">
+                      {totalEntries} entr{totalEntries === 1 ? "y" : "ies"} · Total paid (all time): {formatCurrency(totalPaidAllTime)}
+                    </p>
                   </div>
                 </div>
-                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div><dt className="text-stone-500">Total fee</dt><dd className="text-stone-100 font-medium">{formatCurrency(detailsCustomer.total_fee)}</dd></div>
-                  <div><dt className="text-stone-500">Paid fee</dt><dd className="text-stone-100 font-medium">{formatCurrency(detailsCustomer.paid_fee)}</dd></div>
-                  <div><dt className="text-stone-500">Balance</dt><dd className="text-stone-100 font-medium">{formatCurrency(detailsCustomer.balance)}</dd></div>
-                  <div><dt className="text-stone-500">Trainer</dt><dd className="text-stone-100">{detailsCustomer.plan === "PT" && detailsCustomer.trainer_id ? (trainers.find((t) => t.id === detailsCustomer.trainer_id)?.name ?? "—") : "Not applicable"}</dd></div>
-                  <div><dt className="text-stone-500">Start date</dt><dd className="text-stone-100">{detailsCustomer.start_date ?? "—"}</dd></div>
-                  <div><dt className="text-stone-500">End date</dt><dd className="text-stone-100">{detailsCustomer.end_date ?? "—"}</dd></div>
-                  <div><dt className="text-stone-500">Pay date</dt><dd className="text-stone-100">{detailsCustomer.pay_date ?? "—"}</dd></div>
-                  <div><dt className="text-stone-500">Payment mode</dt><dd className="text-stone-100">{detailsCustomer.payment_mode ?? "—"}</dd></div>
-                  <div className="sm:col-span-2"><dt className="text-stone-500">Remarks</dt><dd className="text-stone-100">{detailsCustomer.remarks ?? "—"}</dd></div>
-                  <div><dt className="text-stone-500">Duration</dt><dd className="text-stone-100">{detailsCustomer.duration ?? "—"}</dd></div>
-                  <div><dt className="text-stone-500">Receipt</dt><dd className="text-stone-100">{detailsCustomer.receipt ? "Yes" : "No"}</dd></div>
-                </dl>
-                <div className="flex gap-2 pt-2 border-t border-white/10">
+
+                <div>
+                  <h3 className="text-stone-300 font-semibold text-sm uppercase tracking-wider mb-3">
+                    All entries & renewals
+                  </h3>
+                  <div className="flex flex-col rounded-xl border border-white/10 overflow-hidden">
+                    <div
+                      ref={reportTopScrollRef}
+                      className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
+                      aria-hidden
+                    >
+                      <div className="min-w-[900px] h-2" />
+                    </div>
+                    <div
+                      ref={reportTableScrollRef}
+                      className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom"
+                    >
+                      <table className="w-full text-sm border-collapse min-w-[900px]">
+                        <thead ref={reportHeaderRef} className="select-none cursor-ew-resize">
+                        <tr className="border-b border-white/10 bg-white/[0.04]">
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">#</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Plan</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Start</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">End</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Duration</th>
+                          <th className="text-right py-2.5 px-3 font-medium text-stone-400">Total</th>
+                          <th className="text-right py-2.5 px-3 font-medium text-stone-400">Paid</th>
+                          <th className="text-right py-2.5 px-3 font-medium text-stone-400">Balance</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Pay date</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Payment</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Trainer</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Status</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Slot</th>
+                          <th className="text-left py-2.5 px-3 font-medium text-stone-400 max-w-[120px]">Remarks</th>
+                          <th className="text-center py-2.5 px-3 font-medium text-stone-400">Receipt</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.map((entry, idx) => {
+                          const trainer = entry.trainer_id ? trainers.find((t) => t.id === entry.trainer_id) : null;
+                          const isCurrent = entry.id === detailsCustomer.id;
+                          return (
+                            <tr
+                              key={entry.id}
+                              className={`border-b border-white/5 ${isCurrent ? "bg-brand-red/10" : ""}`}
+                            >
+                              <td className="py-2 px-3 text-stone-400">{totalEntries - idx}</td>
+                              <td className="py-2 px-3 text-stone-200 font-medium">{entry.plan}</td>
+                              <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.start_date)}</td>
+                              <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.end_date)}</td>
+                              <td className="py-2 px-3 text-stone-300">{entry.duration ?? "—"}</td>
+                              <td className="py-2 px-3 text-right text-stone-300 tabular-nums">{formatCurrency(entry.total_fee)}</td>
+                              <td className="py-2 px-3 text-right text-stone-300 tabular-nums">{formatCurrency(entry.paid_fee)}</td>
+                              <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(entry.balance)}</td>
+                              <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.pay_date)}</td>
+                              <td className="py-2 px-3 text-stone-300">{entry.payment_mode ?? "—"}</td>
+                              <td className="py-2 px-3 text-stone-300">{entry.plan === "PT" ? (trainer?.name ?? "—") : "—"}</td>
+                              <td className="py-2 px-3 text-stone-300">{entry.status ?? "—"}</td>
+                              <td className="py-2 px-3 text-stone-300">{entry.slot_timing ?? "—"}</td>
+                              <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "—"}</td>
+                              <td className="py-2 px-3 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openAddEntryFromReport(detailsCustomer)}
+                    className="px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm"
+                  >
+                    Add entry
+                  </button>
                   <button
                     type="button"
                     onClick={() => { openEdit(detailsCustomer); setDetailsCustomer(null); }}
                     className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm"
                   >
-                    Edit customer data
+                    Edit current entry
                   </button>
                   <button
                     type="button"
@@ -780,9 +1077,10 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
             </div>
           </div>,
           document.body
-        )}
+        );
+      })()}
 
-      <div className="liquid-glass rounded-2xl overflow-hidden overflow-x-auto">
+      <div className="liquid-glass rounded-2xl overflow-hidden border border-white/10">
         {filteredCustomers.length === 0 ? (
           <div className="p-8 text-center text-stone-500 text-sm">
             {customers.length === 0
@@ -790,122 +1088,124 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
               : "No customers match the current filters. Try changing search or filters."}
           </div>
         ) : (
-          <table className="w-full text-sm text-left border-collapse min-w-[800px]">
-            <thead>
-              <tr className="border-b border-white/10 bg-white/[0.03]">
-                <th className="py-3 px-4 text-stone-400 font-medium w-14">Photo</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Name</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Plan</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Total</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Paid</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Balance</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Trainer</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Start</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">End</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Pay date</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Payment</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Remarks</th>
-                <th className="py-3 px-4 text-stone-400 font-medium">Duration</th>
-                <th className="py-3 px-4 text-stone-400 font-medium w-20">Receipt</th>
-                <th className="py-3 px-4 text-stone-400 font-medium w-28">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCustomers.map((c) => {
-                const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
-                return (
-                  <tr
-                    key={c.id}
-                    className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer"
-                    onClick={() => setDetailsCustomer(c)}
-                  >
-                    <td className="py-2.5 px-4">
-                      <img
-                        src={c.image ?? "/images/profile placeholder.jpg"}
-                        alt=""
-                        className="w-10 h-10 rounded-lg object-cover border border-white/10"
-                      />
-                    </td>
-                    <td className="py-2.5 px-4 text-stone-100 font-medium">{c.name}</td>
-                    <td className="py-2.5 px-4 text-stone-300">{c.plan}</td>
-                    <td className="py-2.5 px-4 text-stone-300">{formatCurrency(c.total_fee)}</td>
-                    <td className="py-2.5 px-4 text-stone-300">{formatCurrency(c.paid_fee)}</td>
-                    <td className="py-2.5 px-4 text-stone-300">{formatCurrency(c.balance)}</td>
-                    <td className="py-2.5 px-4 text-stone-400">{c.plan === "GT" ? "Not applicable" : (trainer?.name ?? "—")}</td>
-                    <td className="py-2.5 px-4 text-stone-500 text-xs">{c.start_date ?? "—"}</td>
-                    <td className="py-2.5 px-4 text-stone-500 text-xs">{c.end_date ?? "—"}</td>
-                    <td className="py-2.5 px-4 text-stone-500 text-xs">{c.pay_date ?? "—"}</td>
-                    <td className="py-2.5 px-4 text-stone-400 text-xs">{c.payment_mode ?? "—"}</td>
-                    <td className="py-2.5 px-4 text-stone-500 text-xs max-w-[160px] truncate" title={c.remarks ?? undefined}>{c.remarks ?? "—"}</td>
-                    <td className="py-2.5 px-4 text-stone-400 text-xs">{c.duration ?? "—"}</td>
-                    <td className="py-2.5 px-4">
-                      {c.receipt ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-400 text-xs" title="Receipt issued">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                          Yes
-                        </span>
-                      ) : (
-                        <span className="text-stone-500 text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-4 relative" onClick={(e) => e.stopPropagation()}>
-                      <div className="relative inline-block">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenActionRowId(openActionRowId === c.id ? null : c.id)
-                          }
-                          className="p-2 rounded-lg border border-white/10 text-stone-400 hover:text-stone-100 hover:bg-white/5 transition"
-                          aria-expanded={openActionRowId === c.id}
-                          aria-haspopup="true"
-                          aria-label="Actions"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-                          </svg>
-                        </button>
-                        {openActionRowId === c.id && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-10"
-                              aria-hidden
-                              onClick={() => setOpenActionRowId(null)}
-                            />
-                            <div className="absolute right-0 top-full mt-1 z-20 min-w-[180px] py-1 rounded-xl border border-white/10 bg-stone-900/95 backdrop-blur-xl shadow-xl">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  openEdit(c);
-                                  setOpenActionRowId(null);
-                                }}
-                                className="w-full text-left px-4 py-2.5 text-sm text-stone-100 hover:bg-brand-red/20 hover:text-brand-red transition"
-                              >
-                                Edit customer data
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenActionRowId(null);
-                                  handleDelete(c);
-                                }}
-                                className="w-full text-left px-4 py-2.5 text-sm text-stone-400 hover:bg-red-500/20 hover:text-red-400 transition"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </>
+          <div className="flex flex-col">
+            {/* Top horizontal scrollbar – synced with table */}
+            <div
+              ref={topScrollRef}
+              className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
+              aria-hidden
+            >
+              <div className="min-w-[900px] h-2" />
+            </div>
+            <div
+              ref={tableScrollRef}
+              className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom"
+            >
+              <table className="w-full min-w-[900px] text-sm">
+              <thead
+                ref={headerRef}
+                className="select-none cursor-ew-resize"
+                role="presentation"
+              >
+                <tr className="border-b border-white/10 bg-white/[0.04]">
+                  <th className="sticky left-0 z-20 bg-stone-900 border-r border-white/10 text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider w-[72px] min-w-[72px] shadow-[4px_0_6px_-2px_rgba(0,0,0,0.3)]">Photo</th>
+                  <th className="sticky left-[72px] z-20 bg-stone-900 border-r border-white/10 text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider min-w-[160px] shadow-[4px_0_6px_-2px_rgba(0,0,0,0.3)]">Name</th>
+                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Plan</th>
+                  <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Total</th>
+                  <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Paid</th>
+                  <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Balance</th>
+                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Mobile</th>
+                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Status</th>
+                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Slot</th>
+                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Trainer</th>
+                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Pay date</th>
+                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Payment</th>
+                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider max-w-[120px]">Remarks</th>
+                  <th className="text-center py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider w-14">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((c) => {
+                  const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
+                  return (
+                    <tr
+                      key={c.id}
+                      className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors group"
+                      onClick={() => setDetailsCustomer(c)}
+                    >
+                      <td className="sticky left-0 z-20 w-[72px] min-w-[72px] py-2.5 px-4 bg-stone-900 border-r border-white/10 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.25)] group-hover:bg-stone-800">
+                        <img
+                          src={c.image ?? "/images/profile placeholder.jpg"}
+                          alt=""
+                          className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
+                        />
+                      </td>
+                      <td className="sticky left-[72px] z-20 min-w-[160px] py-2.5 px-4 bg-stone-900 border-r border-white/10 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.25)] group-hover:bg-stone-800">
+                        <span className="text-stone-100 font-medium">{c.name}</span>
+                        {c.duration && (
+                          <span className="block text-stone-500 text-xs">{c.duration}</span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="py-2.5 px-4 text-stone-300">{c.plan}</td>
+                      <td className="py-2.5 px-4 text-right text-stone-300 tabular-nums">{formatCurrency(c.total_fee)}</td>
+                      <td className="py-2.5 px-4 text-right text-stone-300 tabular-nums">{formatCurrency(c.paid_fee)}</td>
+                      <td className="py-2.5 px-4 text-right tabular-nums">
+                        <span className={c.balance !== 0 ? "text-amber-400 font-medium" : "text-stone-300"}>
+                          {formatCurrency(c.balance)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-4 text-stone-300 max-w-[100px] truncate" title={c.mobile ?? undefined}>{c.mobile ?? "—"}</td>
+                      <td className="py-2.5 px-4 text-stone-300 max-w-[80px] truncate" title={c.status ?? undefined}>{c.status ?? "—"}</td>
+                      <td className="py-2.5 px-4 text-stone-300 max-w-[80px] truncate" title={c.slot_timing ?? undefined}>{c.slot_timing ?? "—"}</td>
+                      <td className="py-2.5 px-4 text-stone-300 max-w-[100px] truncate" title={c.plan === "PT" ? (trainer?.name ?? undefined) : undefined}>
+                        {c.plan === "PT" ? (trainer?.name ?? "—") : "—"}
+                      </td>
+                      <td className="py-2.5 px-4 text-stone-300 whitespace-nowrap">{c.pay_date ?? "—"}</td>
+                      <td className="py-2.5 px-4 text-stone-300 max-w-[90px] truncate" title={c.payment_mode ?? undefined}>{c.payment_mode ?? "—"}</td>
+                      <td className="py-2.5 px-4 text-stone-300 max-w-[120px] truncate" title={c.remarks ?? undefined}>{c.remarks ?? "—"}</td>
+                      <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="relative inline-block">
+                          <button
+                            type="button"
+                            onClick={() => setOpenActionRowId(openActionRowId === c.id ? null : c.id)}
+                            className="p-1.5 rounded-lg border border-white/10 text-stone-400 hover:text-stone-100 hover:bg-white/5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                            aria-expanded={openActionRowId === c.id}
+                            aria-label="Actions"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                            </svg>
+                          </button>
+                          {openActionRowId === c.id && (
+                            <>
+                              <div className="fixed inset-0 z-10" aria-hidden onClick={() => setOpenActionRowId(null)} />
+                              <div className="absolute right-0 top-full mt-1 z-20 min-w-[160px] py-1 rounded-xl border border-white/10 bg-stone-900/95 backdrop-blur-xl shadow-xl">
+                                <button
+                                  type="button"
+                                  onClick={() => { openEdit(c); setOpenActionRowId(null); }}
+                                  className="w-full text-left px-3 py-2 text-sm text-stone-100 hover:bg-brand-red/20 hover:text-brand-red"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setOpenActionRowId(null); handleDelete(c); }}
+                                  className="w-full text-left px-3 py-2 text-sm text-stone-400 hover:bg-red-500/20 hover:text-red-400"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            </div>
+          </div>
         )}
       </div>
     </div>

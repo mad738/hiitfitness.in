@@ -1,6 +1,6 @@
 /**
  * Shared mapping: TRAIL TRACKER sheet header names -> customers table columns.
- * Use for import and update-from-sheet so all columns are synced.
+ * All non-empty headers from TRAIL TRACKER.xlsx are included.
  */
 module.exports = {
   // Sheet header (exact) -> DB column name
@@ -15,13 +15,15 @@ module.exports = {
     "Total Fee": "total_fee",
     "Paid Fee": "paid_fee",
     "Due Fee": "balance",
+    Mobile: "mobile",
     "Pay Date": "pay_date",
     "Payment Mode": "payment_mode",
+    "Paid to": "paid_to",
+    "false": "receipt", // column literally named "false" in sheet
     Remarks: "remarks",
-    Status: "status",
+    Feedback: "feedback",
     "Slot timing": "slot_timing",
-    // Column literally named "false" in sheet -> receipt
-    "false": "receipt",
+    Status: "status",
   },
   DATE_COLS: ["start_date", "end_date", "pay_date"],
   NUM_COLS: ["total_fee", "paid_fee", "balance"],

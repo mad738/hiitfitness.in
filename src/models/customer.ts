@@ -11,7 +11,10 @@ export type Customer = {
   end_date: string | null;
   pay_date: string | null;
   payment_mode: string | null;
+  paid_to: string | null;
   remarks: string | null;
+  feedback: string | null;
+  mobile: string | null;
   duration: string | null;
   status: string | null;
   slot_timing: string | null;

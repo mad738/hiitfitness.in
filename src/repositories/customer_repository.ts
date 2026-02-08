@@ -3,7 +3,7 @@ import type { Customer, CustomerInsert, CustomerUpdate } from "@/models/customer
 
 const TABLE = "customers";
 const COLS =
-  "id, name, image, plan, total_fee, paid_fee, balance, trainer_id, start_date, end_date, pay_date, payment_mode, remarks, duration, status, slot_timing, receipt, created_at, updated_at";
+  "id, name, image, plan, total_fee, paid_fee, balance, trainer_id, start_date, end_date, pay_date, payment_mode, paid_to, remarks, feedback, mobile, duration, status, slot_timing, receipt, created_at, updated_at";
 
 const PAGE_SIZE = 1000;
 

@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
@@ -14,7 +14,6 @@ import {
   DUMMY_MONTH_WISE,
 } from "@/data/dummy-admin-data";
 import type { MonthWiseRow } from "@/data/dummy-admin-data";
-import { AdminDatePicker } from "@/components/ui/admin-date-picker";
 
 const DashboardCharts = dynamic(
   () => import("./DashboardCharts").then((m) => m.DashboardCharts),
@@ -118,21 +117,39 @@ const PRESETS = [
   { label: "Last 12 months", months: 12 },
 ] as const;
 
+/** Business month: starts on 6th, ends on 5th of next month. */
+function getBusinessMonthStart(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (x.getDate() >= 6) {
+    x.setDate(6);
+  } else {
+    x.setMonth(x.getMonth() - 1);
+    x.setDate(6);
+  }
+  return x;
+}
+
+/** End of business month (5th of next month at 23:59:59.999). */
+function getBusinessMonthEnd(d: Date): Date {
+  const start = getBusinessMonthStart(d);
+  return new Date(start.getFullYear(), start.getMonth() + 1, 5, 23, 59, 59, 999);
+}
+
 function getDefaultRange(): { dateFrom: string; dateTo: string } {
   const now = new Date();
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  const start = getBusinessMonthStart(now);
+  const end = getBusinessMonthEnd(now);
   return {
     dateFrom: toDateOnly(start.toISOString()),
     dateTo: toDateOnly(end.toISOString()),
   };
 }
 
-/** Monday as start of week (ISO-style). */
+/** Week starts Saturday, ends Friday (business week). */
 function getWeekStart(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const day = x.getDay();
-  const offset = day === 0 ? -6 : 1 - day;
+  const offset = -((day + 1) % 7);
   x.setDate(x.getDate() + offset);
   return x;
 }
@@ -150,9 +167,25 @@ export function DashboardContent({
   adminCount,
 }: Props) {
   const useDummy = useDemoMode();
-  const defaultRange = useMemo(getDefaultRange, []);
-  const [dateFrom, setDateFrom] = useState(defaultRange.dateFrom);
-  const [dateTo, setDateTo] = useState(defaultRange.dateTo);
+  const [selectedPresetMonths, setSelectedPresetMonths] = useState<
+    0 | 3 | 6 | 12
+  >(0);
+  const { dateFrom, dateTo } = useMemo(() => {
+    const now = new Date();
+    const periodEnd = getBusinessMonthEnd(now);
+    const periodStart =
+      selectedPresetMonths === 0
+        ? getBusinessMonthStart(now)
+        : (() => {
+            const curr = getBusinessMonthStart(now);
+            const d = new Date(curr.getFullYear(), curr.getMonth() - selectedPresetMonths, 6);
+            return d;
+          })();
+    return {
+      dateFrom: toDateOnly(periodStart.toISOString()),
+      dateTo: toDateOnly(periodEnd.toISOString()),
+    };
+  }, [selectedPresetMonths]);
   const [selectedTrainer, setSelectedTrainer] = useState<TrainerReport | null>(
     null
   );
@@ -198,10 +231,14 @@ export function DashboardContent({
     }
     const from = dateFrom;
     const to = dateTo;
+    const now = new Date();
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const toDate = new Date(to + "T23:59:59");
+    const effectiveTo = toDate > todayEnd ? toDateOnly(todayEnd.toISOString()) : to;
     const inRangeStart = (d: string | null) =>
-      d && d >= from && d <= to;
+      d && d >= from && d <= effectiveTo;
     const inRangePay = (d: string | null) =>
-      d && d >= from && d <= to;
+      d && d >= from && d <= effectiveTo;
 
     const newEntries = customers.filter((c) =>
       inRangeStart(c.start_date ? toDateOnly(c.start_date) : null)
@@ -214,52 +251,60 @@ export function DashboardContent({
 
     const start = new Date(from + "T00:00:00");
     const end = new Date(to + "T23:59:59");
+    const effectiveEnd = toDate > todayEnd ? todayEnd : end;
+
     const months: MonthWiseRow[] = [];
-    const curr = new Date(start.getFullYear(), start.getMonth(), 1);
+    const curr = new Date(getBusinessMonthStart(start).getTime());
     while (curr <= end) {
-      const y = curr.getFullYear();
-      const m = curr.getMonth();
-      const monthKey = `${y}-${String(m + 1).padStart(2, "0")}`;
-      const monthLabel = curr.toLocaleDateString("en-IN", {
-        month: "short",
-        year: "numeric",
-      });
-      const monthStart = new Date(y, m, 1);
-      const monthEnd = new Date(y, m + 1, 0, 23, 59, 59, 999);
+      const monthStart = new Date(curr.getTime());
+      const monthEnd = getBusinessMonthEnd(curr);
+      if (monthStart > todayEnd) break;
+      const effectiveMonthEnd = monthEnd > todayEnd ? todayEnd : monthEnd;
+      const monthKey = toDateOnly(monthStart.toISOString());
+      const monthLabel =
+        effectiveMonthEnd.getTime() < monthEnd.getTime()
+          ? `${monthStart.getDate()} ${monthStart.toLocaleDateString("en-IN", { month: "short" })} – ${effectiveMonthEnd.getDate()} ${effectiveMonthEnd.toLocaleDateString("en-IN", { month: "short", year: "numeric" })} (so far)`
+          : `${monthStart.getDate()} ${monthStart.toLocaleDateString("en-IN", { month: "short" })} – ${monthEnd.getDate()} ${monthEnd.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`;
       const entries = customers.filter((c) => {
         const sd = c.start_date ? new Date(c.start_date) : null;
-        return sd && sd >= monthStart && sd <= monthEnd;
+        return sd && sd >= monthStart && sd <= effectiveMonthEnd;
       }).length;
       const revenueM = customers
         .filter((c) => {
           const pd = c.pay_date ? new Date(c.pay_date) : null;
-          return pd && pd >= monthStart && pd <= monthEnd;
+          return pd && pd >= monthStart && pd <= effectiveMonthEnd;
         })
         .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
       months.push({ month: monthKey, monthLabel, entries, revenue: revenueM });
       curr.setMonth(curr.getMonth() + 1);
+      curr.setDate(6);
     }
 
     const weeks: WeekWiseRow[] = [];
-    const weekCurr = getWeekStart(start);
+    let weekCurr = new Date(getWeekStart(start).getTime());
     while (weekCurr <= end) {
+      if (weekCurr > todayEnd) break;
       const weekEnd = new Date(weekCurr);
       weekEnd.setDate(weekEnd.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
+      const effectiveWeekEnd = weekEnd > todayEnd ? todayEnd : weekEnd;
       const weekKey = toDateOnly(weekCurr.toISOString());
-      const weekLabel = `${weekCurr.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short" })}`;
+      const weekLabel =
+        effectiveWeekEnd.getTime() < weekEnd.getTime()
+          ? `${weekCurr.getDate()}–${effectiveWeekEnd.getDate()} ${effectiveWeekEnd.toLocaleDateString("en-IN", { month: "short" })} (so far)`
+          : `${weekCurr.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short" })}`;
       const entriesW = customers.filter((c) => {
         const sd = c.start_date ? new Date(c.start_date) : null;
-        return sd && sd >= weekCurr && sd <= weekEnd;
+        return sd && sd >= weekCurr && sd <= effectiveWeekEnd;
       }).length;
       const revenueW = customers
         .filter((c) => {
           const pd = c.pay_date ? new Date(c.pay_date) : null;
-          return pd && pd >= weekCurr && pd <= weekEnd;
+          return pd && pd >= weekCurr && pd <= effectiveWeekEnd;
         })
         .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
       weeks.push({ weekKey, weekLabel, entries: entriesW, revenue: revenueW });
-      weekCurr.setDate(weekCurr.getDate() + 7); // mutate for next iteration
+      weekCurr.setDate(weekCurr.getDate() + 7);
     }
     const trainerById = new Map<string, Trainer>(
       trainers.map((t) => [t.id, t])
@@ -311,9 +356,9 @@ export function DashboardContent({
   }));
 
   const now = new Date();
-  const firstOfMonth = toDateOnly(new Date(now.getFullYear(), now.getMonth(), 1).toISOString());
-  const today = toDateOnly(now.toISOString());
-  const isThisMonth = dateFrom === firstOfMonth && dateTo === today;
+  const businessMonthStartStr = toDateOnly(getBusinessMonthStart(now).toISOString());
+  const businessMonthEndStr = toDateOnly(getBusinessMonthEnd(now).toISOString());
+  const isThisMonth = dateFrom === businessMonthStartStr && (dateTo === businessMonthEndStr || dateTo === toDateOnly(now.toISOString()));
 
   const cards = [
     {
@@ -336,16 +381,6 @@ export function DashboardContent({
       meta: null,
     },
   ];
-
-  const applyPreset = (months: number) => {
-    const end = new Date();
-    const start =
-      months === 0
-        ? new Date(end.getFullYear(), end.getMonth(), 1)
-        : new Date(end.getFullYear(), end.getMonth() - months, 1);
-    setDateFrom(toDateOnly(start.toISOString()));
-    setDateTo(toDateOnly(end.toISOString()));
-  };
 
   const reports = trainerReports;
 
@@ -389,42 +424,27 @@ export function DashboardContent({
           Analytics
         </h2>
         <p className="text-stone-400 text-sm">
-          Set a custom date range, then see new entries (by start date), revenue
-          (by pay date), and month-wise breakdown below. Trainer reports are
-          separate and show all clients.
+          New entries (by start date), revenue (by pay date), and breakdown by
+          business month and week. Trainer reports are separate and show all
+          clients.
         </p>
 
-        <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 flex flex-wrap items-end gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="text-stone-400 text-sm font-medium">From</label>
-            <AdminDatePicker
-              value={dateFrom}
-              onChange={setDateFrom}
-              className="admin-date min-w-[140px]"
-              aria-label="Date from"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="text-stone-400 text-sm font-medium">To</label>
-            <AdminDatePicker
-              value={dateTo}
-              onChange={setDateTo}
-              className="admin-date min-w-[140px]"
-              aria-label="Date to"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PRESETS.map(({ label, months }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => applyPreset(months)}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-stone-300 bg-white/10 border border-white/10 hover:bg-brand-red/20 hover:border-brand-red/40 hover:text-stone-100 focus:outline-none focus:ring-2 focus:ring-brand-red"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 flex flex-wrap items-center gap-2">
+          <span className="text-stone-400 text-sm font-medium mr-1">Period</span>
+          {PRESETS.map(({ label, months }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setSelectedPresetMonths(months)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-red ${
+                selectedPresetMonths === months
+                  ? "bg-brand-red text-white border border-brand-red"
+                  : "text-stone-300 bg-white/10 border border-white/10 hover:bg-brand-red/20 hover:border-brand-red/40 hover:text-stone-100"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -453,7 +473,7 @@ export function DashboardContent({
                 This month by week
               </h3>
               <p className="text-stone-500 text-sm mb-4">
-                Weekly breakdown (Monday–Sunday) for the current month.
+                Weekly breakdown (Saturday–Friday) for the current month.
               </p>
               <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
             </div>
@@ -472,7 +492,7 @@ export function DashboardContent({
                 Weekly view
               </h3>
               <p className="text-stone-500 text-sm mb-4">
-                Same date range, broken down by week (Monday–Sunday).
+                Same date range, broken down by week (Saturday–Friday).
               </p>
               <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
             </div>
@@ -502,7 +522,7 @@ export function DashboardContent({
                 key={report.name}
                 type="button"
                 onClick={() => setSelectedTrainer(report)}
-                className="liquid-glass p-5 rounded-2xl border border-white/10 min-h-[180px] flex flex-col text-left transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/50 hover:shadow-[0_0_28px_rgba(255,0,0,0.15)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+                className="liquid-glass p-5 rounded-2xl border border-white/10 min-h-[180px] flex flex-col text-left transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/50 hover:shadow-[0_0_28px_rgba(255,0,0,0.15)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black bg-stone-900/95"
               >
                 <p className="text-brand-red font-semibold mb-1 truncate">
                   {report.name}
@@ -537,6 +557,7 @@ export function DashboardContent({
         <ClientDetailsModal
           trainerName={selectedTrainer.name}
           entries={selectedTrainer.entries}
+          customers={customers}
           trainers={trainers}
           onClose={() => setSelectedTrainer(null)}
           formatINR={formatINR}
@@ -552,6 +573,7 @@ const PROFILE_PLACEHOLDER = "/images/profile placeholder.jpg";
 function ClientDetailsModal({
   trainerName,
   entries,
+  customers,
   trainers,
   onClose,
   formatINR,
@@ -559,12 +581,16 @@ function ClientDetailsModal({
 }: {
   trainerName: string;
   entries: Customer[] | Tracker[];
+  customers: Customer[];
   trainers: Trainer[];
   onClose: () => void;
   formatINR: (n: number) => string;
   formatDate: (s: string | null) => string;
 }) {
   const [selectedEntry, setSelectedEntry] = useState<Customer | Tracker | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLTableSectionElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -576,6 +602,52 @@ function ClientDetailsModal({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, selectedEntry]);
+
+  useEffect(() => {
+    const topEl = topScrollRef.current;
+    const tableEl = tableScrollRef.current;
+    if (!topEl || !tableEl) return;
+    let syncing = false;
+    const syncFromTop = () => {
+      if (syncing) return;
+      syncing = true;
+      tableEl.scrollLeft = topEl.scrollLeft;
+      requestAnimationFrame(() => { syncing = false; });
+    };
+    const syncFromTable = () => {
+      if (syncing) return;
+      syncing = true;
+      topEl.scrollLeft = tableEl.scrollLeft;
+      requestAnimationFrame(() => { syncing = false; });
+    };
+    topEl.addEventListener("scroll", syncFromTop);
+    tableEl.addEventListener("scroll", syncFromTable);
+    return () => {
+      topEl.removeEventListener("scroll", syncFromTop);
+      tableEl.removeEventListener("scroll", syncFromTable);
+    };
+  }, [entries.length]);
+
+  const onTableWheel = useCallback((e: WheelEvent) => {
+    const tableEl = tableScrollRef.current;
+    const topEl = topScrollRef.current;
+    if (!tableEl || e.deltaY === 0) return;
+    const maxScroll = tableEl.scrollWidth - tableEl.clientWidth;
+    if (maxScroll <= 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const next = Math.max(0, Math.min(maxScroll, tableEl.scrollLeft + e.deltaY));
+    tableEl.scrollLeft = next;
+    if (topEl) topEl.scrollLeft = next;
+  }, []);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    const tableEl = tableScrollRef.current;
+    if (!header || !tableEl) return;
+    header.addEventListener("wheel", onTableWheel, { passive: false });
+    return () => header.removeEventListener("wheel", onTableWheel);
+  }, [entries.length, onTableWheel]);
 
   const sortedEntries = useMemo(
     () =>
@@ -593,6 +665,19 @@ function ClientDetailsModal({
     [trainers]
   );
 
+  const showCustomerReport = selectedEntry && isCustomer(selectedEntry);
+  const customerReportHistory = useMemo(() => {
+    if (!showCustomerReport || !selectedEntry) return [];
+    const nameKey = (selectedEntry as Customer).name?.trim() ?? "";
+    return customers
+      .filter((c) => (c.name ?? "").trim() === nameKey)
+      .sort((a, b) => (b.start_date ?? b.created_at ?? "").localeCompare(a.start_date ?? a.created_at ?? ""));
+  }, [showCustomerReport, selectedEntry, customers]);
+  const totalPaidAllTime = useMemo(
+    () => customerReportHistory.reduce((s, c) => s + Number(c.paid_fee ?? 0), 0),
+    [customerReportHistory]
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
@@ -602,7 +687,7 @@ function ClientDetailsModal({
       aria-labelledby="client-details-title"
     >
       <div
-        className="liquid-glass rounded-2xl border border-white/20 w-full max-w-4xl max-h-[90vh] flex flex-col shadow-xl"
+        className="liquid-glass rounded-2xl border border-white/20 w-full max-w-4xl max-h-[90vh] flex flex-col shadow-xl bg-stone-900/95"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10">
@@ -610,7 +695,7 @@ function ClientDetailsModal({
             id="client-details-title"
             className="font-display text-lg font-bold uppercase text-stone-100"
           >
-            Client details — {trainerName}
+            {showCustomerReport ? "Customer report – all history" : `Client details — ${trainerName}`}
           </h2>
           <button
             type="button"
@@ -621,8 +706,96 @@ function ClientDetailsModal({
             <span className="text-xl leading-none">×</span>
           </button>
         </div>
-        <div className="overflow-auto flex-1 p-4 sm:p-5 scrollbar-theme">
-          {selectedEntry ? (
+        <div className="flex-1 min-h-0 flex flex-col p-4 sm:p-5 overflow-hidden">
+          {showCustomerReport ? (
+            <div className="overflow-y-auto flex-1 min-h-0 space-y-4 scrollbar-theme">
+              <div className="flex gap-4 flex-wrap">
+                <img
+                  src={(selectedEntry as Customer).image ?? PROFILE_PLACEHOLDER}
+                  alt=""
+                  className="w-20 h-20 rounded-xl object-cover border border-white/10 shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-xl font-bold text-stone-100">{(selectedEntry as Customer).name}</p>
+                  <p className="text-stone-400 text-sm">{(selectedEntry as Customer).mobile ?? "—"}</p>
+                  <p className="text-stone-500 text-sm mt-1">
+                    {customerReportHistory.length} entr{customerReportHistory.length === 1 ? "y" : "ies"} · Total paid (all time): {formatINR(totalPaidAllTime)}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-stone-300 font-semibold text-sm uppercase tracking-wider mb-2">All entries & renewals</h3>
+                <div className="flex flex-col">
+                  <div
+                    ref={topScrollRef}
+                    className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
+                    aria-hidden
+                  >
+                    <div className="min-w-[800px] h-2" />
+                  </div>
+                  <div
+                    ref={tableScrollRef}
+                    className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom flex-1 min-h-0"
+                  >
+                    <table className="w-full text-sm border-collapse min-w-[800px]">
+                      <thead ref={headerRef} className="select-none cursor-ew-resize">
+                        <tr className="border-b border-white/10 bg-white/[0.04]">
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">#</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Plan</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Start</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">End</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Duration</th>
+                          <th className="text-right py-2 px-2 text-stone-400 font-medium">Total</th>
+                          <th className="text-right py-2 px-2 text-stone-400 font-medium">Paid</th>
+                          <th className="text-right py-2 px-2 text-stone-400 font-medium">Balance</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Pay date</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Payment</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Trainer</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Status</th>
+                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Remarks</th>
+                          <th className="text-center py-2 px-2 text-stone-400 font-medium">Receipt</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {customerReportHistory.map((entry, idx) => {
+                          const trainer = entry.trainer_id ? trainerById.get(entry.trainer_id) : null;
+                          const isCurrent = entry.id === (selectedEntry as Customer).id;
+                          return (
+                            <tr
+                              key={entry.id}
+                              className={`border-b border-white/5 ${isCurrent ? "bg-brand-red/10" : ""}`}
+                            >
+                              <td className="py-2 px-2 text-stone-400">{customerReportHistory.length - idx}</td>
+                              <td className="py-2 px-2 text-stone-200 font-medium">{entry.plan}</td>
+                              <td className="py-2 px-2 text-stone-300 whitespace-nowrap">{formatDate(entry.start_date)}</td>
+                              <td className="py-2 px-2 text-stone-300 whitespace-nowrap">{formatDate(entry.end_date)}</td>
+                              <td className="py-2 px-2 text-stone-300">{entry.duration ?? "—"}</td>
+                              <td className="py-2 px-2 text-right text-stone-300 tabular-nums">{formatINR(entry.total_fee)}</td>
+                              <td className="py-2 px-2 text-right text-stone-300 tabular-nums">{formatINR(entry.paid_fee)}</td>
+                              <td className="py-2 px-2 text-right tabular-nums">{formatINR(entry.balance)}</td>
+                              <td className="py-2 px-2 text-stone-300 whitespace-nowrap">{formatDate(entry.pay_date)}</td>
+                              <td className="py-2 px-2 text-stone-300">{entry.payment_mode ?? "—"}</td>
+                              <td className="py-2 px-2 text-stone-300">{entry.plan === "PT" ? (trainer?.name ?? "—") : "—"}</td>
+                              <td className="py-2 px-2 text-stone-300">{entry.status ?? "—"}</td>
+                              <td className="py-2 px-2 text-stone-300 max-w-[100px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "—"}</td>
+                              <td className="py-2 px-2 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedEntry(null)}
+                className="px-4 py-2 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
+              >
+                ← Back to list
+              </button>
+            </div>
+          ) : selectedEntry ? (
             <ClientDetailPanel
               entry={selectedEntry}
               isCustomer={isCustomer(selectedEntry)}
@@ -632,97 +805,91 @@ function ClientDetailsModal({
               onBack={() => setSelectedEntry(null)}
             />
           ) : (
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-white/20">
-                  <th className="text-left py-2 px-2 text-stone-400 font-medium w-14">
-                    Photo
-                  </th>
-                  <th className="text-left py-2 px-2 text-stone-400 font-medium">
-                    Name
-                  </th>
-                  <th className="text-left py-2 px-2 text-stone-400 font-medium">
-                    Plan
-                  </th>
-                  <th className="text-left py-2 px-2 text-stone-400 font-medium">
-                    Start
-                  </th>
-                  <th className="text-left py-2 px-2 text-stone-400 font-medium">
-                    End
-                  </th>
-                  <th className="text-right py-2 px-2 text-stone-400 font-medium">
-                    Total (₹)
-                  </th>
-                  <th className="text-right py-2 px-2 text-stone-400 font-medium">
-                    Paid (₹)
-                  </th>
-                  <th className="text-right py-2 px-2 text-stone-400 font-medium">
-                    Due / Balance (₹)
-                  </th>
-                  <th className="text-left py-2 px-2 text-stone-400 font-medium">
-                    Pay date
-                  </th>
-                  <th className="text-left py-2 px-2 text-stone-400 font-medium">
-                    Payment
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedEntries.map((row) => {
-                  const name = isCustomer(row)
-                    ? row.name
-                    : (row.client_name ?? row.client_id ?? "—");
-                  const dueOrBalance = isCustomer(row)
-                    ? row.balance
-                    : (row.due_fee ?? 0);
-                  return (
-                    <tr
-                      key={row.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedEntry(row)}
-                      onKeyDown={(e) =>
-                        (e.key === "Enter" || e.key === " ") && setSelectedEntry(row)
-                      }
-                      className="border-b border-white/5 hover:bg-white/10 cursor-pointer transition-colors"
-                    >
-                      <td className="py-2 px-2 align-middle">
-                        <img
-                          src={entryImage(row)}
-                          alt=""
-                          className="w-10 h-10 rounded-full object-cover border border-white/10"
-                        />
-                      </td>
-                      <td className="py-2 px-2 text-stone-200">{name}</td>
-                      <td className="py-2 px-2 text-stone-300">{row.plan ?? "—"}</td>
-                      <td className="py-2 px-2 text-stone-300">
-                        {formatDate(isCustomer(row) ? row.start_date : row.start_date)}
-                      </td>
-                      <td className="py-2 px-2 text-stone-300">
-                        {formatDate(isCustomer(row) ? row.end_date : row.end_date)}
-                      </td>
-                      <td className="py-2 px-2 text-right text-stone-300">
-                        {row.total_fee != null ? formatINR(Number(row.total_fee)) : "—"}
-                      </td>
-                      <td className="py-2 px-2 text-right text-stone-300">
-                        {row.paid_fee != null ? formatINR(Number(row.paid_fee)) : "—"}
-                      </td>
-                      <td className="py-2 px-2 text-right text-stone-300">
-                        {dueOrBalance != null ? formatINR(Number(dueOrBalance)) : "—"}
-                      </td>
-                      <td className="py-2 px-2 text-stone-300">
-                        {formatDate(
-                          isCustomer(row) ? row.pay_date : row.pay_date
-                        )}
-                      </td>
-                      <td className="py-2 px-2 text-stone-300">
-                        {(isCustomer(row) ? row.payment_mode : row.payment_mode) ?? "—"}
-                      </td>
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div
+                ref={topScrollRef}
+                className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
+                aria-hidden
+              >
+                <div className="min-w-[700px] h-2" />
+              </div>
+              <div
+                ref={tableScrollRef}
+                className="overflow-x-auto flex-1 min-h-0 scrollbar-theme scrollbar-horizontal-bottom"
+              >
+                <table className="w-full text-sm border-collapse min-w-[700px]">
+                  <thead ref={headerRef} className="select-none cursor-ew-resize">
+                    <tr className="border-b border-white/20">
+                      <th className="text-left py-2 px-2 text-stone-400 font-medium w-14">Photo</th>
+                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Name</th>
+                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Plan</th>
+                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Start</th>
+                      <th className="text-left py-2 px-2 text-stone-400 font-medium">End</th>
+                      <th className="text-right py-2 px-2 text-stone-400 font-medium">Total (₹)</th>
+                      <th className="text-right py-2 px-2 text-stone-400 font-medium">Paid (₹)</th>
+                      <th className="text-right py-2 px-2 text-stone-400 font-medium">Due / Balance (₹)</th>
+                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Pay date</th>
+                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Payment</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {sortedEntries.map((row) => {
+                      const name = isCustomer(row)
+                        ? row.name
+                        : (row.client_name ?? row.client_id ?? "—");
+                      const dueOrBalance = isCustomer(row)
+                        ? row.balance
+                        : (row.due_fee ?? 0);
+                      return (
+                        <tr
+                          key={row.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedEntry(row)}
+                          onKeyDown={(e) =>
+                            (e.key === "Enter" || e.key === " ") && setSelectedEntry(row)
+                          }
+                          className="border-b border-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+                        >
+                          <td className="py-2 px-2 align-middle">
+                            <img
+                              src={entryImage(row)}
+                              alt=""
+                              className="w-10 h-10 rounded-full object-cover border border-white/10"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-stone-200">{name}</td>
+                          <td className="py-2 px-2 text-stone-300">{row.plan ?? "—"}</td>
+                          <td className="py-2 px-2 text-stone-300">
+                            {formatDate(isCustomer(row) ? row.start_date : row.start_date)}
+                          </td>
+                          <td className="py-2 px-2 text-stone-300">
+                            {formatDate(isCustomer(row) ? row.end_date : row.end_date)}
+                          </td>
+                          <td className="py-2 px-2 text-right text-stone-300">
+                            {row.total_fee != null ? formatINR(Number(row.total_fee)) : "—"}
+                          </td>
+                          <td className="py-2 px-2 text-right text-stone-300">
+                            {row.paid_fee != null ? formatINR(Number(row.paid_fee)) : "—"}
+                          </td>
+                          <td className="py-2 px-2 text-right text-stone-300">
+                            {dueOrBalance != null ? formatINR(Number(dueOrBalance)) : "—"}
+                          </td>
+                          <td className="py-2 px-2 text-stone-300">
+                            {formatDate(
+                              isCustomer(row) ? row.pay_date : row.pay_date
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-stone-300">
+                            {(isCustomer(row) ? row.payment_mode : row.payment_mode) ?? "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
         </div>
       </div>
