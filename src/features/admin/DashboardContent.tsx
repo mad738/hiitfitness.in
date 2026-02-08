@@ -135,16 +135,6 @@ function getBusinessMonthEnd(d: Date): Date {
   return new Date(start.getFullYear(), start.getMonth() + 1, 5, 23, 59, 59, 999);
 }
 
-function getDefaultRange(): { dateFrom: string; dateTo: string } {
-  const now = new Date();
-  const start = getBusinessMonthStart(now);
-  const end = getBusinessMonthEnd(now);
-  return {
-    dateFrom: toDateOnly(start.toISOString()),
-    dateTo: toDateOnly(end.toISOString()),
-  };
-}
-
 /** Week starts Saturday, ends Friday (business week). */
 function getWeekStart(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -251,7 +241,6 @@ export function DashboardContent({
 
     const start = new Date(from + "T00:00:00");
     const end = new Date(to + "T23:59:59");
-    const effectiveEnd = toDate > todayEnd ? todayEnd : end;
 
     const months: MonthWiseRow[] = [];
     const curr = new Date(getBusinessMonthStart(start).getTime());
@@ -281,7 +270,7 @@ export function DashboardContent({
     }
 
     const weeks: WeekWiseRow[] = [];
-    let weekCurr = new Date(getWeekStart(start).getTime());
+    const weekCurr = new Date(getWeekStart(start).getTime());
     while (weekCurr <= end) {
       if (weekCurr > todayEnd) break;
       const weekEnd = new Date(weekCurr);

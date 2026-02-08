@@ -212,15 +212,19 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     const tableEl = tableScrollRef.current;
     if (!topEl || !tableEl) return;
     function syncFromTop() {
-      if (isSyncingScrollRef.current) return;
+      const t = tableScrollRef.current;
+      const top = topScrollRef.current;
+      if (!t || !top || isSyncingScrollRef.current) return;
       isSyncingScrollRef.current = true;
-      tableEl.scrollLeft = topEl.scrollLeft;
+      t.scrollLeft = top.scrollLeft;
       requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
     }
     function syncFromTable() {
-      if (isSyncingScrollRef.current) return;
+      const t = tableScrollRef.current;
+      const top = topScrollRef.current;
+      if (!t || !top || isSyncingScrollRef.current) return;
       isSyncingScrollRef.current = true;
-      topEl.scrollLeft = tableEl.scrollLeft;
+      top.scrollLeft = t.scrollLeft;
       requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
     }
     topEl.addEventListener("scroll", syncFromTop);
@@ -279,15 +283,19 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     if (!topEl || !tableEl) return;
     let syncing = false;
     const syncFromTop = () => {
-      if (syncing) return;
+      const t = reportTableScrollRef.current;
+      const top = reportTopScrollRef.current;
+      if (!t || !top || syncing) return;
       syncing = true;
-      tableEl.scrollLeft = topEl.scrollLeft;
+      t.scrollLeft = top.scrollLeft;
       requestAnimationFrame(() => { syncing = false; });
     };
     const syncFromTable = () => {
-      if (syncing) return;
+      const t = reportTableScrollRef.current;
+      const top = reportTopScrollRef.current;
+      if (!t || !top || syncing) return;
       syncing = true;
-      topEl.scrollLeft = tableEl.scrollLeft;
+      top.scrollLeft = t.scrollLeft;
       requestAnimationFrame(() => { syncing = false; });
     };
     topEl.addEventListener("scroll", syncFromTop);
@@ -302,23 +310,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     if (!detailsCustomer) return;
     const header = reportHeaderRef.current;
     const tableEl = reportTableScrollRef.current;
-    const topEl = reportTopScrollRef.current;
     if (!header || !tableEl) return;
     const onWheel = (e: WheelEvent) => onReportTableWheel(e);
     header.addEventListener("wheel", onWheel, { passive: false });
     return () => header.removeEventListener("wheel", onWheel);
   }, [detailsCustomer, onReportTableWheel]);
-
-  function buildFilterUrl(): string {
-    const params = new URLSearchParams();
-    if (searchQuery.trim()) params.set("q", searchQuery.trim());
-    if (filterPlan) params.set("plan", filterPlan);
-    if (filterTrainerId) params.set("trainer", filterTrainerId);
-    if (filterPaymentMode) params.set("payment_mode", filterPaymentMode);
-    if (filterPaidStatus) params.set("paid_status", filterPaidStatus);
-    const q = params.toString();
-    return q ? `${pathname}?${q}` : pathname;
-  }
 
   function buildFilterUrlForNewTab(): string {
     const params = new URLSearchParams();

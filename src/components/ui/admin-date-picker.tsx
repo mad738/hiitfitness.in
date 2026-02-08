@@ -98,7 +98,6 @@ export function AdminDatePicker({
     if (!open) return;
     let timeoutId = 0;
     /* removed duplicate handler */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for reference
     function _removed(e: MouseEvent) {
       const target = e.target as Node;
       const isInsidePopover = popoverRef.current?.contains(target);
