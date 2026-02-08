@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -63,7 +64,6 @@ export function AdminDatePicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const valueDate = value ? new Date(value + "T12:00:00") : null;
   const today = toDateOnly(new Date().toISOString());
 
   const updatePosition = useCallback(() => {
@@ -98,6 +98,7 @@ export function AdminDatePicker({
     if (!open) return;
     let timeoutId = 0;
     /* removed duplicate handler */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for reference
     function _removed(e: MouseEvent) {
       const target = e.target as Node;
       const isInsidePopover = popoverRef.current?.contains(target);
@@ -105,7 +106,7 @@ export function AdminDatePicker({
       if (isInsidePopover || isInsideInput) return;
       // t’t trigger close
       // when option is clicked (options render outside our popover in many browsers)
-      const raf = requestAnimationFrame(() => {
+      void requestAnimationFrame(() => {
         const active = document.activeElement;
         const activeInPopover = popoverRef.current?.contains(active);
         const activeIsInput = inputRef.current?.contains(active);
@@ -141,7 +142,6 @@ export function AdminDatePicker({
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
   const days = getDaysInMonth(year, month);
-  const monthLabel = `${MONTHS[month]} ${year}`;
 
   function prevMonth() {
     setViewDate(new Date(year, month - 1, 1));

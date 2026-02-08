@@ -12,7 +12,6 @@ const ICON_SIZE = 24; /* w-6 */
 const TRACK_PAD = 12; /* px-3 */
 const ICON_GAP = -6; /* gap so cycle doesn't touch icons */
 const CYCLIST_START_LEFT = TRACK_PAD + ICON_SIZE + ICON_GAP; /* after Start icon */
-const CYCLIST_END_LEFT = `calc(100% - ${TRACK_PAD + ICON_SIZE + ICON_GAP + LOTTIE_SIZE}px)`; /* before Finish icon */
 
 type LottieAnimationData = object;
 

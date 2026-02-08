@@ -86,7 +86,7 @@ export function TrackerForm({
 
   useEffect(() => {
     setForm(editRow ? toForm(editRow) : { ...emptyRow });
-  }, [editRow?.id]);
+  }, [editRow?.id, editRow]);
 
   const update = (k: keyof TrackerInsert, v: string | number | boolean | null) => {
     setForm((prev) => ({ ...prev, [k]: v }));

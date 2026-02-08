@@ -2,8 +2,8 @@
 
 import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { getTrackerList, deleteTrackerEntry } from "@app/actions/tracker";
+import { useRouter, usePathname } from "next/navigation";
+import { deleteTrackerEntry } from "@app/actions/tracker";
 import type { Tracker } from "@/models/tracker";
 import type { TrackerFilters } from "@/repositories/tracker_repository";
 import type { MembershipPlan } from "@/models/membership_plan";
@@ -24,7 +24,6 @@ type Props = {
 export function TrackerView({ initialList, initialFilters = {}, initialPlans = [] }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const useDemo = useDemoMode();
   const [list, setList] = useState<Tracker[]>(
     useDemo ? DUMMY_TRACKER_LIST : initialList

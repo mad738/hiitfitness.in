@@ -1,11 +1,11 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Trainer } from "@/models/trainer";
 import {
-  listTrainers,
   createTrainer,
   updateTrainer,
   deleteTrainer,

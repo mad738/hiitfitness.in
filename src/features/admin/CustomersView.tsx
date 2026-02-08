@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -61,6 +62,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [paymentMode, setPaymentMode] = useState("");
   const [remarks, setRemarks] = useState("");
   const [duration, setDuration] = useState("");
+  const [status, setStatus] = useState("");
+  const [slotTiming, setSlotTiming] = useState("");
   const [receipt, setReceipt] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -209,6 +212,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setPaymentMode("");
     setRemarks("");
     setDuration("");
+    setStatus("");
+    setSlotTiming("");
     setReceipt(false);
     setFormOpen(true);
     setError(null);
@@ -229,6 +234,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setPaymentMode(c.payment_mode ?? "");
     setRemarks(c.remarks ?? "");
     setDuration(c.duration ?? "");
+    setStatus(c.status ?? "");
+    setSlotTiming(c.slot_timing ?? "");
     setReceipt(c.receipt ?? false);
     setFormOpen(true);
     setError(null);
@@ -276,6 +283,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         payment_mode: paymentMode.trim() || null,
         remarks: remarks.trim() || null,
         duration: duration.trim() || null,
+        status: status.trim() || null,
+        slot_timing: slotTiming.trim() || null,
         receipt,
       };
       if (editing) {

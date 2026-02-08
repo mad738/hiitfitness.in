@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
@@ -240,7 +241,7 @@ export function DashboardContent({
     }
 
     const weeks: WeekWiseRow[] = [];
-    let weekCurr = getWeekStart(start);
+    const weekCurr = getWeekStart(start);
     while (weekCurr <= end) {
       const weekEnd = new Date(weekCurr);
       weekEnd.setDate(weekEnd.getDate() + 6);
@@ -258,7 +259,7 @@ export function DashboardContent({
         })
         .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
       weeks.push({ weekKey, weekLabel, entries: entriesW, revenue: revenueW });
-      weekCurr.setDate(weekCurr.getDate() + 7);
+      weekCurr.setDate(weekCurr.getDate() + 7); // mutate for next iteration
     }
     const trainerById = new Map<string, Trainer>(
       trainers.map((t) => [t.id, t])
@@ -303,6 +304,7 @@ export function DashboardContent({
 
   const chartData = monthWiseData;
   const weeklyChartData = weekWiseData.map((w) => ({
+    month: w.weekKey,
     monthLabel: w.weekLabel,
     entries: w.entries,
     revenue: w.revenue,
