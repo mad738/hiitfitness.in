@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
+import { MobileInViewHover } from "@/components/ui/mobile-in-view-hover";
 
 const facilities = [
   {
@@ -41,29 +44,32 @@ export function LandingFacilities() {
 
         <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
           {facilities.map((f) => (
-            <article
-              key={f.title}
-              className="liquid-glass overflow-hidden"
-            >
-              <div className="relative aspect-[16/10] bg-black">
-                <Image
-                  src={f.imageSrc}
-                  alt={f.alt}
-                  fill
-                  className="object-cover"
-                  priority={false}
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                />
-              </div>
-              <div className="p-6 border-t border-white/10">
-                <h3 className="text-lg font-bold text-stone-100 mb-2">
-                  {f.title}
-                </h3>
-                <p className="text-stone-300/75 text-sm leading-relaxed">
-                  {f.description}
-                </p>
-              </div>
-            </article>
+            <div key={f.title} className="flex justify-center md:block w-full">
+              <MobileInViewHover className="w-full max-w-md md:max-w-none p-3 md:p-0">
+              <article
+                className="liquid-glass overflow-hidden rounded-2xl transition-all duration-300 ease-out hover:scale-[1.04] hover:border-brand-red/60 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.35),0_0_24px_rgba(255,0,0,0.3),0_0_48px_rgba(255,0,0,0.18),0_16px_48px_rgba(0,0,0,0.4)]"
+              >
+                <div className="relative aspect-[16/10] bg-black">
+                  <Image
+                    src={f.imageSrc}
+                    alt={f.alt}
+                    fill
+                    className="object-cover"
+                    priority={false}
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  />
+                </div>
+                <div className="p-6 border-t border-white/10">
+                  <h3 className="text-lg font-bold text-stone-100 mb-2">
+                    {f.title}
+                  </h3>
+                  <p className="text-stone-300/75 text-sm leading-relaxed">
+                    {f.description}
+                  </p>
+                </div>
+              </article>
+            </MobileInViewHover>
+            </div>
           ))}
         </div>
       </AnimateOnScroll>

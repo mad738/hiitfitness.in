@@ -3,16 +3,27 @@ import type { Customer, CustomerInsert, CustomerUpdate } from "@/models/customer
 
 const TABLE = "customers";
 const COLS =
-  "id, name, image, plan, total_fee, paid_fee, balance, trainer_id, start_date, end_date, pay_date, payment_mode, remarks, duration, created_at, updated_at";
+  "id, name, image, plan, total_fee, paid_fee, balance, trainer_id, start_date, end_date, pay_date, payment_mode, remarks, duration, status, slot_timing, receipt, created_at, updated_at";
+
+const PAGE_SIZE = 1000;
 
 export async function listCustomers(): Promise<Customer[]> {
   const supabase = await createServiceRoleClient();
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select(COLS)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as Customer[];
+  const all: Customer[] = [];
+  let offset = 0;
+  let page: Customer[];
+  do {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select(COLS)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw error;
+    page = (data ?? []) as Customer[];
+    all.push(...page);
+    offset += PAGE_SIZE;
+  } while (page.length === PAGE_SIZE);
+  return all;
 }
 
 export async function findCustomerById(id: string): Promise<Customer | null> {

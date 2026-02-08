@@ -23,7 +23,8 @@ export function PlanCard({ plan }: PlanCardProps) {
   return (
     <article
       className={[
-        "liquid-glass p-6 flex flex-col relative overflow-hidden",
+        "liquid-glass p-6 flex flex-col relative overflow-hidden rounded-2xl transition-all duration-300 ease-out",
+        "hover:scale-[1.04] hover:border-brand-red/70 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.4),0_0_24px_rgba(255,0,0,0.35),0_0_48px_rgba(255,0,0,0.2),0_16px_48px_rgba(0,0,0,0.45)]",
         isPopular &&
           "border-brand-red/50 shadow-[0_0_0_1px_rgba(255,0,0,0.25),0_12px_40px_rgba(0,0,0,0.4),0_0_24px_rgba(255,0,0,0.12)]",
       ]

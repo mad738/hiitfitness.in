@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Lottie, { type LottieRefCurrentProps } from "lottie-react";
 import { Play, Flag } from "lucide-react";
+import { useMobileHeader } from "@/features/landing/MobileHeaderContext";
 
 const SCROLL_IDLE_MS = 280;
 const LOTTIE_SIZE = 44;
@@ -16,6 +17,7 @@ const CYCLIST_END_LEFT = `calc(100% - ${TRACK_PAD + ICON_SIZE + ICON_GAP + LOTTI
 type LottieAnimationData = object;
 
 export function ScrollCyclingLottie() {
+  const { headerHidden, isMobile } = useMobileHeader();
   const lottieRef = useRef<LottieRefCurrentProps>(null);
   const [animationData, setAnimationData] = useState<LottieAnimationData | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -107,8 +109,8 @@ export function ScrollCyclingLottie() {
         </div>
       )}
       <div
-        className="fixed left-0 right-0 z-40 h-[52px] md:hidden border-b border-stone-800/80 bg-black/95 backdrop-blur-sm"
-        style={{ top: "var(--header-height)" }}
+        className="fixed left-0 right-0 z-40 h-[52px] md:hidden border-b border-stone-800/80 bg-black/95 backdrop-blur-sm transition-[top] duration-300 ease-out"
+        style={{ top: isMobile && headerHidden ? 0 : "var(--header-height)" }}
         aria-hidden
       >
       {/* Layer 1: Lap line only – positioned under the wheels, not centre of cycle */}

@@ -12,6 +12,12 @@ export async function listTrainers() {
   return trainerRepo.listTrainers();
 }
 
+/** Only trainers assigned to at least one customer (for Trainers page to hide invalid/junk names). */
+export async function listTrainersInUse() {
+  await requireAdminSession();
+  return trainerRepo.listTrainersInUse();
+}
+
 export async function createTrainer(data: TrainerInsert) {
   try {
     await requireAdminSession();

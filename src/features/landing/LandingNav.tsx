@@ -3,8 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { useMobileHeader } from "@/features/landing/MobileHeaderContext";
 
 export function LandingNav() {
+  const { headerHidden, isMobile } = useMobileHeader();
   const sections = useMemo(
     () =>
       [
@@ -58,7 +60,11 @@ export function LandingNav() {
     ].join(" ");
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-stone-800/80 bg-black/90 backdrop-blur-md">
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 border-b border-stone-800/80 bg-black/90 backdrop-blur-md transition-transform duration-300 ease-out ${
+        isMobile && headerHidden ? "-translate-y-full" : ""
+      }`}
+    >
       <nav className="max-w-6xl mx-auto px-3 sm:px-6 flex items-center justify-between h-[var(--header-height)] gap-2 min-h-0">
         <Link href="/" className="flex items-center gap-2 sm:gap-3 tracking-tight min-w-0 flex-1 sm:flex-initial" aria-label="HIIT Fitness – High intensity interval training">
           <Image src="/images/99558_FLAT_JP_AC_03-nobg-cropped.svg" alt="" width={80} height={80} className="h-11 w-11 min-h-11 min-w-11 sm:h-14 sm:w-14 md:h-20 md:w-20 shrink-0 object-contain" aria-hidden />

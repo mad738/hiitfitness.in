@@ -9,6 +9,7 @@ import {
   getPlanGroup,
   type PlanCategory,
 } from "@/data/plans";
+import { MobileInViewHover } from "@/components/ui/mobile-in-view-hover";
 
 const CONTACT_PHONE = { display: "999 666 7714", tel: "tel:+919996667714" };
 
@@ -77,7 +78,7 @@ export function PlanGroups({ plans }: Props) {
 
   return (
     <div
-      className={`grid gap-6 sm:gap-8 ${
+      className={`grid gap-6 sm:gap-8 items-stretch justify-items-center md:justify-items-stretch ${
         categoriesToShow.length === 1 ? "max-w-md mx-auto" : categoriesToShow.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"
       }`}
     >
@@ -88,12 +89,13 @@ export function PlanGroups({ plans }: Props) {
         const isPopular = category === "PT";
 
         return (
-          <article
-            key={category}
-            className={`liquid-glass rounded-2xl overflow-hidden border flex flex-col ${
+          <div key={category} className="flex justify-center md:block w-full">
+            <MobileInViewHover className="w-full max-w-md md:max-w-none h-full min-h-0 p-3 md:p-0">
+            <article
+              className={`liquid-glass rounded-2xl overflow-hidden border flex flex-col h-full transition-all duration-300 ease-out ${
               isPopular
-                ? "border-brand-red/50 shadow-[0_0_0_1px_rgba(255,0,0,0.25),0_12px_40px_rgba(0,0,0,0.4),0_0_24px_rgba(255,0,0,0.12)] md:-mt-2 md:mb-2"
-                : "border-white/10 hover:border-brand-red/30 transition-colors"
+                ? "border-brand-red/50 shadow-[0_0_0_1px_rgba(255,0,0,0.25),0_12px_40px_rgba(0,0,0,0.4),0_0_24px_rgba(255,0,0,0.12)] md:-mt-2 md:mb-2 hover:scale-[1.04] hover:border-brand-red/80 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.45),0_0_24px_rgba(255,0,0,0.4),0_0_48px_rgba(255,0,0,0.22),0_20px_52px_rgba(0,0,0,0.5)]"
+                : "border-white/10 hover:scale-[1.04] hover:border-brand-red/70 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.4),0_0_24px_rgba(255,0,0,0.35),0_0_48px_rgba(255,0,0,0.2),0_16px_48px_rgba(0,0,0,0.45)]"
             }`}
           >
             <div className="p-6 pb-4 border-b border-white/10">
@@ -109,8 +111,8 @@ export function PlanGroups({ plans }: Props) {
               </div>
             </div>
 
-            {/* Pricing table */}
-            <div className="p-6 pt-4">
+            {/* Pricing table + features + button: flex-1 so button sits at bottom on desktop */}
+            <div className="p-6 pt-4 flex flex-col flex-1 min-h-0">
               <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
                 Pricing
               </p>
@@ -142,7 +144,7 @@ export function PlanGroups({ plans }: Props) {
               <button
                 type="button"
                 onClick={handleGetStarted}
-                className={`block w-full text-center py-3 rounded-xl font-semibold text-sm transition ${
+                className={`mt-auto block w-full text-center py-3 rounded-xl font-semibold text-sm transition ${
                   isPopular
                     ? "bg-brand-red text-white hover:opacity-90"
                     : "border border-stone-600 text-stone-100 hover:border-brand-red/50 hover:text-brand-red"
@@ -152,6 +154,8 @@ export function PlanGroups({ plans }: Props) {
               </button>
             </div>
           </article>
+          </MobileInViewHover>
+          </div>
         );
       })}
 

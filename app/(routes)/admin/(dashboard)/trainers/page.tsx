@@ -1,8 +1,8 @@
-import { listTrainers } from "@app/actions/trainers";
+import { listTrainersInUse } from "@app/actions/trainers";
 import { TrainersView } from "@/features/admin/TrainersView";
 
 export default async function AdminTrainersPage() {
-  const trainers = await listTrainers();
+  const trainers = await listTrainersInUse();
 
   return (
     <div className="space-y-6">
@@ -11,7 +11,7 @@ export default async function AdminTrainersPage() {
           Trainers
         </h1>
         <p className="text-stone-400 text-sm">
-          Manage trainers. Add photo, phone, and address.
+          Showing trainers assigned to at least one customer. Add new trainers below; they appear here once assigned to a customer.
         </p>
       </section>
       <TrainersView initialTrainers={trainers} />

@@ -13,6 +13,9 @@ export type Customer = {
   payment_mode: string | null;
   remarks: string | null;
   duration: string | null;
+  status: string | null;
+  slot_timing: string | null;
+  receipt: boolean;
   created_at: string;
   updated_at: string;
 };

@@ -67,18 +67,16 @@ export function LandingHero() {
             {[...Array(2)].map((_, set) => (
               <div key={set} className="flex gap-3 shrink-0">
                 {[
-                  { title: "Strength zone", desc: "Racks, platforms, cables — the real stuff.", accent: "red" },
-                  { title: "HIIT Fitness", desc: "Circuits that spike intensity safely.", accent: "red" },
-                  { title: "Recovery corner", desc: "Cool down, mobility, reset.", accent: "red" },
-                  { title: "Open 7 days", desc: "Train when it suits you.", accent: "red" },
-                  { title: "No long-term contracts", desc: "Cancel anytime.", accent: "red" },
-                  { title: "Drop-in welcome", desc: "Try before you commit.", accent: "red" },
-                  { title: "Expert coaching", desc: "Form, programming, support.", accent: "red" },
-                  { title: "24/7 access", desc: "Some plans round the clock.", accent: "red" },
-                ].map((chip) => (
+                  { title: "Join Now", desc: "Start your membership today.", accent: "red" },
+                  { title: "Book Free Trial", desc: "Try a session on us.", accent: "red" },
+                  { title: "WhatsApp Us", desc: "Quick replies, easy booking.", accent: "red" },
+                  { title: "Join Now", desc: "Start your membership today.", accent: "red" },
+                  { title: "Book Free Trial", desc: "Try a session on us.", accent: "red" },
+                  { title: "WhatsApp Us", desc: "Quick replies, easy booking.", accent: "red" },
+                ].map((chip, i) => (
                   <div
-                    key={`${set}-${chip.title}`}
-                    className="liquid-glass shrink-0 rounded-2xl px-4 py-3 min-w-[180px] sm:min-w-[200px]"
+                    key={`${set}-${chip.title}-${i}`}
+                    className="liquid-glass shrink-0 rounded-2xl px-4 py-3 min-w-[180px] sm:min-w-[200px] transition-all duration-300 ease-out hover:scale-[1.03] hover:border-brand-red/50 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.3),0_0_20px_rgba(255,0,0,0.2),0_0_36px_rgba(255,0,0,0.12)]"
                   >
                     <p className="font-semibold text-stone-100 text-sm sm:text-base text-brand-red/90">
                       {chip.title}

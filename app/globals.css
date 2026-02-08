@@ -138,6 +138,21 @@ body {
     animation: lap-boom-fullscreen 1s ease-out forwards;
   }
 
+  /* Mobile: apply hover effect when card enters viewport (touch devices) – clearly visible */
+  @media (hover: none) {
+    .mobile-in-view-hover.mobile-in-view-hover-visible > * {
+      transform: scale(1.04);
+      border-width: 2px;
+      border-color: rgba(255, 0, 0, 0.75);
+      box-shadow:
+        0 0 0 2px rgba(255, 0, 0, 0.4),
+        0 0 24px rgba(255, 0, 0, 0.4),
+        0 0 48px rgba(255, 0, 0, 0.25),
+        0 16px 48px rgba(0, 0, 0, 0.45);
+      transition: transform 0.35s ease-out, border-color 0.35s ease-out, box-shadow 0.35s ease-out;
+    }
+  }
+
   /* Themed scrollbar – dark track, subtle thumb (admin trainer cards, modals) */
   .scrollbar-theme {
     scrollbar-width: thin;

@@ -61,6 +61,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [paymentMode, setPaymentMode] = useState("");
   const [remarks, setRemarks] = useState("");
   const [duration, setDuration] = useState("");
+  const [receipt, setReceipt] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPlan, setFilterPlan] = useState("");
@@ -208,6 +209,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setPaymentMode("");
     setRemarks("");
     setDuration("");
+    setReceipt(false);
     setFormOpen(true);
     setError(null);
   }
@@ -227,6 +229,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setPaymentMode(c.payment_mode ?? "");
     setRemarks(c.remarks ?? "");
     setDuration(c.duration ?? "");
+    setReceipt(c.receipt ?? false);
     setFormOpen(true);
     setError(null);
   }
@@ -273,6 +276,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         payment_mode: paymentMode.trim() || null,
         remarks: remarks.trim() || null,
         duration: duration.trim() || null,
+        receipt,
       };
       if (editing) {
         const res = await updateCustomer(editing.id, payload);
@@ -661,6 +665,18 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                 placeholder="e.g. 3M, 6M, 12M + 1M"
               />
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="receipt"
+                checked={receipt}
+                onChange={(e) => setReceipt(e.target.checked)}
+                className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0"
+              />
+              <label htmlFor="receipt" className={labelClass + " mb-0 cursor-pointer"}>
+                Receipt issued
+              </label>
+            </div>
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -733,6 +749,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                   <div><dt className="text-stone-500">Payment mode</dt><dd className="text-stone-100">{detailsCustomer.payment_mode ?? "—"}</dd></div>
                   <div className="sm:col-span-2"><dt className="text-stone-500">Remarks</dt><dd className="text-stone-100">{detailsCustomer.remarks ?? "—"}</dd></div>
                   <div><dt className="text-stone-500">Duration</dt><dd className="text-stone-100">{detailsCustomer.duration ?? "—"}</dd></div>
+                  <div><dt className="text-stone-500">Receipt</dt><dd className="text-stone-100">{detailsCustomer.receipt ? "Yes" : "No"}</dd></div>
                 </dl>
                 <div className="flex gap-2 pt-2 border-t border-white/10">
                   <button
@@ -780,6 +797,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                 <th className="py-3 px-4 text-stone-400 font-medium">Payment</th>
                 <th className="py-3 px-4 text-stone-400 font-medium">Remarks</th>
                 <th className="py-3 px-4 text-stone-400 font-medium">Duration</th>
+                <th className="py-3 px-4 text-stone-400 font-medium w-20">Receipt</th>
                 <th className="py-3 px-4 text-stone-400 font-medium w-28">Action</th>
               </tr>
             </thead>
@@ -811,6 +829,16 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                     <td className="py-2.5 px-4 text-stone-400 text-xs">{c.payment_mode ?? "—"}</td>
                     <td className="py-2.5 px-4 text-stone-500 text-xs max-w-[160px] truncate" title={c.remarks ?? undefined}>{c.remarks ?? "—"}</td>
                     <td className="py-2.5 px-4 text-stone-400 text-xs">{c.duration ?? "—"}</td>
+                    <td className="py-2.5 px-4">
+                      {c.receipt ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-400 text-xs" title="Receipt issued">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="text-stone-500 text-xs">—</span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-4 relative" onClick={(e) => e.stopPropagation()}>
                       <div className="relative inline-block">
                         <button

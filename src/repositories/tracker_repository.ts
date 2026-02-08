@@ -12,44 +12,61 @@ export type TrackerFilters = {
   trainerSearch?: string | null;
 };
 
-export async function listTracker(limit = 500): Promise<Tracker[]> {
+const PAGE_SIZE = 1000;
+
+export async function listTracker(): Promise<Tracker[]> {
   const supabase = await createServiceRoleClient();
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select(COLS)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []) as Tracker[];
+  const all: Tracker[] = [];
+  let offset = 0;
+  let page: Tracker[];
+  do {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select(COLS)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw error;
+    page = (data ?? []) as Tracker[];
+    all.push(...page);
+    offset += PAGE_SIZE;
+  } while (page.length === PAGE_SIZE);
+  return all;
 }
 
 export async function listTrackerFiltered(
-  filters: TrackerFilters,
-  limit = 1000
+  filters: TrackerFilters
 ): Promise<Tracker[]> {
   const supabase = await createServiceRoleClient();
-  let q = supabase
-    .from(TABLE)
-    .select(COLS)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const all: Tracker[] = [];
+  let offset = 0;
+  let page: Tracker[];
+  do {
+    let q = supabase
+      .from(TABLE)
+      .select(COLS)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
 
-  if (filters.plan != null && filters.plan !== "") {
-    q = q.eq("plan", filters.plan);
-  }
-  if (filters.trainer != null && filters.trainer !== "") {
-    q = q.eq("trainer_name", filters.trainer);
-  }
-  if (filters.clientSearch != null && filters.clientSearch.trim() !== "") {
-    q = q.ilike("client_name", `%${filters.clientSearch.trim()}%`);
-  }
-  if (filters.trainerSearch != null && filters.trainerSearch.trim() !== "") {
-    q = q.ilike("trainer_name", `%${filters.trainerSearch.trim()}%`);
-  }
+    if (filters.plan != null && filters.plan !== "") {
+      q = q.eq("plan", filters.plan);
+    }
+    if (filters.trainer != null && filters.trainer !== "") {
+      q = q.eq("trainer_name", filters.trainer);
+    }
+    if (filters.clientSearch != null && filters.clientSearch.trim() !== "") {
+      q = q.ilike("client_name", `%${filters.clientSearch.trim()}%`);
+    }
+    if (filters.trainerSearch != null && filters.trainerSearch.trim() !== "") {
+      q = q.ilike("trainer_name", `%${filters.trainerSearch.trim()}%`);
+    }
 
-  const { data, error } = await q;
-  if (error) throw error;
-  return (data ?? []) as Tracker[];
+    const { data, error } = await q;
+    if (error) throw error;
+    page = (data ?? []) as Tracker[];
+    all.push(...page);
+    offset += PAGE_SIZE;
+  } while (page.length === PAGE_SIZE);
+  return all;
 }
 
 export async function findTrackerById(id: string): Promise<Tracker | null> {

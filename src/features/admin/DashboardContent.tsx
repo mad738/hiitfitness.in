@@ -127,6 +127,22 @@ function getDefaultRange(): { dateFrom: string; dateTo: string } {
   };
 }
 
+/** Monday as start of week (ISO-style). */
+function getWeekStart(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = x.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + offset);
+  return x;
+}
+
+export type WeekWiseRow = {
+  weekKey: string;
+  weekLabel: string;
+  entries: number;
+  revenue: number;
+};
+
 export function DashboardContent({
   customers,
   trainers,
@@ -156,12 +172,26 @@ export function DashboardContent({
   const gtCount = byPlan["GT"] ?? 0;
   const ptCount = byPlan["PT"] ?? 0;
 
-  const { newEntries, revenue, monthWiseData, trainerReports } = useMemo(() => {
+  const { newEntries, revenue, monthWiseData, weekWiseData, trainerReports } = useMemo(() => {
     if (useDummy) {
+      const dummyWeeks: WeekWiseRow[] = [];
+      const now = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const weekStart = getWeekStart(new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        dummyWeeks.push({
+          weekKey: toDateOnly(weekStart.toISOString()),
+          weekLabel: `${weekStart.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short" })}`,
+          entries: 4 + (i % 5),
+          revenue: 25000 + (i % 4) * 8000,
+        });
+      }
       return {
         newEntries: DUMMY_DASHBOARD.newCustomersThisMonth,
         revenue: DUMMY_DASHBOARD.revenueThisMonth,
         monthWiseData: DUMMY_MONTH_WISE,
+        weekWiseData: dummyWeeks,
         trainerReports: DUMMY_TRAINER_REPORTS,
       };
     }
@@ -208,6 +238,28 @@ export function DashboardContent({
       months.push({ month: monthKey, monthLabel, entries, revenue: revenueM });
       curr.setMonth(curr.getMonth() + 1);
     }
+
+    const weeks: WeekWiseRow[] = [];
+    let weekCurr = getWeekStart(start);
+    while (weekCurr <= end) {
+      const weekEnd = new Date(weekCurr);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      const weekKey = toDateOnly(weekCurr.toISOString());
+      const weekLabel = `${weekCurr.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short" })}`;
+      const entriesW = customers.filter((c) => {
+        const sd = c.start_date ? new Date(c.start_date) : null;
+        return sd && sd >= weekCurr && sd <= weekEnd;
+      }).length;
+      const revenueW = customers
+        .filter((c) => {
+          const pd = c.pay_date ? new Date(c.pay_date) : null;
+          return pd && pd >= weekCurr && pd <= weekEnd;
+        })
+        .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
+      weeks.push({ weekKey, weekLabel, entries: entriesW, revenue: revenueW });
+      weekCurr.setDate(weekCurr.getDate() + 7);
+    }
     const trainerById = new Map<string, Trainer>(
       trainers.map((t) => [t.id, t])
     );
@@ -244,11 +296,22 @@ export function DashboardContent({
       newEntries,
       revenue,
       monthWiseData: months,
+      weekWiseData: weeks,
       trainerReports: trainerReportsList,
     };
   }, [useDummy, customers, trainers, dateFrom, dateTo]);
 
   const chartData = monthWiseData;
+  const weeklyChartData = weekWiseData.map((w) => ({
+    monthLabel: w.weekLabel,
+    entries: w.entries,
+    revenue: w.revenue,
+  }));
+
+  const now = new Date();
+  const firstOfMonth = toDateOnly(new Date(now.getFullYear(), now.getMonth(), 1).toISOString());
+  const today = toDateOnly(now.toISOString());
+  const isThisMonth = dateFrom === firstOfMonth && dateTo === today;
 
   const cards = [
     {
@@ -381,7 +444,38 @@ export function DashboardContent({
           </div>
         </div>
 
-        <DashboardCharts data={chartData} formatINR={formatINR} />
+        {isThisMonth ? (
+          <>
+            <div>
+              <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
+                This month by week
+              </h3>
+              <p className="text-stone-500 text-sm mb-4">
+                Weekly breakdown (Monday–Sunday) for the current month.
+              </p>
+              <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
+            </div>
+            <div className="mt-10">
+              <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
+                Monthly view
+              </h3>
+              <DashboardCharts data={chartData} formatINR={formatINR} />
+            </div>
+          </>
+        ) : (
+          <>
+            <DashboardCharts data={chartData} formatINR={formatINR} />
+            <div className="mt-10">
+              <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
+                Weekly view
+              </h3>
+              <p className="text-stone-500 text-sm mb-4">
+                Same date range, broken down by week (Monday–Sunday).
+              </p>
+              <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
+            </div>
+          </>
+        )}
       </section>
 
       <section>
