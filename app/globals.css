@@ -76,11 +76,29 @@ body {
       transform: translateX(0);
     }
     to {
-      transform: translateX(-50%);
+      transform: translateX(-25%);
     }
   }
   .animate-marquee {
     animation: marquee 35s linear infinite;
+  }
+  /* Pause marquee while user is scrolling so loop stays seamless */
+  .marquee-container.marquee-paused .animate-marquee {
+    animation-play-state: paused;
+  }
+
+  /* Mobile: touch-friendly horizontal scroll (marquee still runs) */
+  @layer utilities {
+    .touch-scroll-x {
+      -webkit-overflow-scrolling: touch;
+    }
+    .scrollbar-hide {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   /* Scroll-into-view ease-in pop */

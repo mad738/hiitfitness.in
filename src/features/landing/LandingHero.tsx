@@ -1,12 +1,75 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { MatterButton } from "@/components/ui/matter-button";
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
 
 const HERO_IMAGE_SRC =
   "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=800&q=80";
 
+const MARQUEE_CHIPS = [
+  { title: "Join Now", desc: "Start your membership today.", accent: "red" },
+  { title: "Book Free Trial", desc: "Try a session on us.", accent: "red" },
+  { title: "WhatsApp Us", desc: "Quick replies, easy booking.", accent: "red" },
+] as const;
+
+/** Number of duplicate segments so marquee + scroll both feel endless */
+const MARQUEE_COPIES = 4;
+
 export function LandingHero() {
+  const marqueeWrapRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const segmentWidthRef = useRef(0);
+  const [marqueePaused, setMarqueePaused] = useState(false);
+
+  const updateSegmentWidth = useCallback(() => {
+    const el = scrollRef.current;
+    const inner = marqueeWrapRef.current;
+    if (el?.scrollWidth) segmentWidthRef.current = el.scrollWidth / MARQUEE_COPIES;
+    else if (inner) segmentWidthRef.current = inner.scrollWidth / MARQUEE_COPIES;
+  }, []);
+
+  const handleMarqueeScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (segmentWidthRef.current <= 0) updateSegmentWidth();
+    const segment = segmentWidthRef.current;
+    if (segment <= 0) return;
+    const scrollLeft = el.scrollLeft;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 0) return;
+    const threshold = segment * 0.4;
+    let newLeft = scrollLeft;
+    if (scrollLeft < threshold) {
+      newLeft = scrollLeft + segment;
+      if (newLeft > maxScroll) newLeft = maxScroll;
+    } else if (scrollLeft > maxScroll - threshold) {
+      newLeft = scrollLeft - segment;
+      if (newLeft < 0) newLeft = 0;
+    }
+    if (newLeft !== scrollLeft) {
+      el.scrollLeft = newLeft;
+    }
+  }, [updateSegmentWidth]);
+
+  const measureSegment = useCallback(() => {
+    updateSegmentWidth();
+  }, [updateSegmentWidth]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => updateSegmentWidth());
+    ro.observe(el);
+    updateSegmentWidth();
+    return () => ro.disconnect();
+  }, [updateSegmentWidth]);
+
+  const pauseMarquee = useCallback(() => setMarqueePaused(true), []);
+  const resumeMarquee = useCallback(() => setMarqueePaused(false), []);
+
   return (
     <section className="relative min-h-[92vh] flex items-center justify-center px-4 sm:px-6 pt-[calc(var(--header-height)+var(--header-content-gap)+3.25rem)] md:pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden">
       {/* No top/side gradients – global interactive grid shows through as hero background */}
@@ -61,19 +124,27 @@ export function LandingHero() {
           </div>
         </div>
 
-        {/* Marquee chips – full width, no side space unused */}
-        <div className="mt-12 w-screen relative left-1/2 -translate-x-1/2 overflow-hidden">
-          <div className="animate-marquee flex w-max gap-3 px-4 sm:px-6">
-            {[...Array(2)].map((_, set) => (
+        {/* Marquee chips – endless loop: multiple copies + scroll-wrap when user scrolls */}
+        <div
+          ref={scrollRef}
+          className={`mt-12 w-screen relative left-1/2 -translate-x-1/2 overflow-hidden max-md:overflow-x-auto max-md:overflow-y-hidden max-md:touch-scroll-x max-md:scrollbar-hide marquee-container ${marqueePaused ? "marquee-paused" : ""}`}
+          onScroll={handleMarqueeScroll}
+          onPointerDown={() => {
+            measureSegment();
+            pauseMarquee();
+          }}
+          onPointerUp={resumeMarquee}
+          onPointerLeave={resumeMarquee}
+          onPointerCancel={resumeMarquee}
+        >
+          <div
+            ref={marqueeWrapRef}
+            data-marquee-inner
+            className="animate-marquee flex w-max gap-3 px-4 sm:px-6"
+          >
+            {[...Array(MARQUEE_COPIES)].map((_, set) => (
               <div key={set} className="flex gap-3 shrink-0">
-                {[
-                  { title: "Join Now", desc: "Start your membership today.", accent: "red" },
-                  { title: "Book Free Trial", desc: "Try a session on us.", accent: "red" },
-                  { title: "WhatsApp Us", desc: "Quick replies, easy booking.", accent: "red" },
-                  { title: "Join Now", desc: "Start your membership today.", accent: "red" },
-                  { title: "Book Free Trial", desc: "Try a session on us.", accent: "red" },
-                  { title: "WhatsApp Us", desc: "Quick replies, easy booking.", accent: "red" },
-                ].map((chip, i) => (
+                {MARQUEE_CHIPS.map((chip, i) => (
                   <div
                     key={`${set}-${chip.title}-${i}`}
                     className="liquid-glass shrink-0 rounded-2xl px-4 py-3 min-w-[180px] sm:min-w-[200px] transition-all duration-300 ease-out hover:scale-[1.03] hover:border-brand-red/50 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.3),0_0_20px_rgba(255,0,0,0.2),0_0_36px_rgba(255,0,0,0.12)]"

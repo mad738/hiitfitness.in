@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
 
-const aksans = localFont({
-  src: "../public/fonts/aksans-750.otf",
-  variable: "--font-sans",
+const inter = Inter({
+  subsets: ["latin"],
   display: "swap",
+  variable: "--font-sans",
 });
 
 const ethnocentric = localFont({
@@ -33,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body
-        className={`${aksans.variable} ${ethnocentric.variable} antialiased font-sans text-stone-100 min-h-screen`}
+        className={`${inter.variable} ${ethnocentric.variable} antialiased font-sans text-stone-100 min-h-screen`}
       >
         <InteractiveGridPattern
           cellSize={50}

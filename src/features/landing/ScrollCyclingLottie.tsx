@@ -22,6 +22,7 @@ export function ScrollCyclingLottie() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
   const [showBoom, setShowBoom] = useState(false);
+  const [visualViewportTop, setVisualViewportTop] = useState(0);
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
   const prevProgressRef = useRef(0);
@@ -31,6 +32,31 @@ export function ScrollCyclingLottie() {
       .then((res) => res.json())
       .then((data) => setAnimationData(data))
       .catch(() => setAnimationData(null));
+  }, []);
+
+  /**
+   * Mobile browser UI (Chrome/Safari address/tab bars) can slide in/out and
+   * temporarily cover `position: fixed; top: 0` elements while scrolling.
+   * Using the Visual Viewport offset keeps the cycle bar pinned *below* the
+   * browser chrome (when present), so it stays visible on scroll-up.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => setVisualViewportTop(vv.offsetTop || 0);
+    update();
+
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    window.addEventListener("orientationchange", update);
+
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      window.removeEventListener("orientationchange", update);
+    };
   }, []);
 
   const updateProgress = useCallback(() => {
@@ -108,13 +134,19 @@ export function ScrollCyclingLottie() {
         </div>
       )}
       <div
-        className="fixed left-0 right-0 z-40 h-[52px] md:hidden border-b border-stone-800/80 bg-black/95 backdrop-blur-sm transition-[top] duration-300 ease-out"
-        style={{ top: isMobile && headerHidden ? 0 : "var(--header-height)" }}
+        className="fixed left-0 right-0 z-40 md:hidden border-b border-stone-800/80 bg-black/95 backdrop-blur-sm transition-[top] duration-300 ease-out overflow-visible min-h-[56px] flex items-center"
+        style={{
+          top:
+            (isMobile && headerHidden
+              ? `${visualViewportTop}px`
+              : `calc(${visualViewportTop}px + var(--header-height))`),
+          height: 56,
+        }}
         aria-hidden
       >
       {/* Layer 1: Lap line only – positioned under the wheels, not centre of cycle */}
       <div
-        className="absolute inset-x-0 flex px-3 z-0"
+        className="absolute inset-x-0 flex px-3 z-0 overflow-visible"
         style={{ top: "calc(50% + 14px)", height: 0 }}
         aria-hidden
       >
@@ -126,7 +158,7 @@ export function ScrollCyclingLottie() {
         </div>
       </div>
       {/* Layer 2: All cycle UI above the lap line – cyclist + Start/Finish */}
-      <div className="absolute inset-0 flex items-center px-3 z-10 pointer-events-none">
+      <div className="absolute inset-0 flex items-center px-3 z-10 pointer-events-none overflow-visible">
         <div className="flex-1 relative h-[2px]">
           {/* Start lap icon */}
           <span
@@ -157,9 +189,9 @@ export function ScrollCyclingLottie() {
       </div>
       {/* Cyclist Lottie – above lap line, between Start and Finish (no overlap with icons) */}
       <div
-        className="absolute -translate-y-1/2 z-20 flex items-center justify-center transition-[left] duration-75 ease-out"
+        className="absolute -translate-y-1/2 z-20 flex items-center justify-center transition-[left] duration-75 ease-out overflow-visible"
         style={{
-          top: "calc(60% - 10px)",
+          top: "50%",
           left: `calc(${CYCLIST_START_LEFT}px + (100% - ${CYCLIST_START_LEFT + TRACK_PAD + ICON_SIZE + ICON_GAP + LOTTIE_SIZE}px) * ${scrollProgress})`,
           width: LOTTIE_SIZE,
           height: LOTTIE_SIZE,
