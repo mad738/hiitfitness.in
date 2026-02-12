@@ -26,6 +26,8 @@ export function InteractiveGridPattern({
 }: InteractiveGridPatternProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef({ rows: 0, cols: 0, scale: 1 })
+  const pointerRafRef = useRef<number | null>(null)
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null)
   const [grid, setGrid] = useState({ rows: 0, cols: 0, scale: 1 })
   const [hoveredCell, setHoveredCell] = useState<number | null>(null)
   const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 })
@@ -41,27 +43,32 @@ export function InteractiveGridPattern({
     return () => mq.removeEventListener("change", update)
   }, [])
 
-  // On mobile/tablet: animate a glow position along a smooth pattern (Lissajous-style) so the grid feels alive
+  // On mobile/tablet: animate a glow position along a smooth pattern (Lissajous-style).
+  // Throttle state updates to ~15fps to reduce re-renders while keeping motion smooth.
+  const PATTERN_UPDATE_INTERVAL_MS = 66
   useEffect(() => {
     if (enableGlow) return
     const container = containerRef.current
     if (!container) return
 
     let rafId: number
+    let lastUpdate = 0
     const start = performance.now()
 
-    const tick = () => {
+    const tick = (now: number) => {
+      rafId = requestAnimationFrame(tick)
+      if (now - lastUpdate < PATTERN_UPDATE_INTERVAL_MS) return
+      lastUpdate = now
       const rect = container.getBoundingClientRect()
       const { width, height } = rect
       const centerX = width / 2
       const centerY = height / 2
       const radiusX = width * 0.32
       const radiusY = height * 0.22
-      const t = (performance.now() - start) / 1000
+      const t = (now - start) / 1000
       const x = centerX + radiusX * Math.sin(t * 0.45)
       const y = centerY + radiusY * Math.sin(t * 0.65 + 0.5)
       setPatternPos({ x, y })
-      rafId = requestAnimationFrame(tick)
     }
 
     rafId = requestAnimationFrame(tick)
@@ -95,29 +102,48 @@ export function InteractiveGridPattern({
     return () => ro.disconnect()
   }, [updateGrid])
 
-  // Global pointer listeners so the grid reacts to cursor anywhere (desktop only; disabled on mobile)
+  // Global pointer listeners so the grid reacts to cursor anywhere (desktop only; disabled on mobile).
+  // Throttle move updates to avoid excessive re-renders on fast pointer movement.
+  const POINTER_THROTTLE_MS = 32
   useEffect(() => {
     if (!enableGlow) return
     const container = containerRef.current
     if (!container) return
 
-    const onMove = (e: PointerEvent) => {
-      const rect = container.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      setMousePos({ x, y })
+    let lastMoveTime = 0
+    const flushPointer = () => {
+      pointerRafRef.current = null
+      const p = lastPointerRef.current
+      if (p == null) return
+      lastPointerRef.current = null
+      setMousePos(p)
       const g = gridRef.current
       const scaledCellSize = cellSize * g.scale
       const { cols, rows } = g
       if (cols > 0 && rows > 0 && scaledCellSize > 0) {
-        const col = Math.floor(x / scaledCellSize)
-        const row = Math.floor(y / scaledCellSize)
+        const col = Math.floor(p.x / scaledCellSize)
+        const row = Math.floor(p.y / scaledCellSize)
         if (row >= 0 && row < rows && col >= 0 && col < cols) {
           setHoveredCell(row * cols + col)
           return
         }
       }
       setHoveredCell(null)
+    }
+
+    const onMove = (e: PointerEvent) => {
+      const rect = container.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      lastPointerRef.current = { x, y }
+      const now = performance.now()
+      if (now - lastMoveTime >= POINTER_THROTTLE_MS) {
+        lastMoveTime = now
+        if (pointerRafRef.current != null) cancelAnimationFrame(pointerRafRef.current)
+        flushPointer()
+      } else if (pointerRafRef.current == null) {
+        pointerRafRef.current = requestAnimationFrame(flushPointer)
+      }
     }
 
     const onLeave = () => {
@@ -133,6 +159,7 @@ export function InteractiveGridPattern({
     document.documentElement.addEventListener("pointerup", onLeave)
 
     return () => {
+      if (pointerRafRef.current != null) cancelAnimationFrame(pointerRafRef.current)
       window.removeEventListener("pointerdown", onMove)
       window.removeEventListener("pointermove", onMove)
       document.documentElement.removeEventListener("pointerleave", onLeave)

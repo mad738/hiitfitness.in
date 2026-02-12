@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 
 type AnimateOnScrollProps = {
   children: React.ReactNode;
@@ -9,16 +9,16 @@ type AnimateOnScrollProps = {
   delay?: number;
   /** Root margin for Intersection Observer. Default "0px 0px -60px 0px" (trigger when 60px from bottom of viewport). */
   rootMargin?: string;
-  /** Only animate once. Default true. */
+  /** Only animate once. Default false so the effect repeats when scrolling back into view (loop). */
   once?: boolean;
 };
 
-export function AnimateOnScroll({
+function AnimateOnScrollInner({
   children,
   className = "",
   delay = 0,
   rootMargin = "0px 0px -60px 0px",
-  once = true,
+  once = false,
 }: AnimateOnScrollProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
@@ -32,7 +32,10 @@ export function AnimateOnScroll({
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) {
-            if (!once) setInView(false);
+            if (!once) {
+              setInView(false);
+              setDelayedShow(false); // reset so animation can replay when scrolled back into view
+            }
             return;
           }
           setInView(true);
@@ -63,3 +66,5 @@ export function AnimateOnScroll({
     </div>
   );
 }
+
+export const AnimateOnScroll = memo(AnimateOnScrollInner);

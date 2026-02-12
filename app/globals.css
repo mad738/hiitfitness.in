@@ -87,6 +87,11 @@ body {
     animation-play-state: paused;
   }
 
+  /* Fixed cycle bar: contain layout/paint to reduce reflow cost during scroll */
+  .cycle-bar-container {
+    contain: layout paint;
+  }
+
   /* Mobile: touch-friendly horizontal scroll (marquee still runs) */
   @layer utilities {
     .touch-scroll-x {

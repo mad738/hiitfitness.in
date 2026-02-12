@@ -32,19 +32,28 @@ export function MobileHeaderProvider({ children }: { children: React.ReactNode }
   const [isMobile, setIsMobile] = useState(false);
   const lastY = useRef(0);
   const ticking = useRef(false);
+  const headerHiddenRef = useRef(false);
 
   const update = useCallback((scrollY: number) => {
     const prevY = lastY.current;
     lastY.current = scrollY;
 
     if (scrollY <= SHOW_HEADER_SCROLL_TOP) {
-      setHeaderHidden(false);
+      if (headerHiddenRef.current) {
+        headerHiddenRef.current = false;
+        setHeaderHidden(false);
+      }
       return;
     }
 
     const delta = scrollY - prevY;
-    if (delta > SCROLL_THRESHOLD_PX) setHeaderHidden(true);   // scrolled down → hide header
-    if (delta < -SCROLL_THRESHOLD_PX) setHeaderHidden(false); // scrolled up → show header
+    if (delta > SCROLL_THRESHOLD_PX && !headerHiddenRef.current) {
+      headerHiddenRef.current = true;
+      setHeaderHidden(true);
+    } else if (delta < -SCROLL_THRESHOLD_PX && headerHiddenRef.current) {
+      headerHiddenRef.current = false;
+      setHeaderHidden(false);
+    }
   }, []);
 
   useEffect(() => {

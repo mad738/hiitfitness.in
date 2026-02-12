@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
-import { MobileInViewHover } from "@/components/ui/mobile-in-view-hover";
 
 const MapPinIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,72 +68,66 @@ export function LandingContact() {
               We’ll point you to the right plan and help you start strong.
             </p>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="flex justify-center sm:block w-full">
-              <MobileInViewHover className="w-full max-w-md sm:max-w-none p-3 md:p-0">
-                <div className="liquid-glass p-5 rounded-2xl transition-all duration-300 ease-out hover:scale-[1.03] hover:border-brand-red/60 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.3),0_0_24px_rgba(255,0,0,0.25),0_0_40px_rgba(255,0,0,0.15),0_12px_40px_rgba(0,0,0,0.35)]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="w-full min-w-0">
+                <div className="liquid-glass p-5 rounded-2xl">
                   <p className="text-brand-red font-bold mb-1 flex items-center gap-2">
                     <PhoneIcon />
                     Phone
                   </p>
-                <div className="flex flex-col gap-1.5">
-                  {gym.phones.map((p) => (
-                    <a
-                      key={p.tel}
-                      href={p.tel}
-                      className="text-stone-200 font-semibold hover:text-brand-red transition"
-                    >
-                      {p.display}
-                    </a>
-                  ))}
+                  <div className="flex flex-col gap-1.5">
+                    {gym.phones.map((p) => (
+                      <a
+                        key={p.tel}
+                        href={p.tel}
+                        className="text-stone-200 font-semibold hover:text-brand-red transition"
+                      >
+                        {p.display}
+                      </a>
+                    ))}
+                  </div>
+                  <p className="text-stone-500 text-sm mt-1">
+                    Tap to call — class times & tours
+                  </p>
                 </div>
-                <p className="text-stone-500 text-sm mt-1">
-                  Tap to call — class times & tours
-                </p>
-                </div>
-              </MobileInViewHover>
               </div>
-              <div className="flex justify-center sm:block w-full">
-              <MobileInViewHover className="w-full max-w-md sm:max-w-none p-3 md:p-0">
-                <div className="liquid-glass p-5 rounded-2xl transition-all duration-300 ease-out hover:scale-[1.03] hover:border-brand-red/60 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.3),0_0_24px_rgba(255,0,0,0.25),0_0_40px_rgba(255,0,0,0.15),0_12px_40px_rgba(0,0,0,0.35)]">
+              <div className="w-full min-w-0">
+                <div className="liquid-glass p-5 rounded-2xl">
                   <p className="text-brand-red font-bold mb-1 flex items-center gap-2">
                     <InstagramIcon />
                     Instagram
                   </p>
-                <a
-                  href="https://www.instagram.com/hiitfitness01"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-stone-200 font-semibold hover:text-brand-red transition break-all inline-flex items-center gap-2"
-                >
-                  @hiitfitness01
-                </a>
-                <p className="text-stone-500 text-sm mt-1">
-                  Follow us for updates & reels
-                </p>
+                  <a
+                    href="https://www.instagram.com/hiitfitness01"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-stone-200 font-semibold hover:text-brand-red transition break-all inline-flex items-center gap-2"
+                  >
+                    @hiitfitness01
+                  </a>
+                  <p className="text-stone-500 text-sm mt-1">
+                    Follow us for updates & reels
+                  </p>
                 </div>
-              </MobileInViewHover>
               </div>
-              <div className="flex justify-center sm:block w-full sm:col-span-2">
-              <MobileInViewHover className="w-full max-w-md sm:max-w-none p-3 md:p-0">
-                <div className="liquid-glass p-5 rounded-2xl transition-all duration-300 ease-out hover:scale-[1.03] hover:border-brand-red/60 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.3),0_0_24px_rgba(255,0,0,0.25),0_0_40px_rgba(255,0,0,0.15),0_12px_40px_rgba(0,0,0,0.35)]">
+              <div className="w-full min-w-0 sm:col-span-2">
+                <div className="liquid-glass p-5 rounded-2xl">
                   <p className="text-brand-red font-bold mb-2 flex items-center gap-2">
                     <ClockIcon />
                     Gym timings
                   </p>
-                <div className="grid sm:grid-cols-2 gap-2 text-sm">
-                  <p className="text-stone-300">
-                    Mon–Sat: <span className="text-stone-100 font-semibold">Morning 6 AM – 10 AM</span>
-                  </p>
-                  <p className="text-stone-300">
-                    Mon–Sat: <span className="text-stone-100 font-semibold">Evening 5 PM – 9 PM</span>
-                  </p>
-                  <p className="text-stone-300">
-                    Sun: <span className="text-stone-100 font-semibold">Morning 6 AM – 11 AM</span>
-                  </p>
+                  <div className="grid sm:grid-cols-2 gap-2 text-sm">
+                    <p className="text-stone-300">
+                      Mon–Sat: <span className="text-stone-100 font-semibold">Morning 6 AM – 10 AM</span>
+                    </p>
+                    <p className="text-stone-300">
+                      Mon–Sat: <span className="text-stone-100 font-semibold">Evening 5 PM – 9 PM</span>
+                    </p>
+                    <p className="text-stone-300">
+                      Sun: <span className="text-stone-100 font-semibold">Morning 6 AM – 11 AM</span>
+                    </p>
+                  </div>
                 </div>
-                </div>
-              </MobileInViewHover>
               </div>
             </div>
 
@@ -154,9 +147,8 @@ export function LandingContact() {
             </div>
           </div>
 
-          <div className="flex justify-center md:block w-full">
-          <MobileInViewHover className="w-full max-w-md md:max-w-none p-3 md:p-0">
-            <div className="liquid-glass rounded-3xl overflow-hidden transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/50 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.25),0_0_24px_rgba(255,0,0,0.2),0_0_40px_rgba(255,0,0,0.1),0_12px_40px_rgba(0,0,0,0.35)]">
+          <div className="w-full min-w-0 flex justify-center">
+            <div className="liquid-glass rounded-3xl overflow-hidden w-full max-w-md lg:max-w-xl">
               <div className="p-6 border-b border-white/10">
               <p className="text-stone-100 font-bold">Visit the gym</p>
               <p className="text-stone-400 text-sm break-words">
@@ -191,7 +183,6 @@ export function LandingContact() {
               </Button>
             </div>
             </div>
-          </MobileInViewHover>
           </div>
         </div>
       </AnimateOnScroll>

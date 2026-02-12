@@ -61,10 +61,18 @@ export function LandingHero() {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => updateSegmentWidth());
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const debouncedUpdate = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(updateSegmentWidth, 100);
+    };
+    const ro = new ResizeObserver(debouncedUpdate);
     ro.observe(el);
     updateSegmentWidth();
-    return () => ro.disconnect();
+    return () => {
+      clearTimeout(timeoutId);
+      ro.disconnect();
+    };
   }, [updateSegmentWidth]);
 
   const pauseMarquee = useCallback(() => setMarqueePaused(true), []);

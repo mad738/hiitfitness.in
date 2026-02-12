@@ -12,6 +12,8 @@ const ICON_SIZE = 24; /* w-6 */
 const TRACK_PAD = 12; /* px-3 */
 const ICON_GAP = -6; /* gap so cycle doesn't touch icons */
 const CYCLIST_START_LEFT = TRACK_PAD + ICON_SIZE + ICON_GAP; /* after Start icon */
+/** Quantize scroll progress to reduce re-renders (e.g. 150 steps ≈ 0.67% per step). */
+const PROGRESS_STEPS = 150;
 
 type LottieAnimationData = object;
 
@@ -20,12 +22,13 @@ export function ScrollCyclingLottie() {
   const lottieRef = useRef<LottieRefCurrentProps>(null);
   const [animationData, setAnimationData] = useState<LottieAnimationData | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(false);
   const [showBoom, setShowBoom] = useState(false);
   const [visualViewportTop, setVisualViewportTop] = useState(0);
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
   const prevProgressRef = useRef(0);
+  const lastQuantizedRef = useRef(-1);
+  const lastViewportTopRef = useRef(-1);
 
   useEffect(() => {
     fetch("animations/cycling.json")
@@ -37,15 +40,20 @@ export function ScrollCyclingLottie() {
   /**
    * Mobile browser UI (Chrome/Safari address/tab bars) can slide in/out and
    * temporarily cover `position: fixed; top: 0` elements while scrolling.
-   * Using the Visual Viewport offset keeps the cycle bar pinned *below* the
-   * browser chrome (when present), so it stays visible on scroll-up.
+   * Only update state when offset actually changes to avoid re-render storms.
    */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const vv = window.visualViewport;
     if (!vv) return;
 
-    const update = () => setVisualViewportTop(vv.offsetTop || 0);
+    const update = () => {
+      const top = Math.round(vv.offsetTop || 0);
+      if (top !== lastViewportTopRef.current) {
+        lastViewportTopRef.current = top;
+        setVisualViewportTop(top);
+      }
+    };
     update();
 
     vv.addEventListener("resize", update);
@@ -66,19 +74,23 @@ export function ScrollCyclingLottie() {
     const viewHeight = window.innerHeight;
     const maxScroll = Math.max(0, docHeight - viewHeight);
     const progress = maxScroll <= 0 ? 0 : Math.min(1, Math.max(0, scrollTop / maxScroll));
-    setScrollProgress(progress);
+    const step = Math.round(progress * PROGRESS_STEPS);
+    if (step !== lastQuantizedRef.current) {
+      lastQuantizedRef.current = step;
+      setScrollProgress(step / PROGRESS_STEPS);
+    }
   }, []);
 
   useEffect(() => {
     let ticking = false;
     const onScroll = () => {
-      setIsScrolling(true);
+      lottieRef.current?.play();
       if (idleRef.current) {
         clearTimeout(idleRef.current);
         idleRef.current = null;
       }
       idleRef.current = setTimeout(() => {
-        setIsScrolling(false);
+        lottieRef.current?.pause();
         idleRef.current = null;
       }, SCROLL_IDLE_MS);
 
@@ -102,16 +114,6 @@ export function ScrollCyclingLottie() {
     };
   }, [updateProgress]);
 
-  useEffect(() => {
-    const lottie = lottieRef.current;
-    if (!lottie) return;
-    if (isScrolling) {
-      lottie.play();
-    } else {
-      lottie.pause();
-    }
-  }, [isScrolling]);
-
   // Trigger silent boom when reaching end of lap (100% scroll)
   useEffect(() => {
     const prev = prevProgressRef.current;
@@ -134,7 +136,7 @@ export function ScrollCyclingLottie() {
         </div>
       )}
       <div
-        className="fixed left-0 right-0 z-40 md:hidden border-b border-stone-800/80 bg-black/95 backdrop-blur-sm transition-[top] duration-300 ease-out overflow-visible min-h-[56px] flex items-center"
+        className="cycle-bar-container fixed left-0 right-0 z-40 md:hidden border-b border-stone-800/80 bg-black/95 backdrop-blur-sm transition-[top] duration-300 ease-out overflow-visible min-h-[56px] flex items-center"
         style={{
           top:
             (isMobile && headerHidden
