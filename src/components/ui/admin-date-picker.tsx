@@ -4,6 +4,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 
+const DURATION_CHIPS = [
+  { label: "1 month", days: 30 },
+  { label: "3 months", days: 91 },
+  { label: "6 months", days: 182 },
+  { label: "1 year", days: 365 },
+] as const;
+
 type Props = {
   value: string;
   onChange: (value: string) => void;
@@ -13,6 +20,10 @@ type Props = {
   min?: string;
   max?: string;
   "aria-label"?: string;
+  /** When true, show duration chips (1m, 3m, 6m, 1y) under month/year. Base date = durationChipsReferenceDate or today. */
+  showDurationChips?: boolean;
+  /** Base date for duration chips (start date). If empty, today is used. */
+  durationChipsReferenceDate?: string;
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -42,6 +53,15 @@ function getDaysInMonth(year: number, month: number) {
   return days;
 }
 
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function AdminDatePicker({
   value,
   onChange,
@@ -51,8 +71,12 @@ export function AdminDatePicker({
   min,
   max,
   "aria-label": ariaLabel,
+  showDurationChips = false,
+  durationChipsReferenceDate,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const today = toDateOnly(new Date().toISOString());
+  const chipsBaseDate = durationChipsReferenceDate?.trim() || today;
   const [viewDate, setViewDate] = useState(() => {
     if (value) {
       const [y, m] = value.split("-").map(Number);
@@ -63,8 +87,6 @@ export function AdminDatePicker({
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-
-  const today = toDateOnly(new Date().toISOString());
 
   const updatePosition = useCallback(() => {
     if (inputRef.current) {
@@ -250,6 +272,31 @@ export function AdminDatePicker({
                 </svg>
               </button>
             </div>
+            {showDurationChips && (
+              <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/10 mt-2">
+                {DURATION_CHIPS.map(({ label, days }) => {
+                  const endStr = addDays(chipsBaseDate, days);
+                  const disabled = Boolean(
+                    (min && endStr < min) || (max && endStr > max)
+                  );
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => {
+                        onChange(endStr);
+                        setViewDate(new Date(endStr + "T12:00:00"));
+                        setOpen(false);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 disabled:opacity-50 disabled:pointer-events-none transition"
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="grid grid-cols-7 gap-0.5 pt-2">
               {WEEKDAYS.map((w) => (
                 <div key={w} className="calendar-weekday text-center">

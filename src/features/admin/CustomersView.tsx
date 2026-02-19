@@ -1,10 +1,10 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
-import { createPortal } from "react-dom";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { CustomerReportModal } from "./CustomerReportModal";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
 import {
@@ -13,6 +13,7 @@ import {
   deleteCustomer,
 } from "@app/actions/customers";
 import { readFileAsBase64 } from "@/lib/image-utils";
+import { normalizeMobile, dedupeByMobile } from "@/lib/customer-utils";
 import { PLAN_CATEGORIES } from "@/data/plans";
 import { TRACKER_PAYMENT_MODE_OPTIONS } from "@/config/tracker-options";
 import { AdminDatePicker } from "@/components/ui/admin-date-picker";
@@ -29,19 +30,6 @@ function formatCurrency(n: number) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(n);
-}
-
-function formatDateShort(s: string | null): string {
-  if (!s) return "—";
-  try {
-    return new Date(s).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return s;
-  }
 }
 
 function getStringParam(
@@ -72,6 +60,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // GT (left column)
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [plan, setPlan] = useState<string>("GT");
@@ -91,6 +80,26 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [paidTo, setPaidTo] = useState("");
   const [feedback, setFeedback] = useState("");
   const [receipt, setReceipt] = useState(false);
+  // PT (right column) – same fields, individual per column when adding new entry
+  const [namePt, setNamePt] = useState("");
+  const [imagePt, setImagePt] = useState<string | null>(null);
+  const [planPt, setPlanPt] = useState<string>("PT");
+  const [totalFeePt, setTotalFeePt] = useState<number>(0);
+  const [paidFeePt, setPaidFeePt] = useState<number>(0);
+  const [balancePt, setBalancePt] = useState<number>(0);
+  const [trainerIdPt, setTrainerIdPt] = useState<string | null>(null);
+  const [startDatePt, setStartDatePt] = useState("");
+  const [endDatePt, setEndDatePt] = useState("");
+  const [payDatePt, setPayDatePt] = useState("");
+  const [paymentModePt, setPaymentModePt] = useState("");
+  const [remarksPt, setRemarksPt] = useState("");
+  const [durationPt, setDurationPt] = useState("");
+  const [statusPt, setStatusPt] = useState("");
+  const [slotTimingPt, setSlotTimingPt] = useState("");
+  const [mobilePt, setMobilePt] = useState("");
+  const [paidToPt, setPaidToPt] = useState("");
+  const [feedbackPt, setFeedbackPt] = useState("");
+  const [receiptPt, setReceiptPt] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState(() => getStringParam(searchParams, "q"));
   const [filterPlan, setFilterPlan] = useState(() => getStringParam(searchParams, "plan"));
@@ -112,11 +121,6 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     [customers.length],
     { wheelOnBody: true }
   );
-  const reportScroll = useHorizontalScrollTable(
-    [!!detailsCustomer],
-    { wheelOnBody: false }
-  );
-
   useEffect(() => {
     if (!detailsCustomer) return;
     const prev = document.body.style.overflow;
@@ -154,6 +158,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   useEffect(() => {
     setBalance(Number(totalFee) - Number(paidFee));
   }, [totalFee, paidFee]);
+  useEffect(() => {
+    setBalancePt(Number(totalFeePt) - Number(paidFeePt));
+  }, [totalFeePt, paidFeePt]);
 
   useEffect(() => {
     setMounted(true);
@@ -226,6 +233,12 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     return true;
   });
 
+  /** One row per unique mobile in the table (no double entries for same number). */
+  const displayCustomers = useMemo(
+    () => dedupeByMobile(filteredCustomers),
+    [filteredCustomers]
+  );
+
   function buildFilterUrlForNewTab(): string {
     const params = new URLSearchParams();
     if (pendingFilterPlan) params.set("plan", pendingFilterPlan);
@@ -253,6 +266,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
   function openAdd() {
     setEditing(null);
+    // GT
     setName("");
     setImage(null);
     setPlan("GT");
@@ -272,14 +286,40 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setPaidTo("");
     setFeedback("");
     setReceipt(false);
+    // PT
+    setNamePt("");
+    setImagePt(null);
+    setPlanPt("PT");
+    setTotalFeePt(0);
+    setPaidFeePt(0);
+    setBalancePt(0);
+    setTrainerIdPt(null);
+    setStartDatePt("");
+    setEndDatePt("");
+    setPayDatePt("");
+    setPaymentModePt("");
+    setRemarksPt("");
+    setDurationPt("");
+    setStatusPt("");
+    setSlotTimingPt("");
+    setMobilePt("");
+    setPaidToPt("");
+    setFeedbackPt("");
+    setReceiptPt(false);
     setFormOpen(true);
     setError(null);
   }
 
   function openAddEntryFromReport(c: Customer) {
     openAdd();
-    setName(c.name ?? "");
-    setMobile(c.mobile ?? "");
+    const isPt = (c.plan ?? "").toUpperCase() === "PT";
+    if (isPt) {
+      setNamePt(c.name ?? "");
+      setMobilePt(c.mobile ?? "");
+    } else {
+      setName(c.name ?? "");
+      setMobile(c.mobile ?? "");
+    }
     setDetailsCustomer(null);
   }
 
@@ -325,39 +365,104 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setImage(null);
   }
 
+  async function handleImageChangePt(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const data = await readFileAsBase64(file);
+    if (data) setImagePt(data);
+  }
+  function clearImagePt() {
+    setImagePt(null);
+  }
+
+  function buildPayload(opts: {
+    name: string;
+    image: string | null;
+    plan: string;
+    totalFee: number;
+    paidFee: number;
+    trainerId: string | null;
+    startDate: string;
+    endDate: string;
+    payDate: string;
+    paymentMode: string;
+    remarks: string;
+    duration: string;
+    status: string;
+    slotTiming: string;
+    mobile: string;
+    paidTo: string;
+    feedback: string;
+    receipt: boolean;
+  }) {
+    const balanceVal = Number(opts.totalFee) - Number(opts.paidFee);
+    return {
+      name: opts.name.trim(),
+      image: opts.image ?? null,
+      plan: opts.plan,
+      total_fee: Number(opts.totalFee),
+      paid_fee: Number(opts.paidFee),
+      balance: balanceVal,
+      trainer_id: opts.plan === "PT" ? opts.trainerId : null,
+      start_date: opts.startDate.trim() || null,
+      end_date: opts.endDate.trim() || null,
+      pay_date: opts.payDate.trim() || null,
+      payment_mode: opts.paymentMode.trim() || null,
+      remarks: opts.remarks.trim() || null,
+      duration: opts.duration.trim() || null,
+      status: opts.status.trim() || null,
+      slot_timing: opts.slotTiming.trim() || null,
+      mobile: opts.mobile.trim() || null,
+      paid_to: opts.paidTo.trim() || null,
+      feedback: opts.feedback.trim() || null,
+      receipt: opts.receipt,
+    };
+  }
+
+  /** Check if mobile is already used by another customer (optional excludeId when editing). */
+  function isMobileAlreadyUsed(mobileVal: string, excludeId?: string): boolean {
+    const key = normalizeMobile(mobileVal);
+    if (!key) return false;
+    return customers.some(
+      (c) => c.id !== excludeId && normalizeMobile(c.mobile) === key
+    );
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      setError("Name is required.");
-      return;
-    }
-    const balanceVal = Number(totalFee) - Number(paidFee);
     setLoading(true);
     try {
-      const payload = {
-        name: trimmedName,
-        image: image ?? null,
-        plan,
-        total_fee: Number(totalFee),
-        paid_fee: Number(paidFee),
-        balance: balanceVal,
-        trainer_id: plan === "PT" ? trainerId : null,
-        start_date: startDate.trim() || null,
-        end_date: endDate.trim() || null,
-        pay_date: payDate.trim() || null,
-        payment_mode: paymentMode.trim() || null,
-        remarks: remarks.trim() || null,
-        duration: duration.trim() || null,
-        status: status.trim() || null,
-        slot_timing: slotTiming.trim() || null,
-        mobile: mobile.trim() || null,
-        paid_to: paidTo.trim() || null,
-        feedback: feedback.trim() || null,
-        receipt,
-      };
       if (editing) {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+          setError("Name is required.");
+          return;
+        }
+        if (isMobileAlreadyUsed(mobile, editing.id)) {
+          setError("Another customer already has this mobile number. Mobile must be unique.");
+          return;
+        }
+        const payload = buildPayload({
+          name,
+          image,
+          plan,
+          totalFee,
+          paidFee,
+          trainerId,
+          startDate,
+          endDate,
+          payDate,
+          paymentMode,
+          remarks,
+          duration,
+          status,
+          slotTiming,
+          mobile,
+          paidTo,
+          feedback,
+          receipt,
+        });
         const res = await updateCustomer(editing.id, payload);
         if (res.ok) {
           setCustomers((prev) =>
@@ -371,13 +476,74 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           setError(res.error);
         }
       } else {
-        const res = await createCustomer(payload);
-        if (res.ok) {
-          closeForm();
-          router.refresh();
-        } else {
-          setError(res.error);
+        // Add new entry: common name & number; create one GT and one PT customer (both use common name/number)
+        const commonName = name.trim();
+        if (!commonName) {
+          setError("Name is required.");
+          return;
         }
+        const commonMobileRaw = mobile.trim();
+        if (commonMobileRaw && isMobileAlreadyUsed(commonMobileRaw)) {
+          setError("A customer with this mobile number already exists. Mobile must be unique.");
+          return;
+        }
+        const commonMobile = commonMobileRaw || null;
+        {
+          const payloadGt = buildPayload({
+            name: commonName,
+            image,
+            plan: "GT",
+            totalFee,
+            paidFee,
+            trainerId,
+            startDate,
+            endDate,
+            payDate,
+            paymentMode,
+            remarks,
+            duration,
+            status,
+            slotTiming,
+            mobile: commonMobile ?? "",
+            paidTo,
+            feedback,
+            receipt,
+          });
+          const resGt = await createCustomer(payloadGt);
+          if (!resGt.ok) {
+            setError(resGt.error ?? "Failed to add GT.");
+            return;
+          }
+        }
+        {
+          const payloadPt = buildPayload({
+            name: commonName,
+            image: imagePt,
+            plan: "PT",
+            totalFee: totalFeePt,
+            paidFee: paidFeePt,
+            trainerId: trainerIdPt,
+            startDate: startDatePt,
+            endDate: endDatePt,
+            payDate: payDatePt,
+            paymentMode: paymentModePt,
+            remarks: remarksPt,
+            duration: durationPt,
+            status: statusPt,
+            slotTiming: slotTimingPt,
+            mobile: commonMobile ?? "",
+            paidTo: paidToPt,
+            feedback: feedbackPt,
+            receipt: receiptPt,
+          });
+          const resPt = await createCustomer(payloadPt);
+          if (!resPt.ok) {
+            setError(resPt.error ?? "Failed to add PT.");
+            return;
+          }
+        }
+        closeForm();
+        router.refresh();
       }
     } finally {
       setLoading(false);
@@ -553,15 +719,15 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         </button>
         <p className="text-stone-500 text-sm">
           {hasFilterParamsInUrl
-            ? `Showing ${filteredCustomers.length} of ${customers.length} customer${customers.length === 1 ? "" : "s"}`
-            : `Showing ${customers.length} customer${customers.length === 1 ? "" : "s"}`}
+            ? `Showing ${displayCustomers.length} of ${customers.length} customer${customers.length === 1 ? "" : "s"} (one per mobile)`
+            : `Showing ${displayCustomers.length} customer${displayCustomers.length === 1 ? "" : "s"} (one per mobile)`}
         </p>
       </div>
 
       {formOpen && (
         <div className="liquid-glass p-6 rounded-2xl border border-white/10">
           <h2 className="text-lg font-semibold text-stone-100 mb-4">
-            {editing ? "Edit customer" : "New customer"}
+            {editing ? "Edit customer" : "New entry (GT + PT)"}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
@@ -569,249 +735,306 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                 {error}
               </p>
             )}
-            <div>
-              <label className={labelClass}>Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={inputClass}
-                required
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Photo</label>
-              <div className="flex items-center gap-4 flex-wrap">
-                {image ? (
-                  <>
-                    <img
-                      src={image}
-                      alt="Preview"
-                      className="w-20 h-20 rounded-xl object-cover border border-white/10"
-                    />
-                    <div className="flex gap-2">
-                      <label className="cursor-pointer px-3 py-2 rounded-lg border border-white/20 text-stone-300 hover:bg-white/5 text-sm">
-                        Change
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={handleImageChange}
-                        />
-                      </label>
-                      <button type="button" onClick={clearImage} className="px-3 py-2 rounded-lg border border-white/20 text-stone-400 hover:bg-white/5 text-sm">
-                        Remove
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <label className="cursor-pointer px-4 py-2.5 rounded-xl border border-dashed border-white/20 text-stone-400 hover:border-brand-red/50 hover:text-brand-red text-sm transition">
-                    Upload image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleImageChange}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Plan</label>
-                <select
-                  value={plan}
-                  onChange={(e) => {
-                    setPlan(e.target.value);
-                    if (e.target.value !== "PT") setTrainerId(null);
-                  }}
-                  className={inputClass}
-                >
-                  {PLAN_CATEGORIES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {plan === "PT" && (
+            {editing ? (
+              /* Edit: single customer, single column */
+              <>
                 <div>
-                  <label className={labelClass}>Trainer</label>
-                  <select
-                    value={trainerId ?? ""}
-                    onChange={(e) => setTrainerId(e.target.value || null)}
-                    className={inputClass}
-                  >
-                    <option value="">— Select —</option>
-                    {trainerOptions.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
+                  <label className={labelClass}>Name</label>
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} required />
+                </div>
+                <div>
+                  <label className={labelClass}>Number</label>
+                  <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} placeholder="Phone number" />
+                </div>
+                <div>
+                  <label className={labelClass}>Plan</label>
+                  <select value={plan} onChange={(e) => { setPlan(e.target.value); if (e.target.value !== "PT") setTrainerId(null); }} className={inputClass}>
+                    {PLAN_CATEGORIES.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <label className={labelClass}>Total fee (₹)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={totalFee || ""}
-                  onChange={(e) => setTotalFee(Number(e.target.value) || 0)}
-                  className={inputClass}
-                />
+                <div>
+                  <label className={labelClass}>Duration</label>
+                  <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M, 12M + 1M" />
+                </div>
+                {plan === "PT" && (
+                  <div>
+                    <label className={labelClass}>Trainer</label>
+                    <select value={trainerId ?? ""} onChange={(e) => setTrainerId(e.target.value || null)} className={inputClass + " max-w-xs"}>
+                      <option value="">— Select —</option>
+                      {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className={labelClass}>Photo</label>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {image ? (
+                      <>
+                        <img src={image} alt="Preview" className="w-20 h-20 rounded-xl object-cover border border-white/10" />
+                        <div className="flex gap-2">
+                          <label className="cursor-pointer px-3 py-2 rounded-lg border border-white/20 text-stone-300 hover:bg-white/5 text-sm">
+                            Change
+                            <input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} />
+                          </label>
+                          <button type="button" onClick={clearImage} className="px-3 py-2 rounded-lg border border-white/20 text-stone-400 hover:bg-white/5 text-sm">Remove</button>
+                        </div>
+                      </>
+                    ) : (
+                      <label className="cursor-pointer px-4 py-2.5 rounded-xl border border-dashed border-white/20 text-stone-400 hover:border-brand-red/50 hover:text-brand-red text-sm transition">
+                        Upload image
+                        <input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} />
+                      </label>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <label className={labelClass}>Total fee (₹)</label>
+                    <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Paid fee (₹)</label>
+                    <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Balance (₹)</label>
+                    <input type="number" value={balance} readOnly className={inputClass + " bg-stone-900/50 text-stone-400"} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelClass}>Start date</label>
+                    <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="Start date" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>End date</label>
+                    <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="End date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Pay date</label>
+                    <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="Pay date" />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelClass}>Payment mode</label>
+                  <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass}>
+                    <option value="">— Select —</option>
+                    {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Remarks</label>
+                  <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className={inputClass + " min-h-[80px] resize-y"} placeholder="Optional notes…" rows={3} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Status</label>
+                    <input type="text" value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass} placeholder="e.g. Active" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Slot timing</label>
+                    <input type="text" value={slotTiming} onChange={(e) => setSlotTiming(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelClass}>Paid to</label>
+                  <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to (name)" />
+                </div>
+                <div>
+                  <label className={labelClass}>Feedback</label>
+                  <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className={inputClass + " min-h-[60px] resize-y"} placeholder="Optional feedback" rows={2} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="receipt-edit" checked={receipt} onChange={(e) => setReceipt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
+                  <label htmlFor="receipt-edit" className={labelClass + " mb-0 cursor-pointer"}>Receipt issued</label>
+                </div>
+              </>
+            ) : (
+              /* Add new entry: common Name + Number, then two columns — left GT, right PT (Plan, Duration, etc.) */
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-white/10">
+                  <div>
+                    <label className={labelClass}>Name</label>
+                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="Name (common)" required />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Number</label>
+                    <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} placeholder="Phone number (common)" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+                {/* Left column: GT — two fields per row */}
+                <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
+                  <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">GT</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass}>Duration</label>
+                      <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Photo</label>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {image ? (
+                          <>
+                            <img src={image} alt="GT" className="w-12 h-12 rounded-lg object-cover border border-white/10" />
+                            <div className="flex flex-col gap-0.5">
+                              <label className="cursor-pointer px-2 py-1 rounded border border-white/20 text-stone-400 hover:bg-white/5 text-xs">Change<input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} /></label>
+                              <button type="button" onClick={clearImage} className="px-2 py-1 rounded border border-white/20 text-stone-500 hover:bg-white/5 text-xs text-left">Remove</button>
+                            </div>
+                          </>
+                        ) : (
+                          <label className="cursor-pointer px-2 py-2 rounded-lg border border-dashed border-white/20 text-stone-500 hover:border-brand-red/50 text-xs">Upload<input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} /></label>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Total fee (₹)</label>
+                      <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Paid (₹)</label>
+                      <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Balance</label>
+                      <input type="number" value={balance} readOnly className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Start date</label>
+                      <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="GT start date" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>End date</label>
+                      <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="GT end date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Pay date</label>
+                      <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="GT pay date" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Payment mode</label>
+                      <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass}>
+                        <option value="">— Select —</option>
+                        {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Status</label>
+                      <input type="text" value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass} placeholder="e.g. Active" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Slot timing</label>
+                      <input type="text" value={slotTiming} onChange={(e) => setSlotTiming(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Paid to</label>
+                      <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Remarks</label>
+                      <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Feedback</label>
+                      <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="receipt-gt" checked={receipt} onChange={(e) => setReceipt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
+                      <label htmlFor="receipt-gt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
+                    </div>
+                  </div>
+                </div>
+                {/* Right column: PT — two fields per row */}
+                <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
+                  <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">PT</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass}>Duration</label>
+                      <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Trainer</label>
+                      <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass}>
+                        <option value="">— Select —</option>
+                        {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Photo</label>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {imagePt ? (
+                          <>
+                            <img src={imagePt} alt="PT" className="w-12 h-12 rounded-lg object-cover border border-white/10" />
+                            <div className="flex flex-col gap-0.5">
+                              <label className="cursor-pointer px-2 py-1 rounded border border-white/20 text-stone-400 hover:bg-white/5 text-xs">Change<input type="file" accept="image/*" className="sr-only" onChange={handleImageChangePt} /></label>
+                              <button type="button" onClick={clearImagePt} className="px-2 py-1 rounded border border-white/20 text-stone-500 hover:bg-white/5 text-xs text-left">Remove</button>
+                            </div>
+                          </>
+                        ) : (
+                          <label className="cursor-pointer px-2 py-2 rounded-lg border border-dashed border-white/20 text-stone-500 hover:border-brand-red/50 text-xs">Upload<input type="file" accept="image/*" className="sr-only" onChange={handleImageChangePt} /></label>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Total fee (₹)</label>
+                      <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Paid (₹)</label>
+                      <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Balance</label>
+                      <input type="number" value={balancePt} readOnly className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Start date</label>
+                      <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>End date</label>
+                      <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Pay date</label>
+                      <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Payment mode</label>
+                      <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass}>
+                        <option value="">— Select —</option>
+                        {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Status</label>
+                      <input type="text" value={statusPt} onChange={(e) => setStatusPt(e.target.value)} className={inputClass} placeholder="e.g. Active" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Slot timing</label>
+                      <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Paid to</label>
+                      <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Remarks</label>
+                      <textarea value={remarksPt} onChange={(e) => setRemarksPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Feedback</label>
+                      <textarea value={feedbackPt} onChange={(e) => setFeedbackPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="receipt-pt" checked={receiptPt} onChange={(e) => setReceiptPt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
+                      <label htmlFor="receipt-pt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className={labelClass}>Paid fee (₹)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={paidFee || ""}
-                  onChange={(e) => setPaidFee(Number(e.target.value) || 0)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Balance (₹)</label>
-                <input
-                  type="number"
-                  value={balance}
-                  readOnly
-                  className={inputClass + " bg-stone-900/50 text-stone-400"}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className={labelClass}>Start date</label>
-                <AdminDatePicker
-                  value={startDate}
-                  onChange={setStartDate}
-                  className={inputClass}
-                  aria-label="Start date"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>End date</label>
-                <AdminDatePicker
-                  value={endDate}
-                  onChange={setEndDate}
-                  className={inputClass}
-                  aria-label="End date"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Pay date</label>
-                <AdminDatePicker
-                  value={payDate}
-                  onChange={setPayDate}
-                  className={inputClass}
-                  aria-label="Pay date"
-                />
-              </div>
-            </div>
-            <div>
-              <label className={labelClass}>Payment mode</label>
-              <select
-                value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">— Select —</option>
-                {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Remarks</label>
-              <textarea
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                className={inputClass + " min-h-[80px] resize-y"}
-                placeholder="Optional notes…"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Duration</label>
-              <input
-                type="text"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className={inputClass}
-                placeholder="e.g. 3M, 6M, 12M + 1M"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Status</label>
-                <input
-                  type="text"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className={inputClass}
-                  placeholder="e.g. Active"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Slot timing</label>
-                <input
-                  type="text"
-                  value={slotTiming}
-                  onChange={(e) => setSlotTiming(e.target.value)}
-                  className={inputClass}
-                  placeholder="e.g. 6–7 AM"
-                />
-              </div>
-            </div>
-            <div>
-              <label className={labelClass}>Mobile</label>
-              <input
-                type="text"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                className={inputClass}
-                placeholder="Phone number"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Paid to</label>
-              <input
-                type="text"
-                value={paidTo}
-                onChange={(e) => setPaidTo(e.target.value)}
-                className={inputClass}
-                placeholder="Paid to (name)"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Feedback</label>
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                className={inputClass + " min-h-[60px] resize-y"}
-                placeholder="Optional feedback"
-                rows={2}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="receipt"
-                checked={receipt}
-                onChange={(e) => setReceipt(e.target.checked)}
-                className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0"
-              />
-              <label htmlFor="receipt" className={labelClass + " mb-0 cursor-pointer"}>
-                Receipt issued
-              </label>
-            </div>
+              </>
+            )}
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -832,162 +1055,22 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         </div>
       )}
 
-      {/* Customer report modal – all entries, renewals, history */}
-      {detailsCustomer && mounted && typeof document !== "undefined" && (() => {
-        const nameKey = (detailsCustomer.name ?? "").trim();
-        const history = customers
-          .filter((c) => (c.name ?? "").trim() === nameKey)
-          .sort((a, b) => {
-            const aStart = a.start_date ?? a.created_at ?? "";
-            const bStart = b.start_date ?? b.created_at ?? "";
-            return bStart.localeCompare(aStart);
-          });
-        const totalPaidAllTime = history.reduce((sum, c) => sum + Number(c.paid_fee ?? 0), 0);
-        const totalEntries = history.length;
-        return createPortal(
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-            onClick={() => setDetailsCustomer(null)}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="customer-report-title"
-          >
-            <div
-              className="liquid-glass rounded-2xl border border-white/10 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0">
-                <h2 id="customer-report-title" className="text-lg font-bold text-stone-100">
-                  Customer report – all history
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setDetailsCustomer(null)}
-                  className="p-2 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-white/10"
-                  aria-label="Close"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-6">
-                <div className="flex gap-4 flex-wrap">
-                  <img
-                    src={detailsCustomer.image ?? "/images/profile placeholder.jpg"}
-                    alt=""
-                    className="w-20 h-20 rounded-xl object-cover border border-white/10 shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-xl font-bold text-stone-100">{detailsCustomer.name}</p>
-                    <p className="text-stone-400 text-sm">{detailsCustomer.mobile ?? "—"}</p>
-                    <p className="text-stone-500 text-sm mt-1">
-                      {totalEntries} entr{totalEntries === 1 ? "y" : "ies"} · Total paid (all time): {formatCurrency(totalPaidAllTime)}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-stone-300 font-semibold text-sm uppercase tracking-wider mb-3">
-                    All entries & renewals
-                  </h3>
-                  <div className="flex flex-col rounded-xl border border-white/10 overflow-hidden">
-                    <div
-                      ref={reportScroll.topScrollRef}
-                      className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
-                      aria-hidden
-                    >
-                      <div className="min-w-[900px] h-2" />
-                    </div>
-                    <div
-                      ref={reportScroll.tableScrollRef}
-                      className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom"
-                    >
-                      <table className="w-full text-sm border-collapse min-w-[900px]">
-                        <thead ref={reportScroll.headerRef} className="select-none cursor-ew-resize">
-                        <tr className="border-b border-white/10 bg-white/[0.04]">
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">#</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Plan</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Start</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">End</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Duration</th>
-                          <th className="text-right py-2.5 px-3 font-medium text-stone-400">Total</th>
-                          <th className="text-right py-2.5 px-3 font-medium text-stone-400">Paid</th>
-                          <th className="text-right py-2.5 px-3 font-medium text-stone-400">Balance</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Pay date</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Payment</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Trainer</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Status</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400">Slot</th>
-                          <th className="text-left py-2.5 px-3 font-medium text-stone-400 max-w-[120px]">Remarks</th>
-                          <th className="text-center py-2.5 px-3 font-medium text-stone-400">Receipt</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {history.map((entry, idx) => {
-                          const trainer = entry.trainer_id ? trainers.find((t) => t.id === entry.trainer_id) : null;
-                          const isCurrent = entry.id === detailsCustomer.id;
-                          return (
-                            <tr
-                              key={`${entry.id}-${idx}`}
-                              className={`border-b border-white/5 ${isCurrent ? "bg-brand-red/10" : ""}`}
-                            >
-                              <td className="py-2 px-3 text-stone-400">{totalEntries - idx}</td>
-                              <td className="py-2 px-3 text-stone-200 font-medium">{entry.plan}</td>
-                              <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.start_date)}</td>
-                              <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.end_date)}</td>
-                              <td className="py-2 px-3 text-stone-300">{entry.duration ?? "—"}</td>
-                              <td className="py-2 px-3 text-right text-stone-300 tabular-nums">{formatCurrency(entry.total_fee)}</td>
-                              <td className="py-2 px-3 text-right text-stone-300 tabular-nums">{formatCurrency(entry.paid_fee)}</td>
-                              <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(entry.balance)}</td>
-                              <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.pay_date)}</td>
-                              <td className="py-2 px-3 text-stone-300">{entry.payment_mode ?? "—"}</td>
-                              <td className="py-2 px-3 text-stone-300">{entry.plan === "PT" ? (trainer?.name ?? "—") : "—"}</td>
-                              <td className="py-2 px-3 text-stone-300">{entry.status ?? "—"}</td>
-                              <td className="py-2 px-3 text-stone-300">{entry.slot_timing ?? "—"}</td>
-                              <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "—"}</td>
-                              <td className="py-2 px-3 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-white/10 pt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openAddEntryFromReport(detailsCustomer)}
-                    className="px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm"
-                  >
-                    Add entry
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { openEdit(detailsCustomer); setDetailsCustomer(null); }}
-                    className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm"
-                  >
-                    Edit current entry
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDetailsCustomer(null)}
-                    className="px-4 py-2.5 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        );
-      })()}
+      {/* Customer report modal – shared component */}
+      {detailsCustomer && mounted && (
+        <CustomerReportModal
+          customer={detailsCustomer}
+          customers={customers}
+          trainers={trainers}
+          formatCurrency={formatCurrency}
+          onClose={() => setDetailsCustomer(null)}
+          showActions
+          onAddEntry={openAddEntryFromReport}
+          onEditEntry={openEdit}
+        />
+      )}
 
       <div className="liquid-glass rounded-2xl overflow-hidden border border-white/10">
-        {filteredCustomers.length === 0 ? (
+        {displayCustomers.length === 0 ? (
           <div className="p-8 text-center text-stone-500 text-sm">
             {customers.length === 0
               ? "No customers yet. Add one to get started."
@@ -1031,7 +1114,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map((c, i) => {
+                {displayCustomers.map((c, i) => {
                   const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
                   return (
                     <tr

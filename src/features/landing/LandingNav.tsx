@@ -68,9 +68,9 @@ export function LandingNav() {
       <nav className="max-w-6xl mx-auto px-3 sm:px-6 flex items-center justify-between h-[var(--header-height)] gap-2 min-h-0">
         <Link href="/" className="flex items-center gap-2 sm:gap-3 tracking-tight min-w-0 flex-1 sm:flex-initial" aria-label="HIIT Fitness – High intensity interval training">
           <Image src="/images/99558_FLAT_JP_AC_03-nobg-cropped.svg" alt="" width={80} height={80} className="h-12 w-12 min-h-12 min-w-12 sm:h-14 sm:w-14 md:h-20 md:w-20 shrink-0 object-contain" aria-hidden />
-          <span className="flex flex-col justify-center leading-tight text-center min-w-0 flex-1 overflow-hidden">
-            <span className="font-display text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold uppercase text-white tracking-tight">HIIT FITNESS</span>
-            <span className="font-sans text-xs sm:text-xs lg:text-xs font-bold uppercase text-brand-red tracking-tight mt-0.5 sm:mt-1 whitespace-nowrap">HIGH INTENSITY INTERVAL TRAINING</span>
+          <span className="flex flex-col justify-center leading-tight text-center min-w-0 flex-1 overflow-visible">
+            <span className="font-display text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold uppercase text-white tracking-tight drop-shadow-[0_0_12px_rgba(255,255,255,0.4)] [text-shadow:0_0_20px_rgba(255,255,255,0.3)]">HIIT FITNESS</span>
+            <span className="font-sans text-xs sm:text-xs lg:text-xs font-bold uppercase text-brand-red tracking-tight mt-0.5 sm:mt-1 whitespace-nowrap drop-shadow-[0_0_10px_rgba(255,0,0,0.5)] [text-shadow:0_0_14px_rgba(255,0,0,0.4)]">HIGH INTENSITY INTERVAL TRAINING</span>
           </span>
         </Link>
         {/* Desktop */}

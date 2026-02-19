@@ -2,18 +2,14 @@
 /* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
-import dynamic from "next/dynamic";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
+import { dedupeByMobile, normalizeMobile, isPlanCurrentlyRunning } from "@/lib/customer-utils";
 import type { Tracker } from "@/models/tracker";
-import type { MonthWiseRow } from "@/data/dashboard-chart-types";
-
-const DashboardCharts = dynamic(
-  () => import("./DashboardCharts").then((m) => m.DashboardCharts),
-  { ssr: false }
-);
+import { RevenueChart, type RevenueChartRow } from "./DashboardCharts";
+import { CustomerReportModal } from "./CustomerReportModal";
 
 /** Format number as Indian Rupees (e.g. ₹1,47,800) */
 function formatINR(value: number): string {
@@ -64,21 +60,20 @@ function getSortDate(e: Customer | Tracker): string {
 export type TrainerReport = {
   name: string;
   entries: Customer[] | Tracker[];
+  /** Trainer commission: sum of (total_fee / duration_months) * 30% for entries that started this (business) month. */
+  commission: number;
+  /** Entry ids that contributed to commission (start_date in current business month). */
+  commissionEntryIds: Set<string>;
 };
+
+/** One customer (by mobile) with total amount paid in a period. */
+export type CustomerWithAmount = { customer: Customer; amountInPeriod: number };
 
 type Props = {
   customers: Customer[];
   trainers: Trainer[];
   adminCount: number;
 };
-
-const PRESETS = [
-  { label: "This month", months: 0 },
-  { label: "Last month", months: 1 },
-  { label: "Last 3 months", months: 3 },
-  { label: "Last 6 months", months: 6 },
-  { label: "Last 12 months", months: 12 },
-] as const;
 
 /** Business month: starts on 6th, ends on 5th of next month. */
 function getBusinessMonthStart(d: Date): Date {
@@ -98,6 +93,26 @@ function getBusinessMonthEnd(d: Date): Date {
   return new Date(start.getFullYear(), start.getMonth() + 1, 5, 23, 59, 59, 999);
 }
 
+/** Parse duration string to number of months (e.g. "3 months" -> 3, "1 year" -> 12). Returns 1 if unparseable to avoid div by zero. */
+function durationToMonths(duration: string | null): number {
+  if (!duration || typeof duration !== "string") return 1;
+  const s = duration.trim().toLowerCase();
+  const num = parseFloat(s);
+  if (!Number.isNaN(num)) {
+    if (s.includes("year")) return Math.max(1, num * 12);
+    return Math.max(0.5, num);
+  }
+  if (s.includes("year")) {
+    const n = parseFloat(s.replace("year", "").trim());
+    return Number.isNaN(n) ? 12 : Math.max(1, n * 12);
+  }
+  if (s.includes("month")) {
+    const n = parseFloat(s.replace("month", "").replace("s", "").trim());
+    return Number.isNaN(n) ? 1 : Math.max(0.5, n);
+  }
+  return 1;
+}
+
 /** Week starts Saturday, ends Friday (business week). */
 function getWeekStart(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -107,56 +122,69 @@ function getWeekStart(d: Date): Date {
   return x;
 }
 
-export type WeekWiseRow = {
-  weekKey: string;
-  weekLabel: string;
-  entries: number;
-  revenue: number;
-};
+/** Customers who paid in [periodStart, periodEnd], deduped by mobile, with sum of paid_fee in period. */
+function getCustomersInPeriod(
+  customers: Customer[],
+  periodStart: Date,
+  periodEnd: Date
+): CustomerWithAmount[] {
+  const inPeriod = customers.filter((c) => {
+    const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+    return pd && pd >= periodStart && pd <= periodEnd;
+  });
+  const byMobile = new Map<string, { customer: Customer; total: number }>();
+  for (const c of inPeriod) {
+    const key = normalizeMobile(c.mobile) || (c.name ?? "").trim() || c.id;
+    const existing = byMobile.get(key);
+    const fee = Number(c.paid_fee ?? 0);
+    if (!existing) {
+      byMobile.set(key, { customer: c, total: fee });
+    } else {
+      existing.total += fee;
+      const cStart = c.start_date ?? c.created_at ?? "";
+      const exStart = existing.customer.start_date ?? existing.customer.created_at ?? "";
+      if (cStart > exStart) existing.customer = c;
+    }
+  }
+  return Array.from(byMobile.values()).map(({ customer, total }) => ({
+    customer,
+    amountInPeriod: total,
+  }));
+}
 
 export function DashboardContent({
   customers,
   trainers,
   adminCount,
 }: Props) {
-  const [selectedPresetMonths, setSelectedPresetMonths] = useState<
-    0 | 1 | 3 | 6 | 12
-  >(0);
-  const { dateFrom, dateTo } = useMemo(() => {
-    const now = new Date();
-    const currStart = getBusinessMonthStart(now);
-    const periodEnd =
-      selectedPresetMonths === 1
-        ? getBusinessMonthEnd(new Date(currStart.getFullYear(), currStart.getMonth() - 1, 15))
-        : getBusinessMonthEnd(now);
-    const periodStart =
-      selectedPresetMonths === 0
-        ? currStart
-        : selectedPresetMonths === 1
-          ? new Date(currStart.getFullYear(), currStart.getMonth() - 1, 6)
-          : (() => {
-              const d = new Date(currStart.getFullYear(), currStart.getMonth() - selectedPresetMonths, 6);
-              return d;
-            })();
-    return {
-      dateFrom: toDateOnly(periodStart.toISOString()),
-      dateTo: toDateOnly(periodEnd.toISOString()),
-    };
-  }, [selectedPresetMonths]);
   const [selectedTrainer, setSelectedTrainer] = useState<TrainerReport | null>(
     null
   );
+  /** Which analytics period's customer list is shown (click chip to open). */
+  const [analyticsPanel, setAnalyticsPanel] = useState<"daily" | "weekly" | "monthly" | null>(null);
+  /** Chart bar clicked: show customer list for that bar's period. */
+  const [chartClickedPeriod, setChartClickedPeriod] = useState<{ type: "daily" | "weekly" | "monthly"; index: number } | null>(null);
+  /** Customer selected from analytics to show full report modal. */
+  const [reportCustomer, setReportCustomer] = useState<Customer | null>(null);
+  const customerPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!selectedTrainer) return;
+    if (chartClickedPeriod !== null && customerPanelRef.current) {
+      customerPanelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [chartClickedPeriod]);
+
+  // Lock body scroll only when a modal overlay is open (not when inline customer profiles panel is open)
+  useEffect(() => {
+    if (!selectedTrainer && !reportCustomer) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [selectedTrainer]);
+  }, [selectedTrainer, reportCustomer]);
 
-  const customerCount = customers.length;
+  const customerCount = useMemo(() => dedupeByMobile(customers).length, [customers]);
   const byPlan = useMemo(
     () =>
       customers.reduce(
@@ -172,91 +200,108 @@ export function DashboardContent({
   const gtCount = byPlan["GT"] ?? 0;
   const ptCount = byPlan["PT"] ?? 0;
 
-  const { newEntries, revenue, monthWiseData, weekWiseData, trainerReports } = useMemo(() => {
-    const from = dateFrom;
-    const to = dateTo;
+  const { dailySummary, dailyChartData, dailyCustomers, dailyCustomersByBar, weeklySummary, weeklyChartData, weeklyCustomers, weeklyCustomersByBar, monthlySummary, monthlyChartData, monthlyCustomers, monthlyCustomersByBar, trainerReports } = useMemo(() => {
     const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-    const toDate = new Date(to + "T23:59:59");
-    const effectiveTo = toDate > todayEnd ? toDateOnly(todayEnd.toISOString()) : to;
-    const inRangeStart = (d: string | null) =>
-      d && d >= from && d <= effectiveTo;
-    const inRangePay = (d: string | null) =>
-      d && d >= from && d <= effectiveTo;
 
-    const newEntries = customers.filter((c) =>
-      inRangeStart(c.start_date ? toDateOnly(c.start_date) : null)
-    ).length;
-    const revenue = customers
-      .filter((c) =>
-        inRangePay(c.pay_date ? toDateOnly(c.pay_date) : null)
-      )
-      .reduce((sum, c) => sum + Number(c.paid_fee ?? 0), 0);
-
-    const start = new Date(from + "T00:00:00");
-    const end = new Date(to + "T23:59:59");
-
-    const months: MonthWiseRow[] = [];
-    const curr = new Date(getBusinessMonthStart(start).getTime());
-    while (curr <= end) {
-      const monthStart = new Date(curr.getTime());
-      const monthEnd = getBusinessMonthEnd(curr);
-      if (monthStart > todayEnd) break;
-      const effectiveMonthEnd = monthEnd > todayEnd ? todayEnd : monthEnd;
-      const monthKey = toDateOnly(monthStart.toISOString());
-      const monthLabel =
-        effectiveMonthEnd.getTime() < monthEnd.getTime()
-          ? `${monthStart.getDate()} ${monthStart.toLocaleDateString("en-IN", { month: "short" })} – ${effectiveMonthEnd.getDate()} ${effectiveMonthEnd.toLocaleDateString("en-IN", { month: "short", year: "numeric" })} (so far)`
-          : `${monthStart.getDate()} ${monthStart.toLocaleDateString("en-IN", { month: "short" })} – ${monthEnd.getDate()} ${monthEnd.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`;
-      const entries = customers.filter((c) => {
-        const sd = c.start_date ? new Date(c.start_date) : null;
-        return sd && sd >= monthStart && sd <= effectiveMonthEnd;
-      }).length;
-      const revenueM = customers
+    // Daily summary = today only (for chip)
+    const dailyTotal = customers
+      .filter((c) => {
+        const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+        return pd && pd >= todayStart && pd <= todayEnd;
+      })
+      .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
+    // Daily graph = last 7 completed days only (no today) + per-bar customer list for chart click
+    const dailyRows: RevenueChartRow[] = [];
+    const dailyCustomersByBar: CustomerWithAmount[][] = [];
+    for (let i = 7; i >= 1; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(d);
+      dayEnd.setHours(23, 59, 59, 999);
+      const label = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      const revenue = customers
         .filter((c) => {
-          const pd = c.pay_date ? new Date(c.pay_date) : null;
-          return pd && pd >= monthStart && pd <= effectiveMonthEnd;
+          const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+          return pd && pd >= d && pd <= dayEnd;
         })
         .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
-      months.push({ month: monthKey, monthLabel, entries, revenue: revenueM });
-      curr.setMonth(curr.getMonth() + 1);
-      curr.setDate(6);
+      dailyRows.push({ label, revenue });
+      dailyCustomersByBar.push(getCustomersInPeriod(customers, d, dayEnd));
     }
 
-    const weeks: WeekWiseRow[] = [];
-    const weekCurr = new Date(getWeekStart(start).getTime());
-    while (weekCurr <= end) {
-      if (weekCurr > todayEnd) break;
+    // Weekly summary = last complete week only (for chip)
+    const currentWeekStart = getWeekStart(now);
+    const lastCompleteWeekStart = new Date(currentWeekStart);
+    lastCompleteWeekStart.setDate(lastCompleteWeekStart.getDate() - 7);
+    const lastCompleteWeekEnd = new Date(lastCompleteWeekStart);
+    lastCompleteWeekEnd.setDate(lastCompleteWeekEnd.getDate() + 6);
+    lastCompleteWeekEnd.setHours(23, 59, 59, 999);
+    const weeklyTotal = customers
+      .filter((c) => {
+        const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+        return pd && pd >= lastCompleteWeekStart && pd <= lastCompleteWeekEnd;
+      })
+      .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
+    // Weekly graph = last 4 completed weeks only (Sat–Fri each) + per-bar customer list
+    const weeks: RevenueChartRow[] = [];
+    const weeklyCustomersByBar: CustomerWithAmount[][] = [];
+    for (let w = 4; w >= 1; w--) {
+      const weekCurr = new Date(currentWeekStart);
+      weekCurr.setDate(weekCurr.getDate() - w * 7);
       const weekEnd = new Date(weekCurr);
       weekEnd.setDate(weekEnd.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
-      const effectiveWeekEnd = weekEnd > todayEnd ? todayEnd : weekEnd;
-      const weekKey = toDateOnly(weekCurr.toISOString());
-      const weekLabel =
-        effectiveWeekEnd.getTime() < weekEnd.getTime()
-          ? `${weekCurr.getDate()}–${effectiveWeekEnd.getDate()} ${effectiveWeekEnd.toLocaleDateString("en-IN", { month: "short" })} (so far)`
-          : `${weekCurr.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short" })}`;
-      const entriesW = customers.filter((c) => {
-        const sd = c.start_date ? new Date(c.start_date) : null;
-        return sd && sd >= weekCurr && sd <= effectiveWeekEnd;
-      }).length;
-      const revenueW = customers
+      const label = `${weekCurr.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}`;
+      const revenue = customers
         .filter((c) => {
-          const pd = c.pay_date ? new Date(c.pay_date) : null;
-          return pd && pd >= weekCurr && pd <= effectiveWeekEnd;
+          const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+          return pd && pd >= weekCurr && pd <= weekEnd;
         })
         .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
-      weeks.push({ weekKey, weekLabel, entries: entriesW, revenue: revenueW });
-      weekCurr.setDate(weekCurr.getDate() + 7);
+      weeks.push({ label, revenue });
+      weeklyCustomersByBar.push(getCustomersInPeriod(customers, weekCurr, weekEnd));
+    }
+
+    // Monthly summary = last complete business month only (for chip)
+    const lastCompleteMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 6);
+    const lastCompleteMonthEnd = new Date(now.getFullYear(), now.getMonth(), 5, 23, 59, 59, 999);
+    const monthlyTotal = customers
+      .filter((c) => {
+        const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+        return pd && pd >= lastCompleteMonthStart && pd <= lastCompleteMonthEnd;
+      })
+      .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
+    // Monthly graph = last 6 completed business months only (6th–5th each) + per-bar customer list
+    const months: RevenueChartRow[] = [];
+    const monthlyCustomersByBar: CustomerWithAmount[][] = [];
+    for (let m = 6; m >= 1; m--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - m, 6);
+      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 5, 23, 59, 59, 999);
+      const label = `6 ${monthStart.toLocaleDateString("en-IN", { month: "short" })} – 5 ${monthEnd.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}`;
+      const revenue = customers
+        .filter((c) => {
+          const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+          return pd && pd >= monthStart && pd <= monthEnd;
+        })
+        .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
+      months.push({ label, revenue });
+      monthlyCustomersByBar.push(getCustomersInPeriod(customers, monthStart, monthEnd));
     }
     const trainerById = new Map<string, Trainer>(
       trainers.map((t) => [t.id, t])
     );
-    const allPt = customers.filter(
-      (c) => c.plan === "PT" && c.trainer_id
+    // PT only, and only active (today between start_date and end_date)
+    const allPtActive = customers.filter(
+      (c) =>
+        c.plan === "PT" &&
+        c.trainer_id &&
+        isPlanCurrentlyRunning(c.start_date, c.end_date)
     );
     const byTrainer: Record<string, Customer[]> = {};
-    for (const c of allPt) {
+    for (const c of allPtActive) {
       const trainerName = trainerById.get(c.trainer_id!)?.name ?? "Unknown trainer";
       if (!byTrainer[trainerName]) byTrainer[trainerName] = [];
       byTrainer[trainerName].push(c);
@@ -274,36 +319,57 @@ export function DashboardContent({
         (getSortDate(b) ?? "").localeCompare(getSortDate(a) ?? "")
       );
     };
+    // Current business month (6th–5th) for "this month" commission
+    const currentMonthStart = getBusinessMonthStart(now);
+    const currentMonthEnd = getBusinessMonthEnd(now);
+    const isStartInCurrentMonth = (startDate: string | null): boolean => {
+      if (!startDate) return false;
+      const d = new Date(startDate + "T12:00:00");
+      return d >= currentMonthStart && d <= currentMonthEnd;
+    };
+    // Commission = only entries that started this (business) month: (total_fee / duration_months) * 30%
     const trainerReportsList: TrainerReport[] = Object.entries(byTrainer)
-      .map(([name, entries]) => ({
-        name,
-        entries: dedupeByNameKeepRecent(entries),
-      }))
+      .map(([name, entries]) => {
+        const deduped = dedupeByNameKeepRecent(entries);
+        const commissionEntryIds = new Set<string>();
+        let commission = 0;
+        for (const c of deduped) {
+          if (!isStartInCurrentMonth(c.start_date)) continue;
+          commissionEntryIds.add(c.id);
+          const total = Number(c.total_fee ?? 0);
+          const months = durationToMonths(c.duration);
+          commission += (total / months) * 0.3;
+        }
+        return {
+          name,
+          entries: deduped,
+          commission,
+          commissionEntryIds,
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
 
+    // Customer profiles per period (same boundaries: today, last complete week, last complete month)
+    const dailyCustomers = getCustomersInPeriod(customers, todayStart, todayEnd);
+    const weeklyCustomers = getCustomersInPeriod(customers, lastCompleteWeekStart, lastCompleteWeekEnd);
+    const monthlyCustomers = getCustomersInPeriod(customers, lastCompleteMonthStart, lastCompleteMonthEnd);
+
     return {
-      newEntries,
-      revenue,
-      monthWiseData: months,
-      weekWiseData: weeks,
+      dailySummary: dailyTotal,
+      dailyChartData: dailyRows,
+      dailyCustomers,
+      dailyCustomersByBar,
+      weeklySummary: weeklyTotal,
+      weeklyChartData: weeks,
+      weeklyCustomers,
+      weeklyCustomersByBar,
+      monthlySummary: monthlyTotal,
+      monthlyChartData: months,
+      monthlyCustomers,
+      monthlyCustomersByBar,
       trainerReports: trainerReportsList,
     };
-  }, [customers, trainers, dateFrom, dateTo]);
-
-  const chartData = monthWiseData;
-  const weeklyChartData = weekWiseData.map((w) => ({
-    month: w.weekKey,
-    monthLabel: w.weekLabel,
-    entries: w.entries,
-    revenue: w.revenue,
-  }));
-
-  const now = new Date();
-  const businessMonthStartStr = toDateOnly(getBusinessMonthStart(now).toISOString());
-  const businessMonthEndStr = toDateOnly(getBusinessMonthEnd(now).toISOString());
-  const isThisMonth = dateFrom === businessMonthStartStr && (dateTo === businessMonthEndStr || dateTo === toDateOnly(now.toISOString()));
-  /** Show month-wise and week-wise charts only when range spans more than one month. */
-  const showMonthWeekAnalytics = selectedPresetMonths >= 3;
+  }, [customers, trainers]);
 
   const cards = [
     {
@@ -368,93 +434,139 @@ export function DashboardContent({
           Analytics
         </h2>
         <p className="text-stone-400 text-sm">
-          New entries (by start date), revenue (by pay date), and breakdown by
-          business month and week. Trainer reports are separate and show all
-          clients.
+          Revenue by pay date — today; last complete week (Sat–Fri); last complete month (6th–5th). Current week/month not included until finished. Click a chip or a graph point to see customers for that period.
         </p>
 
-        <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 flex flex-wrap items-center gap-2">
-          <span className="text-stone-400 text-sm font-medium mr-1">Period</span>
-          {PRESETS.map(({ label, months }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setSelectedPresetMonths(months)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-red ${
-                selectedPresetMonths === months
-                  ? "bg-brand-red text-white border border-brand-red"
-                  : "text-stone-300 bg-white/10 border border-white/10 hover:bg-brand-red/20 hover:border-brand-red/40 hover:text-stone-100"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Three summary chips in one row – click to see customer profiles for that period */}
+        <div className="grid grid-cols-3 gap-4">
+          <button
+            type="button"
+            onClick={() => setAnalyticsPanel((p) => (p === "daily" ? null : "daily"))}
+            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(255,0,0,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+          >
+            <p className="text-stone-400 text-sm font-medium mb-1">Today</p>
+            <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(dailySummary)}</p>
+            <p className="text-stone-500 text-xs mt-1">Click to see customer profiles</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAnalyticsPanel((p) => (p === "weekly" ? null : "weekly"))}
+            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(255,0,0,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+          >
+            <p className="text-stone-400 text-sm font-medium mb-1">Last week (Sat–Fri)</p>
+            <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(weeklySummary)}</p>
+            <p className="text-stone-500 text-xs mt-1">Click to see customer profiles</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAnalyticsPanel((p) => (p === "monthly" ? null : "monthly"))}
+            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(255,0,0,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+          >
+            <p className="text-stone-400 text-sm font-medium mb-1">Last month (6th–5th)</p>
+            <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(monthlySummary)}</p>
+            <p className="text-stone-500 text-xs mt-1">Click to see customer profiles</p>
+          </button>
         </div>
 
+        {/* Customer profiles for selected period – from chip or from chart bar click; click a profile to open full report */}
+        {(analyticsPanel || chartClickedPeriod) && (() => {
+          const fromChart = chartClickedPeriod !== null;
+          const label = fromChart
+            ? (chartClickedPeriod!.type === "daily"
+                ? dailyChartData[chartClickedPeriod!.index]?.label
+                : chartClickedPeriod!.type === "weekly"
+                  ? weeklyChartData[chartClickedPeriod!.index]?.label
+                  : monthlyChartData[chartClickedPeriod!.index]?.label) ?? "Period"
+            : analyticsPanel === "daily"
+              ? "Today"
+              : analyticsPanel === "weekly"
+                ? "Last week (Sat–Fri)"
+                : "Last month (6th–5th)";
+          const list = fromChart
+            ? (chartClickedPeriod!.type === "daily"
+                ? dailyCustomersByBar[chartClickedPeriod!.index]
+                : chartClickedPeriod!.type === "weekly"
+                  ? weeklyCustomersByBar[chartClickedPeriod!.index]
+                  : monthlyCustomersByBar[chartClickedPeriod!.index]) ?? []
+            : analyticsPanel === "daily"
+              ? dailyCustomers
+              : analyticsPanel === "weekly"
+                ? weeklyCustomers
+                : monthlyCustomers;
+          return (
+            <div ref={customerPanelRef} className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-stone-200 font-semibold">
+                  Customer profiles — {label}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnalyticsPanel(null);
+                    setChartClickedPeriod(null);
+                  }}
+                  className="text-stone-400 hover:text-stone-100 text-sm font-medium"
+                >
+                  Close
+                </button>
+              </div>
+              {list.length === 0 ? (
+                <p className="text-stone-500 text-sm">No payments in this period.</p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 max-h-[320px] overflow-y-auto scrollbar-theme">
+                  {list.map(({ customer, amountInPeriod }) => (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      onClick={() => setReportCustomer(customer)}
+                      className="flex items-center gap-3 p-3 rounded-xl border border-white/10 text-left hover:bg-white/5 hover:border-brand-red/30 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-stone-900"
+                    >
+                      <img
+                        src={customer.image ?? "/images/profile placeholder.jpg"}
+                        alt=""
+                        className="w-12 h-12 rounded-full object-cover border border-white/10 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-stone-100 truncate">{customer.name}</p>
+                        <p className="text-stone-500 text-xs truncate">{customer.mobile ?? "—"}</p>
+                        <p className="text-brand-red text-sm font-semibold mt-0.5">{formatINR(amountInPeriod)} in period</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Two graphs: completed days only, completed weeks only. Click a point to see customers for that period. */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="liquid-glass p-5 sm:p-6 rounded-2xl border border-white/10 transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/30 hover:shadow-[0_0_28px_rgba(255,0,0,0.12)]">
-            <p className="text-stone-400 text-sm font-medium mb-1">
-              New entries (start date)
-            </p>
-            <p className="text-2xl sm:text-3xl font-bold text-stone-100">
-              {newEntries}
-            </p>
-          </div>
-          <div className="liquid-glass p-5 sm:p-6 rounded-2xl border border-white/10 transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/30 hover:shadow-[0_0_28px_rgba(255,0,0,0.12)]">
-            <p className="text-stone-400 text-sm font-medium mb-1">
-              Revenue (pay date, INR)
-            </p>
-            <p className="text-2xl sm:text-3xl font-bold text-stone-100">
-              {formatINR(revenue)}
-            </p>
-          </div>
+          <RevenueChart
+            data={dailyChartData}
+            title="Revenue by day (last 7 completed days)"
+            formatINR={formatINR}
+            gradientId="revenue-daily"
+            onBarClick={(index) => setChartClickedPeriod({ type: "daily", index })}
+          />
+          <RevenueChart
+            data={weeklyChartData}
+            title="Revenue by week (last 4 completed weeks, Sat–Fri)"
+            formatINR={formatINR}
+            gradientId="revenue-weekly"
+            onBarClick={(index) => setChartClickedPeriod({ type: "weekly", index })}
+          />
         </div>
 
-        {selectedPresetMonths <= 1 && (
-          <div className="mt-6">
-            <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
-              {selectedPresetMonths === 0 ? "This month by week" : "Last month by week"}
-            </h3>
-            <p className="text-stone-500 text-sm mb-4">
-              Weekly breakdown (Saturday–Friday) for the selected period.
-            </p>
-            <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
-          </div>
-        )}
-
-        {showMonthWeekAnalytics &&
-          (isThisMonth ? (
-            <>
-              <div className="mt-10">
-                <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
-                  This month by week
-                </h3>
-                <p className="text-stone-500 text-sm mb-4">
-                  Weekly breakdown (Saturday–Friday) for the current month.
-                </p>
-                <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
-              </div>
-              <div className="mt-10">
-                <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
-                  Monthly view
-                </h3>
-                <DashboardCharts data={chartData} formatINR={formatINR} />
-              </div>
-            </>
-          ) : (
-            <>
-              <DashboardCharts data={chartData} formatINR={formatINR} />
-              <div className="mt-10">
-                <h3 className="font-display text-base font-bold uppercase text-stone-200 mb-3 tracking-tight">
-                  Weekly view
-                </h3>
-                <p className="text-stone-500 text-sm mb-4">
-                  Same date range, broken down by week (Saturday–Friday).
-                </p>
-                <DashboardCharts data={weeklyChartData} formatINR={formatINR} />
-              </div>
-            </>
-          ))}
+        {/* Completed months only. Click a point to see customers for that month. */}
+        <div>
+          <RevenueChart
+            data={monthlyChartData}
+            title="Revenue by month (last 6 completed months, 6th–5th)"
+            formatINR={formatINR}
+            gradientId="revenue-monthly"
+            onBarClick={(index) => setChartClickedPeriod({ type: "monthly", index })}
+          />
+        </div>
       </section>
 
       <section>
@@ -462,14 +574,12 @@ export function DashboardContent({
           Trainer-wise reports (PT)
         </h2>
         <p className="text-stone-400 text-sm mb-4">
-          All PT clients per trainer. When the same name appears more than once,
-          only the most recent (by start date) is shown. Click a card for details.
+          Active PT clients only (plan running today). Commission from clients who started this month (6th–5th): (total ÷ duration) × 30%. Highlighted = contributed to commission.
         </p>
         {reports.length === 0 ? (
           <div className="liquid-glass p-6 sm:p-8 rounded-2xl text-center">
             <p className="text-stone-500 text-sm">
-              No PT customers yet. Add customers with PT plan and assign a trainer
-              to see reports.
+              No active PT customers. Add PT customers with current plan dates and assign a trainer.
             </p>
           </div>
         ) : (
@@ -484,22 +594,30 @@ export function DashboardContent({
                 <p className="text-brand-red font-semibold mb-1 truncate">
                   {report.name}
                 </p>
+                <p className="text-stone-400 text-sm font-medium mb-1">
+                  Commission: {formatINR(report.commission)}
+                </p>
                 <p className="text-stone-500 text-xs mb-2">
-                  {report.entries.length} client
+                  {report.entries.length} active client
                   {report.entries.length !== 1 ? "s" : ""} · Click for details
                 </p>
                 <ul className="text-stone-300 text-sm space-y-1 max-h-40 overflow-y-auto pr-1 scrollbar-theme">
-                  {report.entries
-                    .map((e) =>
-                      isCustomer(e) ? e.name : (e.client_name ?? e.client_id ?? "—")
-                    )
-                    .filter((c) => c !== "—")
-                    .slice(0, 8)
-                    .map((c, i) => (
-                      <li key={i} className="truncate pl-0">
-                        {c}
+                  {report.entries.slice(0, 8).map((e) => {
+                    const name = isCustomer(e) ? e.name : (e.client_name ?? e.client_id ?? "—");
+                    const contributes = report.commissionEntryIds.has(e.id);
+                    if (name === "—") return null;
+                    return (
+                      <li
+                        key={e.id}
+                        className={`truncate pl-0 ${contributes ? "bg-emerald-950/50 text-emerald-200 font-medium rounded px-1.5 py-0.5 -mx-1.5" : ""}`}
+                      >
+                        {name}
+                        {contributes && (
+                          <span className="ml-1 text-[10px] text-emerald-400 font-normal">(commission)</span>
+                        )}
                       </li>
-                    ))}
+                    );
+                  })}
                   {report.entries.length > 8 && (
                     <li className="text-stone-500 text-xs">+ more</li>
                   )}
@@ -514,11 +632,27 @@ export function DashboardContent({
         <ClientDetailsModal
           trainerName={selectedTrainer.name}
           entries={selectedTrainer.entries}
+          commissionEntryIds={selectedTrainer.commissionEntryIds}
           customers={customers}
           trainers={trainers}
           onClose={() => setSelectedTrainer(null)}
+          onOpenCustomerReport={(customer) => {
+            setSelectedTrainer(null);
+            setReportCustomer(customer);
+          }}
           formatINR={formatINR}
           formatDate={formatDate}
+        />
+      )}
+
+      {reportCustomer && (
+        <CustomerReportModal
+          customer={reportCustomer}
+          customers={customers}
+          trainers={trainers}
+          formatCurrency={formatINR}
+          onClose={() => setReportCustomer(null)}
+          showActions={false}
         />
       )}
     </div>
@@ -530,17 +664,21 @@ const PROFILE_PLACEHOLDER = "/images/profile placeholder.jpg";
 function ClientDetailsModal({
   trainerName,
   entries,
+  commissionEntryIds,
   customers,
   trainers,
   onClose,
+  onOpenCustomerReport,
   formatINR,
   formatDate,
 }: {
   trainerName: string;
   entries: Customer[] | Tracker[];
+  commissionEntryIds: Set<string>;
   customers: Customer[];
   trainers: Trainer[];
   onClose: () => void;
+  onOpenCustomerReport?: (customer: Customer) => void;
   formatINR: (n: number) => string;
   formatDate: (s: string | null) => string;
 }) {
@@ -752,16 +890,31 @@ function ClientDetailsModal({
                       const dueOrBalance = isCustomer(row)
                         ? row.balance
                         : (row.due_fee ?? 0);
+                      const contributesToCommission = commissionEntryIds.has(row.id);
                       return (
                         <tr
                           key={row.id}
                           role="button"
                           tabIndex={0}
-                          onClick={() => setSelectedEntry(row)}
-                          onKeyDown={(e) =>
-                            (e.key === "Enter" || e.key === " ") && setSelectedEntry(row)
-                          }
-                          className="border-b border-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+                          onClick={() => {
+                            if (isCustomer(row) && onOpenCustomerReport) {
+                              onOpenCustomerReport(row);
+                              onClose();
+                            } else {
+                              setSelectedEntry(row);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            if (isCustomer(row) && onOpenCustomerReport) {
+                              onOpenCustomerReport(row);
+                              onClose();
+                            } else {
+                              setSelectedEntry(row);
+                            }
+                          }}
+                          className={`border-b border-white/5 hover:bg-white/10 cursor-pointer transition-colors ${contributesToCommission ? "bg-emerald-950/40 ring-1 ring-inset ring-emerald-500/30" : ""}`}
+                          title={contributesToCommission ? "Contributes to this month’s commission" : undefined}
                         >
                           <td className="py-2 px-2 align-middle">
                             <img
@@ -770,7 +923,14 @@ function ClientDetailsModal({
                               className="w-10 h-10 rounded-full object-cover border border-white/10"
                             />
                           </td>
-                          <td className="py-2 px-2 text-stone-200">{name}</td>
+                          <td className="py-2 px-2 text-stone-200">
+                            <span className="inline-flex items-center gap-1.5">
+                              {name}
+                              {contributesToCommission && (
+                                <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-emerald-600/60 text-white">Commission</span>
+                              )}
+                            </span>
+                          </td>
                           <td className="py-2 px-2 text-stone-300">{row.plan ?? "—"}</td>
                           <td className="py-2 px-2 text-stone-300">
                             {formatDate(isCustomer(row) ? row.start_date : row.start_date)}
