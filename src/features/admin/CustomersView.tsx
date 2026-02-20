@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { CustomerReportModal } from "./CustomerReportModal";
