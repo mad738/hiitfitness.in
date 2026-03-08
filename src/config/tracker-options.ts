@@ -26,18 +26,15 @@ export const TRACKER_TRAINER_OPTIONS = [
 ] as const;
 
 export const TRACKER_PAYMENT_MODE_OPTIONS = [
-  "12k-Bablu UPI",
-  "3k-Roht Swipe",
-  "Bablu UPI",
-  "Cash",
-  "Chec Manoj",
-  "IDBI swipe",
-  "Manoj UPI",
-  "Rohit",
-  "Rohit Swipe",
-  "Rohit UPI",
   "SS UPI",
+  "Raju UPI",
   "Tarun UPI",
+  "Bablu UPI",
+  "Rohith UPI",
+  "Cash",
+  "IDBI swipe",
+  "Phone pay swipe",
+  "Others -Remark",
 ] as const;
 
 export const TRACKER_PAID_TO_OPTIONS = ["Close", "Inac", "R", "don call"] as const;

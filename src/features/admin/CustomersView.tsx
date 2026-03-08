@@ -595,11 +595,10 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
               ref={filterButtonRef}
               type="button"
               onClick={() => setShowFilterDropdown((s) => !s)}
-              className={`flex items-center justify-center w-12 h-12 rounded-r-xl border-l border-white/10 transition ${
-                showFilterDropdown
+              className={`flex items-center justify-center w-12 h-12 rounded-r-xl border-l border-white/10 transition ${showFilterDropdown
                   ? "bg-brand-red/25 text-brand-red border-brand-red/50"
                   : "bg-stone-800/60 text-stone-400 hover:text-stone-100 hover:bg-stone-800/80"
-              }`}
+                }`}
               aria-expanded={showFilterDropdown}
               aria-label="Filter options"
             >
@@ -864,176 +863,199 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
-                {/* Left column: GT — two fields per row */}
-                <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
-                  <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">GT</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelClass}>Duration</label>
-                      <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Photo</label>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {image ? (
-                          <>
-                            <img src={image} alt="GT" className="w-12 h-12 rounded-lg object-cover border border-white/10" />
-                            <div className="flex flex-col gap-0.5">
-                              <label className="cursor-pointer px-2 py-1 rounded border border-white/20 text-stone-400 hover:bg-white/5 text-xs">Change<input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} /></label>
-                              <button type="button" onClick={clearImage} className="px-2 py-1 rounded border border-white/20 text-stone-500 hover:bg-white/5 text-xs text-left">Remove</button>
-                            </div>
-                          </>
-                        ) : (
-                          <label className="cursor-pointer px-2 py-2 rounded-lg border border-dashed border-white/20 text-stone-500 hover:border-brand-red/50 text-xs">Upload<input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} /></label>
-                        )}
+                  {/* Left column: GT — two fields per row */}
+                  <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
+                    <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">GT</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelClass}>Duration</label>
+                        <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Photo</label>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {image ? (
+                            <>
+                              <img src={image} alt="GT" className="w-12 h-12 rounded-lg object-cover border border-white/10" />
+                              <div className="flex flex-col gap-0.5">
+                                <label className="cursor-pointer px-2 py-1 rounded border border-white/20 text-stone-400 hover:bg-white/5 text-xs">Change<input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} /></label>
+                                <button type="button" onClick={clearImage} className="px-2 py-1 rounded border border-white/20 text-stone-500 hover:bg-white/5 text-xs text-left">Remove</button>
+                              </div>
+                            </>
+                          ) : (
+                            <label className="cursor-pointer px-2 py-2 rounded-lg border border-dashed border-white/20 text-stone-500 hover:border-brand-red/50 text-xs">Upload<input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} /></label>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Total fee (₹)</label>
+                        <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Paid (₹)</label>
+                        <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Balance</label>
+                        <input type="number" value={balance} readOnly className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Start date</label>
+                        <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="GT start date" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>End date</label>
+                        <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="GT end date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Pay date</label>
+                        <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="GT pay date" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Payment mode</label>
+                        <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass}>
+                          <option value="">— Select —</option>
+                          {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Status</label>
+                        <input type="text" value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass} placeholder="e.g. Active" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Slot timing</label>
+                        <input type="text" value={slotTiming} onChange={(e) => setSlotTiming(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Paid to</label>
+                        <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Remarks</label>
+                        <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Feedback</label>
+                        <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" id="receipt-gt" checked={receipt} onChange={(e) => setReceipt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
+                        <label htmlFor="receipt-gt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
+                      </div>
+                      <div className="col-span-2 pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDurationPt(duration);
+                            setTotalFeePt(totalFee);
+                            setPaidFeePt(paidFee);
+                            setBalancePt(balance);
+                            setStartDatePt(startDate);
+                            setEndDatePt(endDate);
+                            setPayDatePt(payDate);
+                            setPaymentModePt(paymentMode);
+                            setStatusPt(status);
+                            setSlotTimingPt(slotTiming);
+                            setPaidToPt(paidTo);
+                            setRemarksPt(remarks);
+                            setFeedbackPt(feedback);
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-medium transition ml-auto border border-white/10"
+                        >
+                          Copy to PT →
+                        </button>
                       </div>
                     </div>
-                    <div>
-                      <label className={labelClass}>Total fee (₹)</label>
-                      <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Paid (₹)</label>
-                      <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Balance</label>
-                      <input type="number" value={balance} readOnly className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Start date</label>
-                      <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="GT start date" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>End date</label>
-                      <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="GT end date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Pay date</label>
-                      <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="GT pay date" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Payment mode</label>
-                      <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass}>
-                        <option value="">— Select —</option>
-                        {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Status</label>
-                      <input type="text" value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass} placeholder="e.g. Active" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Slot timing</label>
-                      <input type="text" value={slotTiming} onChange={(e) => setSlotTiming(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Paid to</label>
-                      <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Remarks</label>
-                      <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Feedback</label>
-                      <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="receipt-gt" checked={receipt} onChange={(e) => setReceipt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
-                      <label htmlFor="receipt-gt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
+                  </div>
+                  {/* Right column: PT — two fields per row */}
+                  <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
+                    <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">PT</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelClass}>Duration</label>
+                        <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Trainer</label>
+                        <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass}>
+                          <option value="">— Select —</option>
+                          {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Photo</label>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {imagePt ? (
+                            <>
+                              <img src={imagePt} alt="PT" className="w-12 h-12 rounded-lg object-cover border border-white/10" />
+                              <div className="flex flex-col gap-0.5">
+                                <label className="cursor-pointer px-2 py-1 rounded border border-white/20 text-stone-400 hover:bg-white/5 text-xs">Change<input type="file" accept="image/*" className="sr-only" onChange={handleImageChangePt} /></label>
+                                <button type="button" onClick={clearImagePt} className="px-2 py-1 rounded border border-white/20 text-stone-500 hover:bg-white/5 text-xs text-left">Remove</button>
+                              </div>
+                            </>
+                          ) : (
+                            <label className="cursor-pointer px-2 py-2 rounded-lg border border-dashed border-white/20 text-stone-500 hover:border-brand-red/50 text-xs">Upload<input type="file" accept="image/*" className="sr-only" onChange={handleImageChangePt} /></label>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Total fee (₹)</label>
+                        <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Paid (₹)</label>
+                        <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Balance</label>
+                        <input type="number" value={balancePt} readOnly className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Start date</label>
+                        <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>End date</label>
+                        <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Pay date</label>
+                        <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Payment mode</label>
+                        <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass}>
+                          <option value="">— Select —</option>
+                          {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Status</label>
+                        <input type="text" value={statusPt} onChange={(e) => setStatusPt(e.target.value)} className={inputClass} placeholder="e.g. Active" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Slot timing</label>
+                        <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Paid to</label>
+                        <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Remarks</label>
+                        <textarea value={remarksPt} onChange={(e) => setRemarksPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Feedback</label>
+                        <textarea value={feedbackPt} onChange={(e) => setFeedbackPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" id="receipt-pt" checked={receiptPt} onChange={(e) => setReceiptPt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
+                        <label htmlFor="receipt-pt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
+                      </div>
                     </div>
                   </div>
                 </div>
-                {/* Right column: PT — two fields per row */}
-                <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
-                  <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">PT</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelClass}>Duration</label>
-                      <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Trainer</label>
-                      <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass}>
-                        <option value="">— Select —</option>
-                        {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Photo</label>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {imagePt ? (
-                          <>
-                            <img src={imagePt} alt="PT" className="w-12 h-12 rounded-lg object-cover border border-white/10" />
-                            <div className="flex flex-col gap-0.5">
-                              <label className="cursor-pointer px-2 py-1 rounded border border-white/20 text-stone-400 hover:bg-white/5 text-xs">Change<input type="file" accept="image/*" className="sr-only" onChange={handleImageChangePt} /></label>
-                              <button type="button" onClick={clearImagePt} className="px-2 py-1 rounded border border-white/20 text-stone-500 hover:bg-white/5 text-xs text-left">Remove</button>
-                            </div>
-                          </>
-                        ) : (
-                          <label className="cursor-pointer px-2 py-2 rounded-lg border border-dashed border-white/20 text-stone-500 hover:border-brand-red/50 text-xs">Upload<input type="file" accept="image/*" className="sr-only" onChange={handleImageChangePt} /></label>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Total fee (₹)</label>
-                      <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Paid (₹)</label>
-                      <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Balance</label>
-                      <input type="number" value={balancePt} readOnly className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Start date</label>
-                      <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>End date</label>
-                      <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Pay date</label>
-                      <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Payment mode</label>
-                      <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass}>
-                        <option value="">— Select —</option>
-                        {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Status</label>
-                      <input type="text" value={statusPt} onChange={(e) => setStatusPt(e.target.value)} className={inputClass} placeholder="e.g. Active" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Slot timing</label>
-                      <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Paid to</label>
-                      <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Remarks</label>
-                      <textarea value={remarksPt} onChange={(e) => setRemarksPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Feedback</label>
-                      <textarea value={feedbackPt} onChange={(e) => setFeedbackPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="receipt-pt" checked={receiptPt} onChange={(e) => setReceiptPt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
-                      <label htmlFor="receipt-pt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
-                    </div>
-                  </div>
-                </div>
-              </div>
               </>
             )}
             <div className="flex gap-2">
@@ -1092,108 +1114,108 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
               className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom"
             >
               <table className="w-full min-w-[900px] text-sm">
-              <thead
-                ref={headerRef}
-                className="select-none cursor-ew-resize"
-                role="presentation"
-              >
-                <tr className="border-b border-white/10 bg-white/[0.04]">
-                  <th className="sticky left-0 z-20 bg-stone-900 border-r border-white/10 text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider w-[72px] min-w-[72px] shadow-[4px_0_6px_-2px_rgba(0,0,0,0.3)]">Photo</th>
-                  <th className="sticky left-[72px] z-20 bg-stone-900 border-r border-white/10 text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider min-w-[160px] shadow-[4px_0_6px_-2px_rgba(0,0,0,0.3)]">Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Plan</th>
-                  <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Total</th>
-                  <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Paid</th>
-                  <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Balance</th>
-                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Mobile</th>
-                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Status</th>
-                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Slot</th>
-                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Trainer</th>
-                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Pay date</th>
-                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Payment</th>
-                  <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider max-w-[120px]">Remarks</th>
-                  <th className="text-center py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider w-14">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayCustomers.map((c, i) => {
-                  const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
-                  return (
-                    <tr
-                      key={`${c.id}-${i}`}
-                      className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors group"
-                      onClick={() => setDetailsCustomer(c)}
-                    >
-                      <td className="sticky left-0 z-20 w-[72px] min-w-[72px] py-2.5 px-4 bg-stone-900 border-r border-white/10 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.25)] group-hover:bg-stone-800">
-                        <img
-                          src={c.image ?? "/images/profile placeholder.jpg"}
-                          alt=""
-                          className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
-                        />
-                      </td>
-                      <td className="sticky left-[72px] z-20 min-w-[160px] py-2.5 px-4 bg-stone-900 border-r border-white/10 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.25)] group-hover:bg-stone-800">
-                        <span className="text-stone-100 font-medium">{c.name}</span>
-                        {c.duration && (
-                          <span className="block text-stone-500 text-xs">{c.duration}</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-4 text-stone-300">{c.plan}</td>
-                      <td className="py-2.5 px-4 text-right text-stone-300 tabular-nums">{formatCurrency(c.total_fee)}</td>
-                      <td className="py-2.5 px-4 text-right text-stone-300 tabular-nums">{formatCurrency(c.paid_fee)}</td>
-                      <td className="py-2.5 px-4 text-right tabular-nums">
-                        <span className={c.balance !== 0 ? "text-amber-400 font-medium" : "text-stone-300"}>
-                          {formatCurrency(c.balance)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 text-stone-300 max-w-[100px] truncate" title={c.mobile ?? undefined}>{c.mobile ?? "—"}</td>
-                      <td className="py-2.5 px-4 text-stone-300 max-w-[80px] truncate" title={c.status ?? undefined}>{c.status ?? "—"}</td>
-                      <td className="py-2.5 px-4 text-stone-300 max-w-[80px] truncate" title={c.slot_timing ?? undefined}>{c.slot_timing ?? "—"}</td>
-                      <td className="py-2.5 px-4 text-stone-300 max-w-[100px] truncate" title={c.plan === "PT" ? (trainer?.name ?? undefined) : undefined}>
-                        {c.plan === "PT" ? (trainer?.name ?? "—") : "—"}
-                      </td>
-                      <td className="py-2.5 px-4 text-stone-300 whitespace-nowrap">{c.pay_date ?? "—"}</td>
-                      <td className="py-2.5 px-4 text-stone-300 max-w-[90px] truncate" title={c.payment_mode ?? undefined}>{c.payment_mode ?? "—"}</td>
-                      <td className="py-2.5 px-4 text-stone-300 max-w-[120px] truncate" title={c.remarks ?? undefined}>{c.remarks ?? "—"}</td>
-                      <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="relative inline-block">
-                          <button
-                            type="button"
-                            onClick={() => setOpenActionRowId(openActionRowId === c.id ? null : c.id)}
-                            className="p-1.5 rounded-lg border border-white/10 text-stone-400 hover:text-stone-100 hover:bg-white/5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                            aria-expanded={openActionRowId === c.id}
-                            aria-label="Actions"
-                          >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-                            </svg>
-                          </button>
-                          {openActionRowId === c.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" aria-hidden onClick={() => setOpenActionRowId(null)} />
-                              <div className="absolute right-0 top-full mt-1 z-20 min-w-[160px] py-1 rounded-xl border border-white/10 bg-stone-900/95 backdrop-blur-xl shadow-xl">
-                                <button
-                                  type="button"
-                                  onClick={() => { openEdit(c); setOpenActionRowId(null); }}
-                                  className="w-full text-left px-3 py-2 text-sm text-stone-100 hover:bg-brand-red/20 hover:text-brand-red"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => { setOpenActionRowId(null); handleDelete(c); }}
-                                  className="w-full text-left px-3 py-2 text-sm text-stone-400 hover:bg-red-500/20 hover:text-red-400"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </>
+                <thead
+                  ref={headerRef}
+                  className="select-none cursor-ew-resize"
+                  role="presentation"
+                >
+                  <tr className="border-b border-white/10 bg-white/[0.04]">
+                    <th className="sticky left-0 z-20 bg-stone-900 border-r border-white/10 text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider w-[72px] min-w-[72px] shadow-[4px_0_6px_-2px_rgba(0,0,0,0.3)]">Photo</th>
+                    <th className="sticky left-[72px] z-20 bg-stone-900 border-r border-white/10 text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider min-w-[160px] shadow-[4px_0_6px_-2px_rgba(0,0,0,0.3)]">Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Plan</th>
+                    <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Total</th>
+                    <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Paid</th>
+                    <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Balance</th>
+                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Mobile</th>
+                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Slot</th>
+                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Trainer</th>
+                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Pay date</th>
+                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Payment</th>
+                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider max-w-[120px]">Remarks</th>
+                    <th className="text-center py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider w-14">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayCustomers.map((c, i) => {
+                    const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
+                    return (
+                      <tr
+                        key={`${c.id}-${i}`}
+                        className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors group"
+                        onClick={() => setDetailsCustomer(c)}
+                      >
+                        <td className="sticky left-0 z-20 w-[72px] min-w-[72px] py-2.5 px-4 bg-stone-900 border-r border-white/10 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.25)] group-hover:bg-stone-800">
+                          <img
+                            src={c.image ?? "/images/profile placeholder.jpg"}
+                            alt=""
+                            className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
+                          />
+                        </td>
+                        <td className="sticky left-[72px] z-20 min-w-[160px] py-2.5 px-4 bg-stone-900 border-r border-white/10 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.25)] group-hover:bg-stone-800">
+                          <span className="text-stone-100 font-medium">{c.name}</span>
+                          {c.duration && (
+                            <span className="block text-stone-500 text-xs">{c.duration}</span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="py-2.5 px-4 text-stone-300">{c.plan}</td>
+                        <td className="py-2.5 px-4 text-right text-stone-300 tabular-nums">{formatCurrency(c.total_fee)}</td>
+                        <td className="py-2.5 px-4 text-right text-stone-300 tabular-nums">{formatCurrency(c.paid_fee)}</td>
+                        <td className="py-2.5 px-4 text-right tabular-nums">
+                          <span className={c.balance !== 0 ? "text-amber-400 font-medium" : "text-stone-300"}>
+                            {formatCurrency(c.balance)}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 text-stone-300 max-w-[100px] truncate" title={c.mobile ?? undefined}>{c.mobile ?? "—"}</td>
+                        <td className="py-2.5 px-4 text-stone-300 max-w-[80px] truncate" title={c.status ?? undefined}>{c.status ?? "—"}</td>
+                        <td className="py-2.5 px-4 text-stone-300 max-w-[80px] truncate" title={c.slot_timing ?? undefined}>{c.slot_timing ?? "—"}</td>
+                        <td className="py-2.5 px-4 text-stone-300 max-w-[100px] truncate" title={c.plan === "PT" ? (trainer?.name ?? undefined) : undefined}>
+                          {c.plan === "PT" ? (trainer?.name ?? "—") : "—"}
+                        </td>
+                        <td className="py-2.5 px-4 text-stone-300 whitespace-nowrap">{c.pay_date ?? "—"}</td>
+                        <td className="py-2.5 px-4 text-stone-300 max-w-[90px] truncate" title={c.payment_mode ?? undefined}>{c.payment_mode ?? "—"}</td>
+                        <td className="py-2.5 px-4 text-stone-300 max-w-[120px] truncate" title={c.remarks ?? undefined}>{c.remarks ?? "—"}</td>
+                        <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="relative inline-block">
+                            <button
+                              type="button"
+                              onClick={() => setOpenActionRowId(openActionRowId === c.id ? null : c.id)}
+                              className="p-1.5 rounded-lg border border-white/10 text-stone-400 hover:text-stone-100 hover:bg-white/5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                              aria-expanded={openActionRowId === c.id}
+                              aria-label="Actions"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                              </svg>
+                            </button>
+                            {openActionRowId === c.id && (
+                              <>
+                                <div className="fixed inset-0 z-10" aria-hidden onClick={() => setOpenActionRowId(null)} />
+                                <div className="absolute right-0 top-full mt-1 z-20 min-w-[160px] py-1 rounded-xl border border-white/10 bg-stone-900/95 backdrop-blur-xl shadow-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => { openEdit(c); setOpenActionRowId(null); }}
+                                    className="w-full text-left px-3 py-2 text-sm text-stone-100 hover:bg-brand-red/20 hover:text-brand-red"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setOpenActionRowId(null); handleDelete(c); }}
+                                    className="w-full text-left px-3 py-2 text-sm text-stone-400 hover:bg-red-500/20 hover:text-red-400"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
