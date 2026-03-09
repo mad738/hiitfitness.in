@@ -304,11 +304,10 @@ export function ServicesCarousel() {
             key={i}
             type="button"
             onClick={() => setActiveIndex(i)}
-            className={`min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:w-2.5 sm:h-2.5 rounded-full flex items-center justify-center transition-all duration-200 ${
-              i === activeIndex
-                ? "bg-brand-red scale-110 sm:scale-125 shadow-[0_0_0_2px_rgba(255,0,0,0.3)]"
-                : "bg-white/35 hover:bg-white/50 active:bg-white/60"
-            }`}
+            className={`min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:w-2.5 sm:h-2.5 rounded-full flex items-center justify-center transition-all duration-200 ${i === activeIndex
+              ? "bg-[#EE2A24] scale-110 sm:scale-125 shadow-[0_0_0_2px_rgba(238,42,36,0.3)]"
+              : "bg-stone-300 hover:bg-stone-400 active:bg-stone-500"
+              }`}
             aria-label={`Go to ${services[i].title}`}
             aria-current={i === activeIndex ? "true" : undefined}
           />
@@ -449,12 +448,12 @@ function MobileGridCarousel({
             type="button"
             onClick={() => onSelect(i)}
             className={[
-              "relative min-h-0 text-left overflow-hidden bg-stone-900 border border-white/10",
+              "relative min-h-0 text-left overflow-hidden bg-white border border-stone-200",
               // Smooth shape / depth morph:
               "transition-[border-radius,box-shadow,border-color] duration-500 ease-out",
               isFeatured
-                ? "rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,0.55)] border-brand-red/30"
-                : "rounded-xl shadow-md hover:border-white/20",
+                ? "rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,0.15)] border-[#EE2A24]/50"
+                : "rounded-xl shadow-md hover:border-red-200",
               gridClass,
             ].join(" ")}
             style={{ willChange: "transform" }}
@@ -472,7 +471,7 @@ function MobileGridCarousel({
 
             {/* Overlay (consistent) */}
             <div
-              className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"
+              className="absolute inset-0 bg-gradient-to-t from-white/45 via-white/20 to-transparent"
               aria-hidden
             />
 
@@ -487,10 +486,10 @@ function MobileGridCarousel({
                   willChange: "opacity, transform",
                 }}
               >
-                <h3 className="font-display font-bold text-stone-100 text-lg drop-shadow-sm">
+                <h3 className="font-display font-bold text-stone-900 text-lg drop-shadow-sm">
                   {service.title}
                 </h3>
-                <p className="text-stone-300/95 text-xs leading-snug line-clamp-2 drop-shadow-sm">
+                <p className="text-stone-700 text-xs leading-snug line-clamp-2 drop-shadow-sm">
                   {service.description}
                 </p>
               </div>
@@ -504,7 +503,7 @@ function MobileGridCarousel({
                   willChange: "opacity, transform",
                 }}
               >
-                <span className="text-stone-100 font-semibold text-xs truncate block w-full drop-shadow-sm">
+                <span className="text-stone-900 font-semibold text-xs truncate block w-full drop-shadow-sm">
                   {service.title}
                 </span>
               </div>
@@ -562,9 +561,9 @@ function MorphCard({
       type="button"
       className={`
         flex-shrink-0 flex overflow-hidden rounded-xl sm:rounded-2xl md:rounded-3xl
-        liquid-glass border shadow-xl text-left
-        focus:outline-none focus:ring-2 focus:ring-brand-red/50 focus:ring-offset-2 focus:ring-offset-black
-        ${isActive ? "border-brand-red/40 shadow-[0_0_0_1px_rgba(255,0,0,0.2),0_24px_48px_rgba(0,0,0,0.4)]" : "border-white/10"}
+        bg-white border shadow-xl text-left
+        focus:outline-none focus:ring-2 focus:ring-[#EE2A24]/50 focus:ring-offset-2 focus:ring-offset-white
+        ${isActive ? "border-[#EE2A24]/40 shadow-[0_0_0_1px_rgba(238,42,36,0.2),0_24px_48px_rgba(0,0,0,0.1)]" : "border-stone-200"}
       `}
       style={{
         width: cardWidth,
@@ -605,14 +604,14 @@ function MorphCard({
           />
           {/* Caption overlay: only visible when inactive (single line) */}
           <div
-            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent px-2 py-1.5 sm:px-3 sm:py-2 flex items-end"
+            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white/40 to-transparent px-2 py-1.5 sm:px-3 sm:py-2 flex items-end"
             style={{
               opacity: isActive ? 0 : 1,
               transition: isDragging ? "none" : `opacity ${TRANSITION_MS}ms ${EASING}`,
               pointerEvents: isActive ? "none" : "auto",
             }}
           >
-            <span className="text-stone-100 font-semibold text-xs sm:text-sm truncate block">
+            <span className="text-stone-900 font-semibold text-xs sm:text-sm truncate block">
               {service.title}
             </span>
           </div>
@@ -633,7 +632,7 @@ function MorphCard({
           <div
             className="absolute inset-0 overflow-hidden pointer-events-none z-[1]"
             style={{
-              background: "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.4) 12%, rgba(0,0,0,0.92) 28%, rgba(0,0,0,0.97) 100%)",
+              background: "linear-gradient(to right, transparent 0%, rgba(255,255,255,0.15) 15%, rgba(255,255,255,0.45) 35%, rgba(255,255,255,0.7) 60%)",
             }}
             aria-hidden
           />
@@ -649,10 +648,10 @@ function MorphCard({
               willChange: "transform, opacity",
             }}
           >
-            <h3 className="font-display text-base sm:text-xl md:text-2xl font-bold text-stone-100 mb-0.5 sm:mb-2 drop-shadow-sm">
+            <h3 className="font-display text-base sm:text-xl md:text-2xl font-bold text-stone-900 mb-0.5 sm:mb-2 drop-shadow-sm">
               {service.title}
             </h3>
-            <p className="text-stone-300/90 text-xs sm:text-sm md:text-base leading-relaxed mb-2 sm:mb-4 drop-shadow-sm min-h-[2.5em] sm:min-h-0">
+            <p className="text-stone-700 text-xs sm:text-sm md:text-base leading-relaxed mb-2 sm:mb-4 drop-shadow-sm min-h-[2.5em] sm:min-h-0">
               {service.description}
             </p>
             <span className="inline-flex items-center text-brand-red font-semibold text-xs sm:text-sm hover:underline">

@@ -11,24 +11,24 @@ export interface ServiceItem {
 
 export const services: ServiceItem[] = [
   {
-    title: "Weight Loss",
+    title: "Amenities",
     image: "/images/HIIT_GYM4.jpg",
-    description: "Burn fat and build sustainable habits",
+    description: "Whether it’s dumbbells, cardio, dedicated strength training area, functional training, or kettlebells, we have it all.",
   },
   {
-    title: "Muscle Gain",
+    title: "Group Classes",
     image: "/images/HIIT_GYM3.jpg",
-    description: "Hypertrophy-focused strength programs",
+    description: "Workout with people who share the same fitness goal. With options for all levels, join our expert-led sessions.",
   },
   {
-    title: "Muscle Training",
-    image: "/images/facility-strength.svg",
-    description: "Strength, endurance and technique mastery",
-  },
-  {
-    title: "HIIT",
+    title: "Personal Training",
     image: "/images/HIIT_GYM.jpg",
-    description: "High intensity workouts for max calorie burn",
+    description: "Personal training gives you personalized guidance and support from certified trainers to help you reach your goals faster.",
+  },
+  {
+    title: "Masterclass",
+    image: "/images/HIIT_GYM4.jpg",
+    description: "Free Master Classes designed to energize and inspire you, including functional training, strength conditioning, and more.",
   },
 ];
 
