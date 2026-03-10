@@ -78,9 +78,8 @@ export function PlanGroups({ plans }: Props) {
 
   return (
     <div
-      className={`grid gap-6 sm:gap-8 items-stretch justify-items-center md:justify-items-stretch ${
-        categoriesToShow.length === 1 ? "max-w-md mx-auto" : categoriesToShow.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"
-      }`}
+      className={`grid gap-6 sm:gap-8 items-stretch justify-items-center md:justify-items-stretch ${categoriesToShow.length === 1 ? "max-w-md mx-auto" : categoriesToShow.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"
+        }`}
     >
       {categoriesToShow.map((category) => {
         const items = grouped[category];
@@ -91,70 +90,68 @@ export function PlanGroups({ plans }: Props) {
         return (
           <div key={category} className="flex justify-center md:block w-full">
             <MobileInViewHover className="w-full max-w-md md:max-w-none h-full min-h-0 p-3 md:p-0">
-            <article
-              className={`liquid-glass rounded-2xl overflow-hidden border flex flex-col h-full transition-all duration-300 ease-out ${
-              isPopular
-                ? "border-brand-red/50 shadow-[0_0_0_1px_rgba(255,0,0,0.25),0_12px_40px_rgba(0,0,0,0.4),0_0_24px_rgba(255,0,0,0.12)] md:-mt-2 md:mb-2 hover:scale-[1.04] hover:border-brand-red/80 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.45),0_0_24px_rgba(255,0,0,0.4),0_0_48px_rgba(255,0,0,0.22),0_20px_52px_rgba(0,0,0,0.5)]"
-                : "border-white/10 hover:scale-[1.04] hover:border-brand-red/70 hover:shadow-[0_0_0_2px_rgba(255,0,0,0.4),0_0_24px_rgba(255,0,0,0.35),0_0_48px_rgba(255,0,0,0.2),0_16px_48px_rgba(0,0,0,0.45)]"
-            }`}
-          >
-            <div className="p-6 pb-4 border-b border-white/10">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-xl font-bold text-stone-100 uppercase tracking-tight">
-                  {label}
-                </h3>
-                {isPopular && (
-                  <span className="text-xs font-semibold tracking-wide uppercase px-2.5 py-1 rounded-full bg-brand-red/15 text-brand-red border border-brand-red/30">
-                    Popular
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Pricing table + features + button: flex-1 so button sits at bottom on desktop */}
-            <div className="p-6 pt-4 flex flex-col flex-1 min-h-0">
-              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
-                Pricing
-              </p>
-              <ul className="space-y-2 mb-6">
-                {items.map((plan) => (
-                  <li
-                    key={plan.id}
-                    className="flex items-center justify-between gap-3 py-2 border-b border-white/5 last:border-0"
-                  >
-                    <span className="text-stone-300 text-sm">{getDurationLabel(plan)}</span>
-                    <span className="text-stone-100 font-semibold">{formatPrice(getTotalPrice(plan))}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* Feature list */}
-              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
-                What&apos;s included
-              </p>
-              <ul className="space-y-2.5 mb-6">
-                {features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2.5 text-sm text-stone-300">
-                    <CheckIcon />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                type="button"
-                onClick={handleGetStarted}
-                className={`mt-auto block w-full text-center py-3 rounded-xl font-semibold text-sm transition ${
-                  isPopular
-                    ? "bg-brand-red text-white hover:opacity-90"
-                    : "border border-stone-600 text-stone-100 hover:border-brand-red/50 hover:text-brand-red"
-                }`}
+              <article
+                className={`bg-white rounded-2xl overflow-hidden shadow-md flex flex-col h-full transition-all duration-300 ease-out border ${isPopular
+                    ? "border-[#EE2A24] md:-mt-2 md:mb-2 hover:scale-[1.04] hover:shadow-xl"
+                    : "border-stone-200 hover:scale-[1.04] hover:shadow-lg hover:border-red-300"
+                  }`}
               >
-                Get started
-              </button>
-            </div>
-          </article>
-          </MobileInViewHover>
+                <div className="p-6 pb-4 border-b border-stone-100">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xl font-bold text-black uppercase tracking-tight">
+                      {label}
+                    </h3>
+                    {isPopular && (
+                      <span className="text-xs font-semibold tracking-wide uppercase px-2.5 py-1 rounded-full bg-red-100 text-[#EE2A24] border border-red-200">
+                        Popular
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Pricing table + features + button: flex-1 so button sits at bottom on desktop */}
+                <div className="p-6 pt-4 flex flex-col flex-1 min-h-0">
+                  <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
+                    Pricing
+                  </p>
+                  <ul className="space-y-2 mb-6">
+                    {items.map((plan) => (
+                      <li
+                        key={plan.id}
+                        className="flex items-center justify-between gap-3 py-2 border-b border-stone-100 last:border-0"
+                      >
+                        <span className="text-stone-600 text-sm">{getDurationLabel(plan)}</span>
+                        <span className="text-stone-900 font-semibold">{formatPrice(getTotalPrice(plan))}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* Feature list */}
+                  <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
+                    What&apos;s included
+                  </p>
+                  <ul className="space-y-2.5 mb-6">
+                    {features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2.5 text-sm text-stone-600">
+                        <CheckIcon />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    type="button"
+                    onClick={handleGetStarted}
+                    className={`mt-auto block w-full text-center py-3 rounded-xl font-semibold text-sm transition ${isPopular
+                        ? "bg-[#EE2A24] text-white hover:bg-red-700"
+                        : "border border-stone-300 text-stone-700 hover:border-red-300 hover:text-[#EE2A24]"
+                      }`}
+                  >
+                    Get started
+                  </button>
+                </div>
+              </article>
+            </MobileInViewHover>
           </div>
         );
       })}
@@ -162,34 +159,34 @@ export function PlanGroups({ plans }: Props) {
       {/* Call / contact prompt when coming from Get started */}
       {showCallPrompt && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="get-started-prompt-title"
           onClick={() => setShowCallPrompt(false)}
         >
           <div
-            className="liquid-glass rounded-2xl border border-white/10 p-6 max-w-sm w-full shadow-xl"
+            className="bg-white rounded-2xl border border-stone-200 p-6 max-w-sm w-full shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="get-started-prompt-title" className="text-lg font-bold text-stone-100 mb-2">
+            <h3 id="get-started-prompt-title" className="text-lg font-bold text-stone-900 mb-2">
               Get started
             </h3>
-            <p className="text-stone-300 text-sm mb-4">
+            <p className="text-stone-600 text-sm mb-4">
               Call us now to join or ask about plans. You can also use the contact section below.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <a
                 href={CONTACT_PHONE.tel}
                 onClick={handleCallNow}
-                className="flex-1 text-center py-3 rounded-xl font-semibold text-sm bg-brand-red text-white hover:opacity-90 transition"
+                className="flex-1 text-center py-3 rounded-xl font-semibold text-sm bg-[#EE2A24] text-white hover:bg-red-700 transition"
               >
                 Call {CONTACT_PHONE.display}
               </a>
               <button
                 type="button"
                 onClick={handleViewContact}
-                className="flex-1 py-3 rounded-xl font-semibold text-sm border border-stone-600 text-stone-100 hover:border-brand-red/50 hover:text-brand-red transition"
+                className="flex-1 py-3 rounded-xl font-semibold text-sm border border-stone-300 text-stone-700 hover:border-red-300 hover:text-[#EE2A24] transition"
               >
                 View contact
               </button>

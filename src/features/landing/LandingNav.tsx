@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { Instagram, Youtube } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useMobileHeader } from "@/features/landing/MobileHeaderContext";
 
@@ -11,6 +12,7 @@ export function LandingNav() {
     () =>
       [
         { id: "facilities", label: "Facilities" },
+        { id: "programs", label: "Programs" },
         { id: "plans", label: "Plans" },
         { id: "contact", label: "Contact" },
       ] as const,
@@ -56,14 +58,13 @@ export function LandingNav() {
   const linkClass = (id: string) =>
     [
       "text-sm md:text-base font-semibold transition relative",
-      active === id ? "text-stone-100" : "text-stone-400 hover:text-stone-100",
+      active === id ? "text-white" : "text-white/80 hover:text-white",
     ].join(" ");
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 border-b border-stone-800/80 bg-black/90 backdrop-blur-md transition-transform duration-300 ease-out ${
-        isMobile && headerHidden ? "-translate-y-full" : ""
-      }`}
+      className={`fixed top-0 left-0 right-0 z-50 border-b border-stone-800 bg-black backdrop-blur-md transition-transform duration-300 ease-out ${isMobile && headerHidden ? "-translate-y-full" : ""
+        }`}
     >
       <nav className="max-w-6xl mx-auto px-3 sm:px-6 flex items-center justify-between h-[var(--header-height)] gap-2 min-h-0">
         <Link href="/" className="flex items-center gap-2 sm:gap-3 tracking-tight min-w-0 flex-1 sm:flex-initial" aria-label="HIIT Fitness – High intensity interval training">
@@ -79,16 +80,37 @@ export function LandingNav() {
             <a key={s.id} href={`#${s.id}`} className={linkClass(s.id)}>
               {s.label}
               {active === s.id && (
-                <span className="absolute -bottom-2 left-0 right-0 h-[2px] rounded-full bg-brand-red shadow-[0_0_18px_rgba(255,0,0,0.4)]" />
+                <span className="absolute -bottom-2 left-0 right-0 h-[2px] rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.4)]" />
               )}
             </a>
           ))}
           <Link
             href="/admin/login"
-            className="text-stone-500 hover:text-stone-300 text-base"
+            className="text-white/80 hover:text-white text-base"
           >
             Admin
           </Link>
+
+          <div className="flex items-center gap-4 ml-6 pl-6 border-l border-stone-800">
+            <a
+              href="https://www.instagram.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/80 hover:text-[#EE2A24] transition-colors"
+              aria-label="Instagram"
+            >
+              <Instagram className="w-5 h-5" />
+            </a>
+            <a
+              href="https://www.youtube.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/80 hover:text-[#EE2A24] transition-colors"
+              aria-label="YouTube"
+            >
+              <Youtube className="w-5 h-5" />
+            </a>
+          </div>
         </div>
 
         {/* Mobile */}
@@ -111,7 +133,7 @@ export function LandingNav() {
       </nav>
 
       {mobileOpen && (
-        <div className="md:hidden border-t border-stone-800/80 bg-black/95 backdrop-blur-md">
+        <div className="md:hidden border-t border-stone-800 bg-black backdrop-blur-md">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col gap-2">
             {sections.map((s) => (
               <a
@@ -120,16 +142,38 @@ export function LandingNav() {
                 className={[
                   "flex items-center justify-between rounded-xl px-3 py-2 text-base font-semibold transition",
                   active === s.id
-                    ? "bg-stone-900/50 text-stone-100 border border-stone-800"
-                    : "text-stone-300 hover:bg-stone-900/30",
+                    ? "bg-stone-800/50 text-white border border-stone-700"
+                    : "text-white/80 hover:bg-stone-800/30",
                 ].join(" ")}
               >
                 {s.label}
                 {active === s.id && (
-                  <span className="h-2 w-2 rounded-full bg-brand-red shadow-[0_0_18px_rgba(255,0,0,0.4)]" />
+                  <span className="h-2 w-2 rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.4)]" />
                 )}
               </a>
             ))}
+
+            {/* Mobile Social Links */}
+            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-stone-800 px-3">
+              <a
+                href="https://www.instagram.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 text-white/80 hover:text-[#EE2A24] transition-colors"
+              >
+                <Instagram className="w-6 h-6" />
+                <span className="font-semibold">Instagram</span>
+              </a>
+              <a
+                href="https://www.youtube.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 text-white/80 hover:text-[#EE2A24] transition-colors"
+              >
+                <Youtube className="w-6 h-6" />
+                <span className="font-semibold">YouTube</span>
+              </a>
+            </div>
           </div>
         </div>
       )}
