@@ -58,8 +58,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
+  const [editingLinkedId, setEditingLinkedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileCustomer, setProfileCustomer] = useState<Customer | null>(null);
 
   // GT (left column)
   const [name, setName] = useState("");
@@ -227,9 +230,10 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     if (filterPaidStatus === "not_paid" && (c.balance ?? 0) === 0) return false;
     if (searchLower) {
       const nameMatch = (c.name ?? "").toLowerCase().includes(searchLower);
+      const mobileMatch = (c.mobile ?? "").toLowerCase().includes(searchLower);
       const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
       const trainerMatch = trainer?.name?.toLowerCase().includes(searchLower);
-      if (!nameMatch && !trainerMatch) return false;
+      if (!nameMatch && !mobileMatch && !trainerMatch) return false;
     }
     return true;
   });
@@ -326,32 +330,86 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
   function openEdit(c: Customer) {
     setEditing(c);
-    setName(c.name);
-    setImage(c.image);
-    setPlan(c.plan);
-    setTotalFee(c.total_fee);
-    setPaidFee(c.paid_fee);
-    setBalance(c.balance);
-    setTrainerId(c.trainer_id);
-    setStartDate(c.start_date ?? "");
-    setEndDate(c.end_date ?? "");
-    setPayDate(c.pay_date ?? "");
-    setPaymentMode(c.payment_mode ?? "");
-    setRemarks(c.remarks ?? "");
-    setDuration(c.duration ?? "");
-    setStatus(c.status ?? "");
-    setSlotTiming(c.slot_timing ?? "");
-    setMobile(c.mobile ?? "");
-    setPaidTo(c.paid_to ?? "");
-    setFeedback(c.feedback ?? "");
-    setReceipt(c.receipt ?? false);
-    setFormOpen(true);
     setError(null);
+    // Common fields
+    setName(c.name);
+    setMobile(c.mobile ?? "");
+
+    // Attempt to find matching PT/GT to show in the two-column template
+    const mobileKey = normalizeMobile(c.mobile);
+    const linked = mobileKey ? customers.find(x => x.id !== c.id && normalizeMobile(x.mobile) === mobileKey && x.plan !== c.plan) : null;
+    setEditingLinkedId(linked?.id ?? null);
+
+    const gtSource = c.plan === "GT" ? c : (linked?.plan === "GT" ? linked : null);
+    const ptSource = c.plan === "PT" ? c : (linked?.plan === "PT" ? linked : null);
+
+    if (gtSource) {
+      setImage(gtSource.image);
+      setPlan("GT");
+      setTotalFee(gtSource.total_fee);
+      setPaidFee(gtSource.paid_fee);
+      setBalance(gtSource.balance);
+      setTrainerId(gtSource.trainer_id);
+      setStartDate(gtSource.start_date ?? "");
+      setEndDate(gtSource.end_date ?? "");
+      setPayDate(gtSource.pay_date ?? "");
+      setPaymentMode(gtSource.payment_mode ?? "");
+      setRemarks(gtSource.remarks ?? "");
+      setDuration(gtSource.duration ?? "");
+      setStatus(gtSource.status ?? "");
+      setSlotTiming(gtSource.slot_timing ?? "");
+      setPaidTo(gtSource.paid_to ?? "");
+      setFeedback(gtSource.feedback ?? "");
+      setReceipt(gtSource.receipt ?? false);
+    } else {
+      setImage(null); setTotalFee(0); setPaidFee(0); setTrainerId(null); setStartDate(""); setEndDate(""); setPayDate(""); setPaymentMode(""); setRemarks(""); setDuration(""); setStatus(""); setSlotTiming(""); setPaidTo(""); setFeedback(""); setReceipt(false);
+    }
+
+    if (ptSource) {
+      setImagePt(ptSource.image);
+      setPlanPt("PT");
+      setTotalFeePt(ptSource.total_fee);
+      setPaidFeePt(ptSource.paid_fee);
+      setBalancePt(ptSource.balance);
+      setTrainerIdPt(ptSource.trainer_id);
+      setStartDatePt(ptSource.start_date ?? "");
+      setEndDatePt(ptSource.end_date ?? "");
+      setPayDatePt(ptSource.pay_date ?? "");
+      setPaymentModePt(ptSource.payment_mode ?? "");
+      setRemarksPt(ptSource.remarks ?? "");
+      setDurationPt(ptSource.duration ?? "");
+      setStatusPt(ptSource.status ?? "");
+      setSlotTimingPt(ptSource.slot_timing ?? "");
+      setMobilePt(ptSource.mobile ?? "");
+      setPaidToPt(ptSource.paid_to ?? "");
+      setFeedbackPt(ptSource.feedback ?? "");
+      setReceiptPt(ptSource.receipt ?? false);
+    } else {
+      setImagePt(null); setTotalFeePt(0); setPaidFeePt(0); setTrainerIdPt(null); setStartDatePt(""); setEndDatePt(""); setPayDatePt(""); setPaymentModePt(""); setRemarksPt(""); setDurationPt(""); setStatusPt(""); setSlotTimingPt(""); setPaidToPt(""); setFeedbackPt(""); setReceiptPt(false);
+    }
+
+    setFormOpen(true);
   }
 
   function closeForm() {
     setFormOpen(false);
     setEditing(null);
+    setEditingLinkedId(null);
+    setError(null);
+  }
+
+  function openProfileEdit(c: Customer) {
+    setProfileCustomer(c);
+    setName(c.name);
+    setMobile(c.mobile || "");
+    setImage(c.image || null);
+    setError(null);
+    setProfileOpen(true);
+  }
+
+  function closeProfileForm() {
+    setProfileOpen(false);
+    setProfileCustomer(null);
     setError(null);
   }
 
@@ -421,12 +479,71 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   }
 
   /** Check if mobile is already used by another customer (optional excludeId when editing). */
-  function isMobileAlreadyUsed(mobileVal: string, excludeId?: string): boolean {
+  function isMobileAlreadyUsed(mobileVal: string, excludeId?: string, currentName?: string): boolean {
     const key = normalizeMobile(mobileVal);
     if (!key) return false;
-    return customers.some(
-      (c) => c.id !== excludeId && normalizeMobile(c.mobile) === key
-    );
+
+    // Check if the mobile is used by someone else
+    return customers.some((c) => {
+      if (c.id === excludeId) return false; // same record
+      if (normalizeMobile(c.mobile) !== key) return false; // different mobile
+      if (currentName && (c.name || "").trim().toLowerCase() === currentName.trim().toLowerCase()) {
+        return false; // same person's other record
+      }
+      return true; // found a conflict!
+    });
+  }
+
+  async function handleSubmitProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        setError("Name is required.");
+        setLoading(false);
+        return;
+      }
+      const newMobileRaw = mobile.trim();
+      const mobileKey = profileCustomer?.mobile ? normalizeMobile(profileCustomer.mobile) : null;
+      const nameKey = (profileCustomer?.name ?? "").trim();
+      const historyToUpdate = customers.filter((c) => {
+        if (mobileKey) return normalizeMobile(c.mobile) === mobileKey;
+        return (c.name ?? "").trim() === nameKey;
+      });
+
+      if (newMobileRaw !== (profileCustomer?.mobile || "").trim()) {
+        const newKey = normalizeMobile(newMobileRaw);
+        if (newKey) {
+          const used = customers.some(c => !historyToUpdate.some(h => h.id === c.id) && normalizeMobile(c.mobile) === newKey);
+          if (used) {
+            setError("Another customer already has this mobile number.");
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      const promises = historyToUpdate.map(h =>
+        updateCustomer(h.id, {
+          name: trimmedName,
+          mobile: newMobileRaw || null,
+          image: image || null
+        })
+      );
+
+      const results = await Promise.all(promises);
+      const failed = results.find(r => !r.ok);
+      if (failed) throw new Error(failed.error ?? "Failed to update profile for some entries.");
+
+      closeProfileForm();
+      router.refresh();
+    } catch (err) {
+      setError((err as Error)?.message ?? "An error occurred.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -438,114 +555,96 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         const trimmedName = name.trim();
         if (!trimmedName) {
           setError("Name is required.");
+          setLoading(false);
           return;
         }
-        if (isMobileAlreadyUsed(mobile, editing.id)) {
+        if (isMobileAlreadyUsed(mobile, editing.id, trimmedName)) {
           setError("Another customer already has this mobile number. Mobile must be unique.");
+          setLoading(false);
           return;
         }
-        const payload = buildPayload({
-          name,
-          image,
-          plan,
-          totalFee,
-          paidFee,
-          trainerId,
-          startDate,
-          endDate,
-          payDate,
-          paymentMode,
-          remarks,
-          duration,
-          status,
-          slotTiming,
-          mobile,
-          paidTo,
-          feedback,
-          receipt,
-        });
+
+        const isGtMain = plan === "GT";
+        const gtPayloadInfo = {
+          name, image, plan: "GT", totalFee, paidFee, trainerId: null, startDate, endDate, payDate, paymentMode, remarks, duration, status, slotTiming, mobile, paidTo, feedback, receipt
+        };
+        const ptPayloadInfo = {
+          name, image: imagePt, plan: "PT", totalFee: totalFeePt, paidFee: paidFeePt, trainerId: trainerIdPt, startDate: startDatePt, endDate: endDatePt, payDate: payDatePt, paymentMode: paymentModePt, remarks: remarksPt, duration: durationPt, status: statusPt, slotTiming: slotTimingPt, mobile, paidTo: paidToPt, feedback: feedbackPt, receipt: receiptPt
+        };
+
+        const payload = buildPayload(isGtMain ? gtPayloadInfo : ptPayloadInfo);
         const res = await updateCustomer(editing.id, payload);
+
         if (res.ok) {
-          setCustomers((prev) =>
-            prev.map((c) =>
-              c.id === editing.id ? { ...c, ...payload, updated_at: new Date().toISOString() } : c
-            )
-          );
-          closeForm();
-          router.refresh();
+          if (editingLinkedId) {
+            const linkedPayload = buildPayload(isGtMain ? ptPayloadInfo : gtPayloadInfo);
+            await updateCustomer(editingLinkedId, linkedPayload);
+          } else {
+            // If they entered details for the other plan type during edit, create it
+            const hasPtDetails = totalFeePt > 0 || paidFeePt > 0 || durationPt.trim() !== "" || !!trainerIdPt;
+            const hasGtDetails = totalFee > 0 || paidFee > 0 || duration.trim() !== "";
+
+            if (isGtMain && hasPtDetails) {
+              await createCustomer(buildPayload(ptPayloadInfo));
+            } else if (!isGtMain && hasGtDetails) {
+              await createCustomer(buildPayload(gtPayloadInfo));
+            }
+          }
         } else {
           setError(res.error);
+          setLoading(false);
+          return;
         }
       } else {
-        // Add new entry: common name & number; create one GT and one PT customer (both use common name/number)
+        // Add new entry
         const commonName = name.trim();
         if (!commonName) {
           setError("Name is required.");
+          setLoading(false);
           return;
         }
         const commonMobileRaw = mobile.trim();
-        if (commonMobileRaw && isMobileAlreadyUsed(commonMobileRaw)) {
+        if (commonMobileRaw && isMobileAlreadyUsed(commonMobileRaw, undefined, commonName)) {
           setError("A customer with this mobile number already exists. Mobile must be unique.");
+          setLoading(false);
           return;
         }
         const commonMobile = commonMobileRaw || null;
-        {
+
+        const hasGtDetails = totalFee > 0 || paidFee > 0 || duration.trim() !== "" || startDate.trim() !== "";
+        const hasPtDetails = totalFeePt > 0 || paidFeePt > 0 || durationPt.trim() !== "" || !!trainerIdPt || startDatePt.trim() !== "";
+
+        // If neither have details but they hit submit, default to creating an empty GT
+        const createGt = hasGtDetails || !hasPtDetails;
+
+        if (createGt) {
           const payloadGt = buildPayload({
-            name: commonName,
-            image,
-            plan: "GT",
-            totalFee,
-            paidFee,
-            trainerId,
-            startDate,
-            endDate,
-            payDate,
-            paymentMode,
-            remarks,
-            duration,
-            status,
-            slotTiming,
-            mobile: commonMobile ?? "",
-            paidTo,
-            feedback,
-            receipt,
+            name: commonName, image, plan: "GT", totalFee, paidFee, trainerId: null, startDate, endDate, payDate, paymentMode, remarks, duration, status, slotTiming, mobile: commonMobile ?? "", paidTo, feedback, receipt,
           });
           const resGt = await createCustomer(payloadGt);
           if (!resGt.ok) {
             setError(resGt.error ?? "Failed to add GT.");
+            setLoading(false);
             return;
           }
         }
-        {
+
+        if (hasPtDetails) {
           const payloadPt = buildPayload({
-            name: commonName,
-            image: imagePt,
-            plan: "PT",
-            totalFee: totalFeePt,
-            paidFee: paidFeePt,
-            trainerId: trainerIdPt,
-            startDate: startDatePt,
-            endDate: endDatePt,
-            payDate: payDatePt,
-            paymentMode: paymentModePt,
-            remarks: remarksPt,
-            duration: durationPt,
-            status: statusPt,
-            slotTiming: slotTimingPt,
-            mobile: commonMobile ?? "",
-            paidTo: paidToPt,
-            feedback: feedbackPt,
-            receipt: receiptPt,
+            name: commonName, image: imagePt, plan: "PT", totalFee: totalFeePt, paidFee: paidFeePt, trainerId: trainerIdPt, startDate: startDatePt, endDate: endDatePt, payDate: payDatePt, paymentMode: paymentModePt, remarks: remarksPt, duration: durationPt, status: statusPt, slotTiming: slotTimingPt, mobile: commonMobile ?? "", paidTo: paidToPt, feedback: feedbackPt, receipt: receiptPt,
           });
           const resPt = await createCustomer(payloadPt);
           if (!resPt.ok) {
             setError(resPt.error ?? "Failed to add PT.");
+            setLoading(false);
             return;
           }
         }
-        closeForm();
-        router.refresh();
       }
+      closeForm();
+      router.refresh();
+    } catch (err) {
+      setError((err as Error)?.message ?? "An error occurred.");
     } finally {
       setLoading(false);
     }
@@ -596,8 +695,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
               type="button"
               onClick={() => setShowFilterDropdown((s) => !s)}
               className={`flex items-center justify-center w-12 h-12 rounded-r-xl border-l border-white/10 transition ${showFilterDropdown
-                  ? "bg-brand-red/25 text-brand-red border-brand-red/50"
-                  : "bg-stone-800/60 text-stone-400 hover:text-stone-100 hover:bg-stone-800/80"
+                ? "bg-brand-red/25 text-brand-red border-brand-red/50"
+                : "bg-stone-800/60 text-stone-400 hover:text-stone-100 hover:bg-stone-800/80"
                 }`}
               aria-expanded={showFilterDropdown}
               aria-label="Filter options"
@@ -735,329 +834,159 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                 {error}
               </p>
             )}
-            {editing ? (
-              /* Edit: single customer, single column */
-              <>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-white/10">
                 <div>
                   <label className={labelClass}>Name</label>
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} required />
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="Name (common)" required />
                 </div>
                 <div>
                   <label className={labelClass}>Number</label>
-                  <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} placeholder="Phone number" />
+                  <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} placeholder="Phone number (common)" />
                 </div>
-                <div>
-                  <label className={labelClass}>Plan</label>
-                  <select value={plan} onChange={(e) => { setPlan(e.target.value); if (e.target.value !== "PT") setTrainerId(null); }} className={inputClass}>
-                    {PLAN_CATEGORIES.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Duration</label>
-                  <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M, 12M + 1M" />
-                </div>
-                {plan === "PT" && (
-                  <div>
-                    <label className={labelClass}>Trainer</label>
-                    <select value={trainerId ?? ""} onChange={(e) => setTrainerId(e.target.value || null)} className={inputClass + " max-w-xs"}>
-                      <option value="">— Select —</option>
-                      {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <label className={labelClass}>Photo</label>
-                  <div className="flex items-center gap-4 flex-wrap">
-                    {image ? (
-                      <>
-                        <img src={image} alt="Preview" className="w-20 h-20 rounded-xl object-cover border border-white/10" />
-                        <div className="flex gap-2">
-                          <label className="cursor-pointer px-3 py-2 rounded-lg border border-white/20 text-stone-300 hover:bg-white/5 text-sm">
-                            Change
-                            <input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} />
-                          </label>
-                          <button type="button" onClick={clearImage} className="px-3 py-2 rounded-lg border border-white/20 text-stone-400 hover:bg-white/5 text-sm">Remove</button>
-                        </div>
-                      </>
-                    ) : (
-                      <label className="cursor-pointer px-4 py-2.5 rounded-xl border border-dashed border-white/20 text-stone-400 hover:border-brand-red/50 hover:text-brand-red text-sm transition">
-                        Upload image
-                        <input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} />
-                      </label>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div>
-                    <label className={labelClass}>Total fee (₹)</label>
-                    <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} className={inputClass} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Paid fee (₹)</label>
-                    <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} className={inputClass} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Balance (₹)</label>
-                    <input type="number" value={balance} readOnly className={inputClass + " bg-stone-900/50 text-stone-400"} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className={labelClass}>Start date</label>
-                    <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="Start date" />
-                  </div>
-                  <div>
-                    <label className={labelClass}>End date</label>
-                    <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="End date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Pay date</label>
-                    <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="Pay date" />
-                  </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Payment mode</label>
-                  <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass}>
-                    <option value="">— Select —</option>
-                    {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Remarks</label>
-                  <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className={inputClass + " min-h-[80px] resize-y"} placeholder="Optional notes…" rows={3} />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClass}>Status</label>
-                    <input type="text" value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass} placeholder="e.g. Active" />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Slot timing</label>
-                    <input type="text" value={slotTiming} onChange={(e) => setSlotTiming(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
-                  </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Paid to</label>
-                  <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to (name)" />
-                </div>
-                <div>
-                  <label className={labelClass}>Feedback</label>
-                  <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className={inputClass + " min-h-[60px] resize-y"} placeholder="Optional feedback" rows={2} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" id="receipt-edit" checked={receipt} onChange={(e) => setReceipt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
-                  <label htmlFor="receipt-edit" className={labelClass + " mb-0 cursor-pointer"}>Receipt issued</label>
-                </div>
-              </>
-            ) : (
-              /* Add new entry: common Name + Number, then two columns — left GT, right PT (Plan, Duration, etc.) */
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-white/10">
-                  <div>
-                    <label className={labelClass}>Name</label>
-                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="Name (common)" required />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Number</label>
-                    <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} placeholder="Phone number (common)" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
-                  {/* Left column: GT — two fields per row */}
-                  <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
-                    <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">GT</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelClass}>Duration</label>
-                        <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Photo</label>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {image ? (
-                            <>
-                              <img src={image} alt="GT" className="w-12 h-12 rounded-lg object-cover border border-white/10" />
-                              <div className="flex flex-col gap-0.5">
-                                <label className="cursor-pointer px-2 py-1 rounded border border-white/20 text-stone-400 hover:bg-white/5 text-xs">Change<input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} /></label>
-                                <button type="button" onClick={clearImage} className="px-2 py-1 rounded border border-white/20 text-stone-500 hover:bg-white/5 text-xs text-left">Remove</button>
-                              </div>
-                            </>
-                          ) : (
-                            <label className="cursor-pointer px-2 py-2 rounded-lg border border-dashed border-white/20 text-stone-500 hover:border-brand-red/50 text-xs">Upload<input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} /></label>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <label className={labelClass}>Total fee (₹)</label>
-                        <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} className={inputClass} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Paid (₹)</label>
-                        <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} className={inputClass} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Balance</label>
-                        <input type="number" value={balance} readOnly className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Start date</label>
-                        <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="GT start date" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>End date</label>
-                        <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="GT end date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Pay date</label>
-                        <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="GT pay date" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Payment mode</label>
-                        <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass}>
-                          <option value="">— Select —</option>
-                          {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className={labelClass}>Status</label>
-                        <input type="text" value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass} placeholder="e.g. Active" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Slot timing</label>
-                        <input type="text" value={slotTiming} onChange={(e) => setSlotTiming(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Paid to</label>
-                        <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Remarks</label>
-                        <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Feedback</label>
-                        <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" id="receipt-gt" checked={receipt} onChange={(e) => setReceipt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
-                        <label htmlFor="receipt-gt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
-                      </div>
-                      <div className="col-span-2 pt-2 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDurationPt(duration);
-                            setTotalFeePt(totalFee);
-                            setPaidFeePt(paidFee);
-                            setBalancePt(balance);
-                            setStartDatePt(startDate);
-                            setEndDatePt(endDate);
-                            setPayDatePt(payDate);
-                            setPaymentModePt(paymentMode);
-                            setStatusPt(status);
-                            setSlotTimingPt(slotTiming);
-                            setPaidToPt(paidTo);
-                            setRemarksPt(remarks);
-                            setFeedbackPt(feedback);
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-medium transition ml-auto border border-white/10"
-                        >
-                          Copy to PT →
-                        </button>
-                      </div>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+                {/* Left column: GT — two fields per row */}
+                <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
+                  <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">GT</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass}>Duration</label>
+                      <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
                     </div>
-                  </div>
-                  {/* Right column: PT — two fields per row */}
-                  <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
-                    <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">PT</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelClass}>Duration</label>
-                        <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Trainer</label>
-                        <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass}>
-                          <option value="">— Select —</option>
-                          {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className={labelClass}>Photo</label>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {imagePt ? (
-                            <>
-                              <img src={imagePt} alt="PT" className="w-12 h-12 rounded-lg object-cover border border-white/10" />
-                              <div className="flex flex-col gap-0.5">
-                                <label className="cursor-pointer px-2 py-1 rounded border border-white/20 text-stone-400 hover:bg-white/5 text-xs">Change<input type="file" accept="image/*" className="sr-only" onChange={handleImageChangePt} /></label>
-                                <button type="button" onClick={clearImagePt} className="px-2 py-1 rounded border border-white/20 text-stone-500 hover:bg-white/5 text-xs text-left">Remove</button>
-                              </div>
-                            </>
-                          ) : (
-                            <label className="cursor-pointer px-2 py-2 rounded-lg border border-dashed border-white/20 text-stone-500 hover:border-brand-red/50 text-xs">Upload<input type="file" accept="image/*" className="sr-only" onChange={handleImageChangePt} /></label>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <label className={labelClass}>Total fee (₹)</label>
-                        <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} className={inputClass} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Paid (₹)</label>
-                        <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} className={inputClass} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Balance</label>
-                        <input type="number" value={balancePt} readOnly className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Start date</label>
-                        <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>End date</label>
-                        <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Pay date</label>
-                        <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Payment mode</label>
-                        <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass}>
-                          <option value="">— Select —</option>
-                          {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className={labelClass}>Status</label>
-                        <input type="text" value={statusPt} onChange={(e) => setStatusPt(e.target.value)} className={inputClass} placeholder="e.g. Active" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Slot timing</label>
-                        <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Paid to</label>
-                        <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Remarks</label>
-                        <textarea value={remarksPt} onChange={(e) => setRemarksPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Feedback</label>
-                        <textarea value={feedbackPt} onChange={(e) => setFeedbackPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" id="receipt-pt" checked={receiptPt} onChange={(e) => setReceiptPt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
-                        <label htmlFor="receipt-pt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
-                      </div>
+
+                    <div>
+                      <label className={labelClass}>Total fee (₹)</label>
+                      <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Paid (₹)</label>
+                      <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Balance</label>
+                      <input type="number" value={balance} readOnly onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Start date</label>
+                      <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="GT start date" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>End date</label>
+                      <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="GT end date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Pay date</label>
+                      <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="GT pay date" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Payment mode</label>
+                      <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass}>
+                        <option value="">— Select —</option>
+                        {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Paid to</label>
+                      <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Remarks</label>
+                      <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="receipt-gt" checked={receipt} onChange={(e) => setReceipt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
+                      <label htmlFor="receipt-gt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
+                    </div>
+                    <div className="col-span-2 pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDurationPt(duration);
+                          setTotalFeePt(totalFee);
+                          setPaidFeePt(paidFee);
+                          setBalancePt(balance);
+                          setStartDatePt(startDate);
+                          setEndDatePt(endDate);
+                          setPayDatePt(payDate);
+                          setPaymentModePt(paymentMode);
+                          setPaidToPt(paidTo);
+                          setRemarksPt(remarks);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-medium transition ml-auto border border-white/10"
+                      >
+                        Copy to PT →
+                      </button>
                     </div>
                   </div>
                 </div>
-              </>
-            )}
+                {/* Right column: PT — two fields per row */}
+                <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
+                  <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">PT</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass}>Duration</label>
+                      <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Trainer</label>
+                      <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass}>
+                        <option value="">— Select —</option>
+                        {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Total fee (₹)</label>
+                      <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Paid (₹)</label>
+                      <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Balance</label>
+                      <input type="number" value={balancePt} readOnly onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Start date</label>
+                      <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>End date</label>
+                      <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Pay date</label>
+                      <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Payment mode</label>
+                      <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass}>
+                        <option value="">— Select —</option>
+                        {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Slot timing</label>
+                      <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Paid to</label>
+                      <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Remarks</label>
+                      <textarea value={remarksPt} onChange={(e) => setRemarksPt(e.target.value)} className={inputClass + " min-h-[52px] resize-y text-sm"} placeholder="Optional" rows={1} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="receipt-pt" checked={receiptPt} onChange={(e) => setReceiptPt(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0" />
+                      <label htmlFor="receipt-pt" className={labelClass + " mb-0 cursor-pointer"}>Receipt</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -1078,6 +1007,48 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         </div>
       )}
 
+      {profileOpen && profileCustomer && (
+        <div className="liquid-glass p-6 rounded-2xl border border-white/10">
+          <h2 className="text-lg font-semibold text-stone-100 mb-4">
+            Edit Customer Profile
+          </h2>
+          <form onSubmit={handleSubmitProfile} className="space-y-4">
+            {error && (
+              <p className="text-brand-red text-sm bg-brand-red/10 px-3 py-2 rounded">
+                {error}
+              </p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Name</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} required />
+              </div>
+              <div>
+                <label className={labelClass}>Number</label>
+                <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} />
+              </div>
+
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm disabled:opacity-50"
+              >
+                {loading ? "Saving…" : "Update"}
+              </button>
+              <button
+                type="button"
+                onClick={closeProfileForm}
+                className="px-4 py-2.5 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Customer report modal – shared component */}
       {detailsCustomer && mounted && (
         <CustomerReportModal
@@ -1089,6 +1060,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           showActions
           onAddEntry={openAddEntryFromReport}
           onEditEntry={openEdit}
+          onDeleteEntry={handleDelete}
         />
       )}
 
@@ -1101,108 +1073,58 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           </div>
         ) : (
           <div className="flex flex-col">
-            {/* Top horizontal scrollbar – synced with table */}
-            <div
-              ref={topScrollRef}
-              className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
-              aria-hidden
-            >
-              <div className="min-w-[900px] h-2" />
-            </div>
-            <div
-              ref={tableScrollRef}
-              className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom"
-            >
-              <table className="w-full min-w-[900px] text-sm">
-                <thead
-                  ref={headerRef}
-                  className="select-none cursor-ew-resize"
-                  role="presentation"
-                >
+            <div className="overflow-x-auto overflow-y-visible scrollbar-theme">
+              <table className="w-full text-sm border-collapse">
+                <thead>
                   <tr className="border-b border-white/10 bg-white/[0.04]">
-                    <th className="sticky left-0 z-20 bg-stone-900 border-r border-white/10 text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider w-[72px] min-w-[72px] shadow-[4px_0_6px_-2px_rgba(0,0,0,0.3)]">Photo</th>
-                    <th className="sticky left-[72px] z-20 bg-stone-900 border-r border-white/10 text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider min-w-[160px] shadow-[4px_0_6px_-2px_rgba(0,0,0,0.3)]">Name</th>
-                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Plan</th>
-                    <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Total</th>
-                    <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Paid</th>
-                    <th className="text-right py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Balance</th>
-                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Mobile</th>
-                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Slot</th>
-                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Trainer</th>
-                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Pay date</th>
-                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider">Payment</th>
-                    <th className="text-left py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider max-w-[120px]">Remarks</th>
-                    <th className="text-center py-3 px-4 font-semibold text-stone-400 uppercase tracking-wider w-14">Actions</th>
+
+                    <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider h-[50px]">Name</th>
+                    <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider w-[200px] h-[50px]">Phone No</th>
+                    <th className="text-center py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider w-[100px] h-[50px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayCustomers.map((c, i) => {
-                    const trainer = c.trainer_id ? trainers.find((t) => t.id === c.trainer_id) : null;
                     return (
                       <tr
                         key={`${c.id}-${i}`}
                         className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors group"
                         onClick={() => setDetailsCustomer(c)}
                       >
-                        <td className="sticky left-0 z-20 w-[72px] min-w-[72px] py-2.5 px-4 bg-stone-900 border-r border-white/10 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.25)] group-hover:bg-stone-800">
-                          <img
-                            src={c.image ?? "/images/profile placeholder.jpg"}
-                            alt=""
-                            className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
-                          />
+
+                        <td className="py-3 px-6">
+                          <span className="text-stone-100 font-semibold text-base">{c.name}</span>
                         </td>
-                        <td className="sticky left-[72px] z-20 min-w-[160px] py-2.5 px-4 bg-stone-900 border-r border-white/10 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.25)] group-hover:bg-stone-800">
-                          <span className="text-stone-100 font-medium">{c.name}</span>
-                          {c.duration && (
-                            <span className="block text-stone-500 text-xs">{c.duration}</span>
-                          )}
+
+                        <td className="py-3 px-6 text-stone-300 font-medium">
+                          {c.mobile ?? "—"}
                         </td>
-                        <td className="py-2.5 px-4 text-stone-300">{c.plan}</td>
-                        <td className="py-2.5 px-4 text-right text-stone-300 tabular-nums">{formatCurrency(c.total_fee)}</td>
-                        <td className="py-2.5 px-4 text-right text-stone-300 tabular-nums">{formatCurrency(c.paid_fee)}</td>
-                        <td className="py-2.5 px-4 text-right tabular-nums">
-                          <span className={c.balance !== 0 ? "text-amber-400 font-medium" : "text-stone-300"}>
-                            {formatCurrency(c.balance)}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4 text-stone-300 max-w-[100px] truncate" title={c.mobile ?? undefined}>{c.mobile ?? "—"}</td>
-                        <td className="py-2.5 px-4 text-stone-300 max-w-[80px] truncate" title={c.status ?? undefined}>{c.status ?? "—"}</td>
-                        <td className="py-2.5 px-4 text-stone-300 max-w-[80px] truncate" title={c.slot_timing ?? undefined}>{c.slot_timing ?? "—"}</td>
-                        <td className="py-2.5 px-4 text-stone-300 max-w-[100px] truncate" title={c.plan === "PT" ? (trainer?.name ?? undefined) : undefined}>
-                          {c.plan === "PT" ? (trainer?.name ?? "—") : "—"}
-                        </td>
-                        <td className="py-2.5 px-4 text-stone-300 whitespace-nowrap">{c.pay_date ?? "—"}</td>
-                        <td className="py-2.5 px-4 text-stone-300 max-w-[90px] truncate" title={c.payment_mode ?? undefined}>{c.payment_mode ?? "—"}</td>
-                        <td className="py-2.5 px-4 text-stone-300 max-w-[120px] truncate" title={c.remarks ?? undefined}>{c.remarks ?? "—"}</td>
-                        <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3 px-6 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="relative inline-block">
                             <button
                               type="button"
                               onClick={() => setOpenActionRowId(openActionRowId === c.id ? null : c.id)}
-                              className="p-1.5 rounded-lg border border-white/10 text-stone-400 hover:text-stone-100 hover:bg-white/5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                              aria-expanded={openActionRowId === c.id}
-                              aria-label="Actions"
+                              className="p-2 rounded-xl border border-white/10 text-stone-400 hover:text-stone-100 hover:bg-white/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
                             >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
                               </svg>
                             </button>
                             {openActionRowId === c.id && (
                               <>
                                 <div className="fixed inset-0 z-10" aria-hidden onClick={() => setOpenActionRowId(null)} />
-                                <div className="absolute right-0 top-full mt-1 z-20 min-w-[160px] py-1 rounded-xl border border-white/10 bg-stone-900/95 backdrop-blur-xl shadow-xl">
+                                <div className="absolute right-0 top-full mt-2 z-20 min-w-[160px] py-2 rounded-2xl border border-white/10 bg-stone-900 shadow-2xl animate-in fade-in zoom-in duration-200">
                                   <button
                                     type="button"
-                                    onClick={() => { openEdit(c); setOpenActionRowId(null); }}
-                                    className="w-full text-left px-3 py-2 text-sm text-stone-100 hover:bg-brand-red/20 hover:text-brand-red"
+                                    onClick={() => { openProfileEdit(c); setOpenActionRowId(null); }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-stone-100 hover:bg-white/5"
                                   >
-                                    Edit
+                                    Edit Profile
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => { setOpenActionRowId(null); handleDelete(c); }}
-                                    className="w-full text-left px-3 py-2 text-sm text-stone-400 hover:bg-red-500/20 hover:text-red-400"
+                                    className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10"
                                   >
                                     Delete
                                   </button>

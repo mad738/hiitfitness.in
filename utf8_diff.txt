@@ -1,0 +1,130 @@
+﻿diff --git a/src/features/admin/DashboardContent.tsx b/src/features/admin/DashboardContent.tsx
+index ece45d7..d3e5b87 100644
+--- a/src/features/admin/DashboardContent.tsx
++++ b/src/features/admin/DashboardContent.tsx
+@@ -473,10 +473,10 @@ export function DashboardContent({
+           const fromChart = chartClickedPeriod !== null;
+           const label = fromChart
+             ? (chartClickedPeriod!.type === "daily"
+-                ? dailyChartData[chartClickedPeriod!.index]?.label
+-                : chartClickedPeriod!.type === "weekly"
+-                  ? weeklyChartData[chartClickedPeriod!.index]?.label
+-                  : monthlyChartData[chartClickedPeriod!.index]?.label) ?? "Period"
++              ? dailyChartData[chartClickedPeriod!.index]?.label
++              : chartClickedPeriod!.type === "weekly"
++                ? weeklyChartData[chartClickedPeriod!.index]?.label
++                : monthlyChartData[chartClickedPeriod!.index]?.label) ?? "Period"
+             : analyticsPanel === "daily"
+               ? "Today"
+               : analyticsPanel === "weekly"
+@@ -484,10 +484,10 @@ export function DashboardContent({
+                 : "Last month (6thΓÇô5th)";
+           const list = fromChart
+             ? (chartClickedPeriod!.type === "daily"
+-                ? dailyCustomersByBar[chartClickedPeriod!.index]
+-                : chartClickedPeriod!.type === "weekly"
+-                  ? weeklyCustomersByBar[chartClickedPeriod!.index]
+-                  : monthlyCustomersByBar[chartClickedPeriod!.index]) ?? []
++              ? dailyCustomersByBar[chartClickedPeriod!.index]
++              : chartClickedPeriod!.type === "weekly"
++                ? weeklyCustomersByBar[chartClickedPeriod!.index]
++                : monthlyCustomersByBar[chartClickedPeriod!.index]) ?? []
+             : analyticsPanel === "daily"
+               ? dailyCustomers
+               : analyticsPanel === "weekly"
+@@ -521,11 +521,7 @@ export function DashboardContent({
+                       onClick={() => setReportCustomer(customer)}
+                       className="flex items-center gap-3 p-3 rounded-xl border border-white/10 text-left hover:bg-white/5 hover:border-brand-red/30 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-stone-900"
+                     >
+-                      <img
+-                        src={customer.image ?? "/images/profile placeholder.jpg"}
+-                        alt=""
+-                        className="w-12 h-12 rounded-full object-cover border border-white/10 shrink-0"
+-                      />
++
+                       <div className="min-w-0 flex-1">
+                         <p className="font-medium text-stone-100 truncate">{customer.name}</p>
+                         <p className="text-stone-500 text-xs truncate">{customer.mobile ?? "ΓÇö"}</p>
+@@ -659,7 +655,7 @@ export function DashboardContent({
+   );
+ }
+ 
+-const PROFILE_PLACEHOLDER = "/images/profile placeholder.jpg";
++
+ 
+ function ClientDetailsModal({
+   trainerName,
+@@ -707,8 +703,7 @@ function ClientDetailsModal({
+     [entries]
+   );
+ 
+-  const entryImage = (row: Customer | Tracker) =>
+-    isCustomer(row) ? (row.image ?? PROFILE_PLACEHOLDER) : PROFILE_PLACEHOLDER;
++
+ 
+   const trainerById = useMemo(
+     () => new Map(trainers.map((t) => [t.id, t])),
+@@ -760,11 +755,7 @@ function ClientDetailsModal({
+           {showCustomerReport ? (
+             <div className="overflow-y-auto flex-1 min-h-0 space-y-4 scrollbar-theme">
+               <div className="flex gap-4 flex-wrap">
+-                <img
+-                  src={(selectedEntry as Customer).image ?? PROFILE_PLACEHOLDER}
+-                  alt=""
+-                  className="w-20 h-20 rounded-xl object-cover border border-white/10 shrink-0"
+-                />
++
+                 <div className="min-w-0">
+                   <p className="text-xl font-bold text-stone-100">{(selectedEntry as Customer).name}</p>
+                   <p className="text-stone-400 text-sm">{(selectedEntry as Customer).mobile ?? "ΓÇö"}</p>
+@@ -870,7 +861,7 @@ function ClientDetailsModal({
+                 <table className="w-full text-sm border-collapse min-w-[700px]">
+                   <thead ref={headerRef} className="select-none cursor-ew-resize">
+                     <tr className="border-b border-white/20">
+-                      <th className="text-left py-2 px-2 text-stone-400 font-medium w-14">Photo</th>
++
+                       <th className="text-left py-2 px-2 text-stone-400 font-medium">Name</th>
+                       <th className="text-left py-2 px-2 text-stone-400 font-medium">Plan</th>
+                       <th className="text-left py-2 px-2 text-stone-400 font-medium">Start</th>
+@@ -916,13 +907,7 @@ function ClientDetailsModal({
+                           className={`border-b border-white/5 hover:bg-white/10 cursor-pointer transition-colors ${contributesToCommission ? "bg-emerald-950/40 ring-1 ring-inset ring-emerald-500/30" : ""}`}
+                           title={contributesToCommission ? "Contributes to this monthΓÇÖs commission" : undefined}
+                         >
+-                          <td className="py-2 px-2 align-middle">
+-                            <img
+-                              src={entryImage(row)}
+-                              alt=""
+-                              className="w-10 h-10 rounded-full object-cover border border-white/10"
+-                            />
+-                          </td>
++
+                           <td className="py-2 px-2 text-stone-200">
+                             <span className="inline-flex items-center gap-1.5">
+                               {name}
+@@ -987,10 +972,7 @@ function ClientDetailPanel({
+   const name = isCustomerEntry
+     ? (entry as Customer).name
+     : (entry as Tracker).client_name ?? (entry as Tracker).client_id ?? "ΓÇö";
+-  const image =
+-    isCustomerEntry
+-      ? (entry as Customer).image ?? PROFILE_PLACEHOLDER
+-      : PROFILE_PLACEHOLDER;
++
+ 
+   const rows: { label: string; value: string }[] = [];
+   if (isCustomerEntry) {
+@@ -1046,13 +1028,7 @@ function ClientDetailPanel({
+         ΓåÉ Back to list
+       </button>
+       <div className="flex gap-6 flex-wrap">
+-        <div className="shrink-0">
+-          <img
+-            src={image}
+-            alt=""
+-            className="w-24 h-24 rounded-full object-cover border-2 border-white/20"
+-          />
+-        </div>
++
+         <div className="min-w-0 flex-1">
+           <h3 className="text-lg font-semibold text-stone-100 mb-4">{name}</h3>
+           <dl className="grid gap-2 sm:grid-cols-2">

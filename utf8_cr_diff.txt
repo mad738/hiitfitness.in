@@ -1,0 +1,91 @@
+﻿diff --git a/src/features/admin/CustomerReportModal.tsx b/src/features/admin/CustomerReportModal.tsx
+index 46c573b..93a877c 100644
+--- a/src/features/admin/CustomerReportModal.tsx
++++ b/src/features/admin/CustomerReportModal.tsx
+@@ -33,6 +33,8 @@ type Props = {
+   onAddEntry?: (customer: Customer) => void;
+   /** When provided, "Edit current entry" calls this instead of linking to customers. */
+   onEditEntry?: (customer: Customer) => void;
++  /** When provided, "Delete" calls this. */
++  onDeleteEntry?: (customer: Customer) => void;
+ };
+ 
+ export function CustomerReportModal({
+@@ -44,6 +46,7 @@ export function CustomerReportModal({
+   showActions = true,
+   onAddEntry,
+   onEditEntry,
++  onDeleteEntry,
+ }: Props) {
+   const mobileKey = normalizeMobile(customer.mobile);
+   const nameKey = (customer.name ?? "").trim();
+@@ -105,11 +108,7 @@ export function CustomerReportModal({
+         </div>
+         <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-6">
+           <div className="flex gap-4 flex-wrap">
+-            <img
+-              src={customer.image ?? "/images/profile placeholder.jpg"}
+-              alt=""
+-              className="w-20 h-20 rounded-xl object-cover border border-white/10 shrink-0"
+-            />
++
+             <div className="min-w-0">
+               <p className="text-xl font-bold text-stone-100">{customer.name}</p>
+               <p className="text-stone-400 text-sm">{customer.mobile ?? "ΓÇö"}</p>
+@@ -156,6 +155,7 @@ export function CustomerReportModal({
+                       <th className="text-left py-2.5 px-3 font-medium text-stone-400">Slot</th>
+                       <th className="text-left py-2.5 px-3 font-medium text-stone-400 max-w-[120px]">Remarks</th>
+                       <th className="text-center py-2.5 px-3 font-medium text-stone-400">Receipt</th>
++                      {showActions && <th className="text-center py-2.5 px-3 font-medium text-stone-400">Actions</th>}
+                     </tr>
+                   </thead>
+                   <tbody>
+@@ -182,7 +182,11 @@ export function CustomerReportModal({
+                           <td className="py-2 px-3 text-stone-300">{entry.duration ?? "ΓÇö"}</td>
+                           <td className="py-2 px-3 text-right text-stone-300 tabular-nums">{formatCurrency(entry.total_fee)}</td>
+                           <td className="py-2 px-3 text-right text-stone-300 tabular-nums">{formatCurrency(entry.paid_fee)}</td>
+-                          <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(entry.balance)}</td>
++                          <td className="py-2 px-3 text-right tabular-nums">
++                            <span className={entry.balance !== 0 ? "text-amber-400 font-bold bg-amber-400/10 px-2 py-0.5 rounded" : "text-stone-300"}>
++                              {formatCurrency(entry.balance)}
++                            </span>
++                          </td>
+                           <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.pay_date)}</td>
+                           <td className="py-2 px-3 text-stone-300">{entry.payment_mode ?? "ΓÇö"}</td>
+                           <td className="py-2 px-3 text-stone-300">{entry.plan === "PT" ? (trainer?.name ?? "ΓÇö") : "ΓÇö"}</td>
+@@ -190,10 +194,35 @@ export function CustomerReportModal({
+                           <td className="py-2 px-3 text-stone-300">{entry.slot_timing ?? "ΓÇö"}</td>
+                           <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "ΓÇö"}</td>
+                           <td className="py-2 px-3 text-center text-stone-300">{entry.receipt ? "Yes" : "ΓÇö"}</td>
++                          {showActions && (
++                            <td className="py-2 px-3 text-center whitespace-nowrap">
++                              <button
++                                type="button"
++                                onClick={() => { onEditEntry?.(entry); onClose(); }}
++                                className="p-1 rounded text-stone-500 hover:text-brand-red hover:bg-brand-red/10 transition mr-2"
++                                title="Edit this entry"
++                              >
++                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
++                                </svg>
++                              </button>
++                              <button
++                                type="button"
++                                onClick={() => onDeleteEntry?.(entry)}
++                                className="p-1 rounded text-stone-500 hover:text-red-500 hover:bg-red-500/10 transition"
++                                title="Delete this entry"
++                              >
++                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
++                                </svg>
++                              </button>
++                            </td>
++                          )}
+                         </tr>
+                       );
+                     })}
+                   </tbody>
++
+                 </table>
+               </div>
+             </div>

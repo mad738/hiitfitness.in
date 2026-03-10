@@ -68,16 +68,7 @@ export function TrainersView({ initialTrainers }: Props) {
     setError(null);
   }
 
-  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const data = await readFileAsBase64(file);
-    if (data) setImage(data);
-  }
 
-  function clearImage() {
-    setImage(null);
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -101,13 +92,13 @@ export function TrainersView({ initialTrainers }: Props) {
             prev.map((t) =>
               t.id === editing.id
                 ? {
-                    ...t,
-                    name: trimmedName,
-                    image: image ?? t.image,
-                    phone_number: phoneNumber.trim() || null,
-                    address: address.trim() || null,
-                    updated_at: new Date().toISOString(),
-                  }
+                  ...t,
+                  name: trimmedName,
+                  image: image ?? t.image,
+                  phone_number: phoneNumber.trim() || null,
+                  address: address.trim() || null,
+                  updated_at: new Date().toISOString(),
+                }
                 : t
             )
           );
@@ -182,48 +173,7 @@ export function TrainersView({ initialTrainers }: Props) {
                 required
               />
             </div>
-            <div>
-              <label className={labelClass}>Photo</label>
-              <div className="flex items-center gap-4 flex-wrap">
-                {image ? (
-                  <>
-                    <img
-                      src={image}
-                      alt="Preview"
-                      className="w-20 h-20 rounded-xl object-cover border border-white/10"
-                    />
-                    <div className="flex gap-2">
-                      <label className="cursor-pointer px-3 py-2 rounded-lg border border-white/20 text-stone-300 hover:bg-white/5 text-sm">
-                        Change
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={handleImageChange}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={clearImage}
-                        className="px-3 py-2 rounded-lg border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <label className="cursor-pointer px-4 py-2.5 rounded-xl border border-dashed border-white/20 text-stone-400 hover:border-brand-red/50 hover:text-brand-red text-sm transition">
-                    Upload image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleImageChange}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
+
             <div>
               <label className={labelClass}>Phone number</label>
               <input
@@ -295,11 +245,6 @@ export function TrainersView({ initialTrainers }: Props) {
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex gap-4">
-                  <img
-                    src={detailsTrainer.image ?? "/images/profile placeholder.jpg"}
-                    alt=""
-                    className="w-24 h-24 rounded-xl object-cover border border-white/10 shrink-0"
-                  />
                   <div className="min-w-0">
                     <p className="text-2xl font-bold text-stone-100">{detailsTrainer.name}</p>
                   </div>
@@ -351,7 +296,7 @@ export function TrainersView({ initialTrainers }: Props) {
               <table className="w-full text-sm text-left border-collapse min-w-[700px]">
                 <thead ref={headerRef} className="select-none cursor-ew-resize">
                   <tr className="border-b border-white/10 bg-white/[0.04]">
-                    <th className="py-3 px-4 text-stone-400 font-medium w-14">Photo</th>
+
                     <th className="py-3 px-4 text-stone-400 font-medium">Name</th>
                     <th className="py-3 px-4 text-stone-400 font-medium">Phone</th>
                     <th className="py-3 px-4 text-stone-400 font-medium">Address</th>
@@ -365,13 +310,7 @@ export function TrainersView({ initialTrainers }: Props) {
                       className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer"
                       onClick={() => setDetailsTrainer(t)}
                     >
-                      <td className="py-2.5 px-4">
-                        <img
-                          src={t.image ?? "/images/profile placeholder.jpg"}
-                          alt=""
-                          className="w-10 h-10 rounded-lg object-cover border border-white/10"
-                        />
-                      </td>
+
                       <td className="py-2.5 px-4 text-stone-100 font-medium">{t.name}</td>
                       <td className="py-2.5 px-4 text-stone-300">{t.phone_number ?? "—"}</td>
                       <td className="py-2.5 px-4 text-stone-300 max-w-[200px] truncate">
