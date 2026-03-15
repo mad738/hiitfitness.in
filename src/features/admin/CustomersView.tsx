@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
+/* eslint-disable -- admin images are base64/dynamic */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -71,7 +71,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [totalFee, setTotalFee] = useState<number>(0);
   const [paidFee, setPaidFee] = useState<number>(0);
   const [balance, setBalance] = useState<number>(0);
-  const [trainerId, setTrainerId] = useState<string | null>(null);
+  const [, setTrainerId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [payDate, setPayDate] = useState("");
@@ -85,9 +85,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [feedback, setFeedback] = useState("");
   const [receipt, setReceipt] = useState(false);
   // PT (right column) – same fields, individual per column when adding new entry
-  const [namePt, setNamePt] = useState("");
+  const [, setNamePt] = useState("");
   const [imagePt, setImagePt] = useState<string | null>(null);
-  const [planPt, setPlanPt] = useState<string>("PT");
+  const [, setPlanPt] = useState<string>("PT");
   const [totalFeePt, setTotalFeePt] = useState<number>(0);
   const [paidFeePt, setPaidFeePt] = useState<number>(0);
   const [balancePt, setBalancePt] = useState<number>(0);
@@ -100,7 +100,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [durationPt, setDurationPt] = useState("");
   const [statusPt, setStatusPt] = useState("");
   const [slotTimingPt, setSlotTimingPt] = useState("");
-  const [mobilePt, setMobilePt] = useState("");
+  const [, setMobilePt] = useState("");
   const [paidToPt, setPaidToPt] = useState("");
   const [feedbackPt, setFeedbackPt] = useState("");
   const [receiptPt, setReceiptPt] = useState(false);
@@ -121,7 +121,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
-  const { tableScrollRef, topScrollRef, headerRef } = useHorizontalScrollTable(
+  useHorizontalScrollTable(
     [customers.length],
     { wheelOnBody: true }
   );
@@ -413,26 +413,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setError(null);
   }
 
-  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const data = await readFileAsBase64(file);
-    if (data) setImage(data);
-  }
 
-  function clearImage() {
-    setImage(null);
-  }
-
-  async function handleImageChangePt(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const data = await readFileAsBase64(file);
-    if (data) setImagePt(data);
-  }
-  function clearImagePt() {
-    setImagePt(null);
-  }
 
   function buildPayload(opts: {
     name: string;
@@ -786,7 +767,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                       <button
                         type="button"
                         onClick={applyFilters}
-                        className="px-4 py-2.5 rounded-xl bg-brand-red hover:bg-red-600 text-white font-semibold text-sm transition"
+                        className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm transition"
                       >
                         Apply (new tab)
                       </button>
@@ -1124,7 +1105,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                                   <button
                                     type="button"
                                     onClick={() => { setOpenActionRowId(null); handleDelete(c); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10"
+                                    className="w-full text-left px-4 py-2.5 text-sm text-brand-red hover:bg-brand-red/10"
                                   >
                                     Delete
                                   </button>

@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 :root {
-  /* Palette: black #000000 + red #ff0000 */
+  /* Palette: black #000000 + red #EE2A24 */
   --brand-black: #000000;
-  --brand-red: #ff0000;
+  --brand-red: #EE2A24;
   --bg: 0 0 0;
   --panel: 0 0 0;
   --text: 245 245 244; /* stone-100 / white-ish */
   --muted: 168 162 158; /* stone-400-ish */
-  --accent: 0 100% 50%; /* #ff0000 in HSL */
-  --accent-2: 0 100% 40%;
-  --accent-light: 0 100% 50%;
+  --accent: 2 86% 54%; /* #EE2A24 in HSL */
+  --accent-2: 2 86% 44%;
+  --accent-light: 2 86% 64%;
 
   /* Header: compact on mobile, taller on desktop */
   --header-height: 3.5rem; /* 56px mobile */
@@ -122,16 +122,16 @@ body {
     0% {
       opacity: 0.9;
       transform: scale(1);
-      box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.5);
+      box-shadow: 0 0 0 0 rgba(238, 42, 36, 0.5);
     }
     50% {
       opacity: 1;
-      box-shadow: 0 0 0 6px rgba(255, 0, 0, 0.25), 0 0 12px 2px rgba(255, 0, 0, 0.35);
+      box-shadow: 0 0 0 6px rgba(238, 42, 36, 0.25), 0 0 12px 2px rgba(238, 42, 36, 0.35);
     }
     100% {
       opacity: 0;
       transform: scale(1.4);
-      box-shadow: 0 0 0 10px rgba(255, 0, 0, 0);
+      box-shadow: 0 0 0 10px rgba(238, 42, 36, 0);
     }
   }
   .animate-end-lap-boom {
@@ -142,22 +142,22 @@ body {
   @keyframes lap-boom-fullscreen {
     0% {
       opacity: 0;
-      background-color: rgba(255, 0, 0, 0);
+      background-color: rgba(238, 42, 36, 0);
     }
     20% {
       opacity: 1;
-      background-color: rgba(255, 0, 0, 0.2);
+      background-color: rgba(238, 42, 36, 0.2);
     }
     50% {
-      background-color: rgba(255, 0, 0, 0.15);
+      background-color: rgba(238, 42, 36, 0.15);
     }
     100% {
       opacity: 0;
-      background-color: rgba(255, 0, 0, 0);
+      background-color: rgba(238, 42, 36, 0);
     }
   }
   .animate-lap-boom-fullscreen {
-    background-color: rgba(255, 0, 0, 0.18);
+    background-color: rgba(238, 42, 36, 0.18);
     animation: lap-boom-fullscreen 1s ease-out forwards;
   }
 
@@ -166,11 +166,11 @@ body {
     .mobile-in-view-hover.mobile-in-view-hover-visible > * {
       transform: scale(1.04);
       border-width: 2px;
-      border-color: rgba(255, 0, 0, 0.75);
+      border-color: rgba(238, 42, 36, 0.75);
       box-shadow:
-        0 0 0 2px rgba(255, 0, 0, 0.4),
-        0 0 24px rgba(255, 0, 0, 0.4),
-        0 0 48px rgba(255, 0, 0, 0.25),
+        0 0 0 2px rgba(238, 42, 36, 0.4),
+        0 0 24px rgba(238, 42, 36, 0.4),
+        0 0 48px rgba(238, 42, 36, 0.25),
         0 16px 48px rgba(0, 0, 0, 0.45);
       transition: transform 0.35s ease-out, border-color 0.35s ease-out, box-shadow 0.35s ease-out;
     }

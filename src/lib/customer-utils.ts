@@ -23,17 +23,34 @@ export function dedupeByMobile<
     }
     const rowStart = row.start_date ?? row.created_at ?? "";
     const existingStart = existing.start_date ?? existing.created_at ?? "";
-    if (rowStart > existingStart) byMobile.set(key, row);
+    
+    const rowStartMs = parseDateToMs(rowStart);
+    const existingStartMs = parseDateToMs(existingStart);
+
+    if (rowStartMs > existingStartMs) byMobile.set(key, row);
   }
   return Array.from(byMobile.values());
+}
+
+function parseDateToMs(dStr: string): number {
+  if (!dStr) return 0;
+  if (dStr.includes("/")) {
+    const [d, m, y] = dStr.split("/").map(Number);
+    return new Date(y, m - 1, d).getTime();
+  }
+  return new Date(dStr).getTime() || 0;
 }
 
 /** True if today is within [start, end] (inclusive). */
 export function isPlanCurrentlyRunning(startDate: string | null, endDate: string | null): boolean {
   if (!startDate || !endDate) return false;
   try {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const startMs = parseDateToMs(startDate);
+    const endMs = parseDateToMs(endDate);
+    if (!startMs || !endMs) return false;
+
+    const start = new Date(startMs);
+    const end = new Date(endMs);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     start.setHours(0, 0, 0, 0);

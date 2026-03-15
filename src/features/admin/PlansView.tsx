@@ -93,7 +93,7 @@ export function PlansView(props: PlansViewProps) {
         <button
           type="button"
           onClick={openAdd}
-          className="px-4 py-2.5 rounded-xl bg-brand-red hover:bg-red-600 text-white font-semibold text-sm transition"
+          className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm transition"
         >
           Add plan
         </button>
@@ -103,7 +103,7 @@ export function PlansView(props: PlansViewProps) {
         <div className="liquid-glass p-6 rounded-2xl border border-white/10">
           <h2 className="text-lg font-semibold text-stone-100 mb-4">{formPlan ? "Edit plan" : "New plan"}</h2>
           {error && (
-            <p className="text-red-400 text-sm mb-4 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+            <p className="text-brand-red text-sm mb-4 bg-brand-red/10 px-3 py-2 rounded-lg">{error}</p>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -181,7 +181,7 @@ export function PlansView(props: PlansViewProps) {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2.5 rounded-xl bg-brand-red hover:bg-red-600 text-white font-semibold text-sm transition disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm transition disabled:opacity-50"
               >
                 {loading ? "Saving…" : formPlan ? "Update plan" : "Add plan"}
               </button>

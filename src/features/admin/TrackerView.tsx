@@ -259,7 +259,7 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
                       <button
                         type="button"
                         onClick={applyFilters}
-                        className="px-4 py-2.5 rounded-xl bg-brand-red hover:bg-red-600 text-white font-semibold text-sm transition shadow-md"
+                        className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm transition shadow-md"
                       >
                         Apply (new tab)
                       </button>
@@ -389,7 +389,7 @@ export function TrackerView({ initialList, initialFilters = {}, initialPlans = [
                     <button
                       type="button"
                       onClick={() => handleDelete(row.id)}
-                      className="text-stone-400 hover:text-red-400 hover:underline"
+                      className="text-stone-400 hover:text-brand-red hover:underline"
                     >
                       Delete
                     </button>

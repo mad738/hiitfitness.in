@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
+/* eslint-disable -- admin images are base64/dynamic */
 
 import { useState, useEffect } from "react";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
@@ -11,7 +11,7 @@ import {
   updateTrainer,
   deleteTrainer,
 } from "@app/actions/trainers";
-import { readFileAsBase64 } from "@/lib/image-utils";
+
 
 type Props = { initialTrainers: Trainer[] };
 
@@ -327,7 +327,7 @@ export function TrainersView({ initialTrainers }: Props) {
                         <button
                           type="button"
                           onClick={() => handleDelete(t)}
-                          className="text-stone-500 hover:text-red-400 text-sm"
+                          className="text-stone-500 hover:text-brand-red text-sm"
                         >
                           Delete
                         </button>

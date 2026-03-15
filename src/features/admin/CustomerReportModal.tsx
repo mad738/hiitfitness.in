@@ -11,7 +11,13 @@ import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 function formatDateShort(s: string | null): string {
   if (!s) return "—";
   try {
-    return new Date(s).toLocaleDateString("en-IN", {
+    let d = new Date(s);
+    if (s.includes("/")) {
+      const [day, month, year] = s.split("/").map(Number);
+      d = new Date(year, month - 1, day);
+    }
+    if (isNaN(d.getTime())) return s;
+    return d.toLocaleDateString("en-IN", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -19,6 +25,15 @@ function formatDateShort(s: string | null): string {
   } catch {
     return s;
   }
+}
+
+function parseDateToMs(dStr: string | null | undefined): number {
+  if (!dStr) return 0;
+  if (dStr.includes("/")) {
+    const [d, m, y] = dStr.split("/").map(Number);
+    return new Date(y, m - 1, d).getTime();
+  }
+  return new Date(dStr).getTime() || 0;
 }
 
 type Props = {
@@ -58,9 +73,9 @@ export function CustomerReportModal({
           return (c.name ?? "").trim() === nameKey;
         })
         .sort((a, b) => {
-          const aStart = a.start_date ?? a.created_at ?? "";
-          const bStart = b.start_date ?? b.created_at ?? "";
-          return bStart.localeCompare(aStart);
+          const aStartMs = parseDateToMs(a.start_date ?? a.created_at);
+          const bStartMs = parseDateToMs(b.start_date ?? b.created_at);
+          return bStartMs - aStartMs;
         }),
     [customers, mobileKey, nameKey]
   );
@@ -209,7 +224,7 @@ export function CustomerReportModal({
                               <button
                                 type="button"
                                 onClick={() => onDeleteEntry?.(entry)}
-                                className="p-1 rounded text-stone-500 hover:text-red-500 hover:bg-red-500/10 transition"
+                                className="p-1 rounded text-stone-500 hover:text-brand-red hover:bg-brand-red/10 transition"
                                 title="Delete this entry"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

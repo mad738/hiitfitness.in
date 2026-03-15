@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- admin images are base64/dynamic */
+/* eslint-disable -- admin images are base64/dynamic */
 
 import Link from "next/link";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -35,13 +35,21 @@ function formatDate(s: string | null): string {
   }
 }
 
-/** Date string YYYY-MM-DD for start of day (for comparisons) */
-function toDateOnly(isoOrDate: string): string {
-  const d = new Date(isoOrDate);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+
+
+function parseDashboardDate(dStr: string | null | undefined): Date | null {
+  if (!dStr) return null;
+  if (dStr.includes("/")) {
+    const [d, m, y] = dStr.split("/").map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0);
+  }
+  const dt = new Date(dStr + "T12:00:00");
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+function parseDashboardDateMs(dStr: string | null | undefined): number {
+  const d = parseDashboardDate(dStr);
+  return d ? d.getTime() : 0;
 }
 
 function isCustomer(e: Customer | Tracker): e is Customer {
@@ -49,12 +57,12 @@ function isCustomer(e: Customer | Tracker): e is Customer {
 }
 
 /** Sort key for "recent first": start_date > end_date > created_at */
-function getSortDate(e: Customer | Tracker): string {
+function getSortDateMs(e: Customer | Tracker): number {
   const created =
     "created_at" in e && typeof (e as { created_at: string }).created_at === "string"
       ? (e as { created_at: string }).created_at
       : "";
-  return e.start_date ?? e.end_date ?? created ?? "";
+  return parseDashboardDateMs(e.start_date) || parseDashboardDateMs(e.end_date) || parseDashboardDateMs(created) || 0;
 }
 
 export type TrainerReport = {
@@ -129,7 +137,7 @@ function getCustomersInPeriod(
   periodEnd: Date
 ): CustomerWithAmount[] {
   const inPeriod = customers.filter((c) => {
-    const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+    const pd = parseDashboardDate(c.pay_date);
     return pd && pd >= periodStart && pd <= periodEnd;
   });
   const byMobile = new Map<string, { customer: Customer; total: number }>();
@@ -141,8 +149,8 @@ function getCustomersInPeriod(
       byMobile.set(key, { customer: c, total: fee });
     } else {
       existing.total += fee;
-      const cStart = c.start_date ?? c.created_at ?? "";
-      const exStart = existing.customer.start_date ?? existing.customer.created_at ?? "";
+      const cStart = parseDashboardDateMs(c.start_date ?? c.created_at);
+      const exStart = parseDashboardDateMs(existing.customer.start_date ?? existing.customer.created_at);
       if (cStart > exStart) existing.customer = c;
     }
   }
@@ -208,7 +216,7 @@ export function DashboardContent({
     // Daily summary = today only (for chip)
     const dailyTotal = customers
       .filter((c) => {
-        const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+        const pd = parseDashboardDate(c.pay_date);
         return pd && pd >= todayStart && pd <= todayEnd;
       })
       .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
@@ -224,7 +232,7 @@ export function DashboardContent({
       const label = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
       const revenue = customers
         .filter((c) => {
-          const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+          const pd = parseDashboardDate(c.pay_date);
           return pd && pd >= d && pd <= dayEnd;
         })
         .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
@@ -241,7 +249,7 @@ export function DashboardContent({
     lastCompleteWeekEnd.setHours(23, 59, 59, 999);
     const weeklyTotal = customers
       .filter((c) => {
-        const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+        const pd = parseDashboardDate(c.pay_date);
         return pd && pd >= lastCompleteWeekStart && pd <= lastCompleteWeekEnd;
       })
       .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
@@ -257,7 +265,7 @@ export function DashboardContent({
       const label = `${weekCurr.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}`;
       const revenue = customers
         .filter((c) => {
-          const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+          const pd = parseDashboardDate(c.pay_date);
           return pd && pd >= weekCurr && pd <= weekEnd;
         })
         .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
@@ -270,7 +278,7 @@ export function DashboardContent({
     const lastCompleteMonthEnd = new Date(now.getFullYear(), now.getMonth(), 5, 23, 59, 59, 999);
     const monthlyTotal = customers
       .filter((c) => {
-        const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+        const pd = parseDashboardDate(c.pay_date);
         return pd && pd >= lastCompleteMonthStart && pd <= lastCompleteMonthEnd;
       })
       .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
@@ -283,7 +291,7 @@ export function DashboardContent({
       const label = `6 ${monthStart.toLocaleDateString("en-IN", { month: "short" })} – 5 ${monthEnd.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}`;
       const revenue = customers
         .filter((c) => {
-          const pd = c.pay_date ? new Date(c.pay_date + "T12:00:00") : null;
+          const pd = parseDashboardDate(c.pay_date);
           return pd && pd >= monthStart && pd <= monthEnd;
         })
         .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
@@ -311,12 +319,12 @@ export function DashboardContent({
       for (const c of entries) {
         const name = c.name ?? "";
         const existing = byName.get(name);
-        const cStart = c.start_date ?? "";
-        const existingStart = existing?.start_date ?? "";
+        const cStart = parseDashboardDateMs(c.start_date);
+        const existingStart = parseDashboardDateMs(existing?.start_date);
         if (!existing || cStart > existingStart) byName.set(name, c);
       }
       return Array.from(byName.values()).sort((a, b) =>
-        (getSortDate(b) ?? "").localeCompare(getSortDate(a) ?? "")
+        getSortDateMs(b) - getSortDateMs(a)
       );
     };
     // Current business month (6th–5th) for "this month" commission
@@ -324,8 +332,8 @@ export function DashboardContent({
     const currentMonthEnd = getBusinessMonthEnd(now);
     const isStartInCurrentMonth = (startDate: string | null): boolean => {
       if (!startDate) return false;
-      const d = new Date(startDate + "T12:00:00");
-      return d >= currentMonthStart && d <= currentMonthEnd;
+      const d = parseDashboardDate(startDate);
+      return d ? (d >= currentMonthStart && d <= currentMonthEnd) : false;
     };
     // Commission = only entries that started this (business) month: (total_fee / duration_months) * 30%
     const trainerReportsList: TrainerReport[] = Object.entries(byTrainer)
@@ -410,7 +418,7 @@ export function DashboardContent({
           <Link
             key={card.href}
             href={card.href}
-            className="liquid-glass block p-6 rounded-2xl min-h-[140px] transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/40 hover:shadow-[0_0_32px_rgba(255,0,0,0.15)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+            className="liquid-glass block p-6 rounded-2xl min-h-[140px] transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/40 hover:shadow-[0_0_32px_rgba(238,42,36,0.15)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
             <p className="text-stone-400 text-sm font-medium mb-1">
               {card.title}
@@ -442,7 +450,7 @@ export function DashboardContent({
           <button
             type="button"
             onClick={() => setAnalyticsPanel((p) => (p === "daily" ? null : "daily"))}
-            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(255,0,0,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
             <p className="text-stone-400 text-sm font-medium mb-1">Today</p>
             <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(dailySummary)}</p>
@@ -451,7 +459,7 @@ export function DashboardContent({
           <button
             type="button"
             onClick={() => setAnalyticsPanel((p) => (p === "weekly" ? null : "weekly"))}
-            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(255,0,0,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
             <p className="text-stone-400 text-sm font-medium mb-1">Last week (Sat–Fri)</p>
             <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(weeklySummary)}</p>
@@ -460,7 +468,7 @@ export function DashboardContent({
           <button
             type="button"
             onClick={() => setAnalyticsPanel((p) => (p === "monthly" ? null : "monthly"))}
-            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(255,0,0,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+            className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
             <p className="text-stone-400 text-sm font-medium mb-1">Last month (6th–5th)</p>
             <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(monthlySummary)}</p>
@@ -585,7 +593,7 @@ export function DashboardContent({
                 key={report.name}
                 type="button"
                 onClick={() => setSelectedTrainer(report)}
-                className="liquid-glass p-5 rounded-2xl border border-white/10 min-h-[180px] flex flex-col text-left transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/50 hover:shadow-[0_0_28px_rgba(255,0,0,0.15)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black bg-stone-900/95"
+                className="liquid-glass p-5 rounded-2xl border border-white/10 min-h-[180px] flex flex-col text-left transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/50 hover:shadow-[0_0_28px_rgba(238,42,36,0.15)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black bg-stone-900/95"
               >
                 <p className="text-brand-red font-semibold mb-1 truncate">
                   {report.name}
@@ -698,7 +706,7 @@ function ClientDetailsModal({
   const sortedEntries = useMemo(
     () =>
       [...entries].sort((a, b) =>
-        (getSortDate(b) ?? "").localeCompare(getSortDate(a) ?? "")
+        getSortDateMs(b) - getSortDateMs(a)
       ),
     [entries]
   );
@@ -716,7 +724,7 @@ function ClientDetailsModal({
     const nameKey = (selectedEntry as Customer).name?.trim() ?? "";
     return customers
       .filter((c) => (c.name ?? "").trim() === nameKey)
-      .sort((a, b) => (b.start_date ?? b.created_at ?? "").localeCompare(a.start_date ?? a.created_at ?? ""));
+      .sort((a, b) => parseDashboardDateMs(b.start_date ?? b.created_at) - parseDashboardDateMs(a.start_date ?? a.created_at));
   }, [showCustomerReport, selectedEntry, customers]);
   const totalPaidAllTime = useMemo(
     () => customerReportHistory.reduce((s, c) => s + Number(c.paid_fee ?? 0), 0),

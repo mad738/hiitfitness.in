@@ -46,7 +46,7 @@ export function LandingTestimonials() {
                     {testimonials.map((t) => (
                         <div key={t.name} className="bg-stone-900/50 border border-stone-800 rounded-xl p-6 relative hover:border-[#EE2A24] transition-all group">
                             <span className="absolute -top-4 -left-1 text-5xl text-[#EE2A24] opacity-30 font-serif leading-none group-hover:opacity-60 transition-opacity">
-                                "
+                                &quot;
                             </span>
                             <p className="text-stone-300 text-sm italic mb-6 relative z-10 leading-relaxed">
                                 {t.review}

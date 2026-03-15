@@ -133,7 +133,7 @@ export function CredentialsView({ credentials, currentUsername }: Props) {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="liquid-glass rounded-xl border border-red-500/30 px-4 py-3 text-red-400 text-sm">
+        <div className="liquid-glass rounded-xl border border-brand-red/30 px-4 py-3 text-brand-red text-sm">
           {error}
         </div>
       )}
@@ -206,7 +206,7 @@ export function CredentialsView({ credentials, currentUsername }: Props) {
                         type="button"
                         onClick={() => handleRemove(c)}
                         disabled={loading}
-                        className="text-stone-400 hover:text-red-400 hover:underline text-sm disabled:opacity-50"
+                        className="text-stone-400 hover:text-brand-red hover:underline text-sm disabled:opacity-50"
                       >
                         Remove
                       </button>

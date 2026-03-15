@@ -6,7 +6,6 @@ import { verifyPassword } from "@/lib/verify-password";
 import {
   setAdminSession,
   clearAdminSession,
-  getAdminSession,
 } from "@/lib/admin-session";
 import { hasSupabaseConfig } from "@/config/env";
 

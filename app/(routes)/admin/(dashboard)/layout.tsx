@@ -1,9 +1,5 @@
-import { redirect } from "next/navigation";
 import { AdminNav } from "@/features/admin/AdminNav";
 import { AdminBackLink } from "@/features/admin/AdminBackLink";
-import { hasSupabaseConfig } from "@/config/env";
-import { getAdminSession } from "@/lib/admin-session";
-
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardLayout({

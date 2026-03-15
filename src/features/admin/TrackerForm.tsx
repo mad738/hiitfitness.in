@@ -127,7 +127,7 @@ export function TrackerForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <p className="text-red-500 text-sm bg-red-500/10 px-3 py-2 rounded">
+        <p className="text-brand-red text-sm bg-brand-red/10 px-3 py-2 rounded">
           {error}
         </p>
       )}

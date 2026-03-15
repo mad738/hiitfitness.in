@@ -5,11 +5,44 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 
 const DURATION_CHIPS = [
-  { label: "1 month", days: 30 },
-  { label: "3 months", days: 91 },
-  { label: "6 months", days: 182 },
+  { label: "1m", days: 31 },
+  { label: "3m", days: 92 },
+  { label: "6m", days: 183 },
   { label: "1 year", days: 365 },
 ] as const;
+
+function parseDateInput(val: string): Date {
+  if (!val) return new Date();
+  if (val.includes("/")) {
+    const [d, m, y] = val.split("/").map(Number);
+    return new Date(y, m - 1, 1);
+  }
+  if (val.includes("-")) {
+    const [y, m, d] = val.split("-").map(Number);
+    return new Date(y, m - 1, 1);
+  }
+  return new Date();
+}
+
+function parseDateInputExact(val: string): Date | null {
+  if (!val) return null;
+  if (val.includes("/")) {
+    const [d, m, y] = val.split("/").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  if (val.includes("-")) {
+    const [y, m, d] = val.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function toDdMmYyyy(d: Date): string {
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${d.getFullYear()}`;
+}
 
 type Props = {
   value: string;
@@ -39,8 +72,8 @@ const YEAR_OPTIONS = Array.from(
   (_, i) => CURRENT_YEAR - Math.floor(YEAR_RANGE / 2) + i
 );
 
-function toDateOnly(iso: string): string {
-  return iso.slice(0, 10);
+function toDateOnly(): string {
+  return toDdMmYyyy(new Date());
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -54,12 +87,10 @@ function getDaysInMonth(year: number, month: number) {
 }
 
 function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T12:00:00");
-  d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const dObj = parseDateInputExact(dateStr) || new Date();
+  dObj.setHours(12, 0, 0, 0);
+  dObj.setDate(dObj.getDate() + days);
+  return toDdMmYyyy(dObj);
 }
 
 export function AdminDatePicker({
@@ -75,15 +106,9 @@ export function AdminDatePicker({
   durationChipsReferenceDate,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const today = toDateOnly(new Date().toISOString());
+  const today = toDateOnly();
   const chipsBaseDate = durationChipsReferenceDate?.trim() || today;
-  const [viewDate, setViewDate] = useState(() => {
-    if (value) {
-      const [y, m] = value.split("-").map(Number);
-      return new Date(y, m - 1, 1);
-    }
-    return new Date();
-  });
+  const [viewDate, setViewDate] = useState(() => parseDateInput(value));
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -100,8 +125,7 @@ export function AdminDatePicker({
 
   useEffect(() => {
     if (value && open) {
-      const [y, m] = value.split("-").map(Number);
-      setViewDate(new Date(y, m - 1, 1));
+      setViewDate(parseDateInput(value));
     }
   }, [value, open]);
 
@@ -178,18 +202,15 @@ export function AdminDatePicker({
   }
 
   function selectDay(d: number) {
-    const y = year;
-    const m = String(month + 1).padStart(2, "0");
-    const day = String(d).padStart(2, "0");
-    const next = `${y}-${m}-${day}`;
-    if (min && next < min) return;
-    if (max && next > max) return;
-    onChange(next);
+    const nextObj = new Date(year, month, d, 12, 0, 0);
+    if (minDate && nextObj < minDate) return;
+    if (maxDate && nextObj > maxDate) return;
+    onChange(toDdMmYyyy(nextObj));
     setOpen(false);
   }
 
-  const minDate = min ? new Date(min + "T12:00:00") : null;
-  const maxDate = max ? new Date(max + "T12:00:00") : null;
+  const minDate = min ? parseDateInputExact(min) : null;
+  const maxDate = max ? parseDateInputExact(max) : null;
 
   return (
     <>
@@ -276,8 +297,9 @@ export function AdminDatePicker({
               <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/10 mt-2">
                 {DURATION_CHIPS.map(({ label, days }) => {
                   const endStr = addDays(chipsBaseDate, days);
+                  const endObj = parseDateInputExact(endStr);
                   const disabled = Boolean(
-                    (min && endStr < min) || (max && endStr > max)
+                    endObj && ((minDate && endObj < minDate) || (maxDate && endObj > maxDate))
                   );
                   return (
                     <button
@@ -286,7 +308,7 @@ export function AdminDatePicker({
                       disabled={disabled}
                       onClick={() => {
                         onChange(endStr);
-                        setViewDate(new Date(endStr + "T12:00:00"));
+                        setViewDate(parseDateInput(endStr));
                         setOpen(false);
                       }}
                       className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 disabled:opacity-50 disabled:pointer-events-none transition"
@@ -307,7 +329,7 @@ export function AdminDatePicker({
                 if (d === null) {
                   return <div key={`e-${i}`} />;
                 }
-                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                const dateStr = `${String(d).padStart(2, "0")}/${String(month + 1).padStart(2, "0")}/${year}`;
                 const isSelected = value === dateStr;
                 const isToday = dateStr === today;
                 const dateObj = new Date(year, month, d);

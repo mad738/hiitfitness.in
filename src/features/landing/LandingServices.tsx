@@ -3,7 +3,7 @@
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
 import {
   Bike, Dumbbell, Swords, Activity, Target,
-  HeartPulse, Music, Star, Users, Repeat
+  HeartPulse, Star, Users, Repeat
 } from "lucide-react";
 
 const servicesList = [

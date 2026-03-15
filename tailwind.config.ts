@@ -33,7 +33,7 @@ const config: Config = {
   		colors: {
   			brand: {
   				black: '#000000',
-  				red: '#ff0000'
+  				red: '#ee2a24'
   			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',

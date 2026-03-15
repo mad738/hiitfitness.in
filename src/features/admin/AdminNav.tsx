@@ -68,8 +68,8 @@ export function AdminNav() {
                   href={href}
                   className={`rounded-xl px-3 py-2.5 text-sm font-semibold border-l-2 transition-all duration-200 ease-out ${
                     active
-                      ? "bg-brand-red/20 text-stone-100 border-l-4 border-brand-red shadow-[0_0_20px_rgba(255,0,0,0.15)]"
-                      : "border-transparent text-stone-400 hover:text-stone-100 hover:bg-white/10 hover:border-l-4 hover:border-brand-red/70 hover:translate-x-1 hover:shadow-[0_0_18px_rgba(255,0,0,0.12)]"
+                      ? "bg-brand-red/20 text-stone-100 border-l-4 border-brand-red shadow-[0_0_20px_rgba(238,42,36,0.15)]"
+                      : "border-transparent text-stone-400 hover:text-stone-100 hover:bg-white/10 hover:border-l-4 hover:border-brand-red/70 hover:translate-x-1 hover:shadow-[0_0_18px_rgba(238,42,36,0.12)]"
                   }`}
                 >
                   {label}
@@ -82,7 +82,7 @@ export function AdminNav() {
             <button
               type="button"
               onClick={handleSignOut}
-              className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold text-stone-400 transition-all duration-200 hover:text-brand-red hover:bg-white/10 hover:translate-x-1 hover:shadow-[0_0_12px_rgba(255,0,0,0.1)] text-left"
+              className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold text-stone-400 transition-all duration-200 hover:text-brand-red hover:bg-white/10 hover:translate-x-1 hover:shadow-[0_0_12px_rgba(238,42,36,0.1)] text-left"
             >
               Sign out
             </button>
@@ -152,7 +152,7 @@ export function AdminNav() {
                   >
                     {label}
                     {active && (
-                      <span className="h-2 w-2 rounded-full bg-brand-red shadow-[0_0_18px_rgba(255,0,0,0.4)]" />
+                      <span className="h-2 w-2 rounded-full bg-brand-red shadow-[0_0_18px_rgba(238,42,36,0.4)]" />
                     )}
                   </Link>
                 );

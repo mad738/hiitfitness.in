@@ -25,12 +25,12 @@ type Props = {
   onBarClick?: (index: number) => void;
 };
 
-const barColor = "rgb(239 68 68)";
+const barColor = "#EE2A24";
 
 export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue", onBarClick }: Props) {
   const id = gradientId.replace(/\s/g, "-");
   return (
-    <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 transition-all duration-300 ease-out hover:border-brand-red/25 hover:shadow-[0_0_24px_rgba(255,0,0,0.1)]">
+    <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 transition-all duration-300 ease-out hover:border-brand-red/25 hover:shadow-[0_0_24px_rgba(238,42,36,0.1)]">
       <p className="text-stone-400 text-sm font-medium mb-4">{title}</p>
       <div className="h-[260px] w-full">
         <ResponsiveContainer width="100%" height="100%">
