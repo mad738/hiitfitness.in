@@ -60,3 +60,35 @@ export function isPlanCurrentlyRunning(startDate: string | null, endDate: string
     return false;
   }
 }
+
+export function parseFlexibleDate(value: string): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const match = value.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  let year = Number(match[3]);
+  if (year < 100) year += year < 50 ? 2000 : 1900;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+export function normalizeDateForStorage(value: string, label?: string): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  const iso = parseFlexibleDate(trimmed);
+  if (!iso) {
+    const field = label ?? "Date";
+    throw new Error(`${field} must be in YYYY-MM-DD or DD/MM/YYYY format (received "${value}").`);
+  }
+  return iso;
+}

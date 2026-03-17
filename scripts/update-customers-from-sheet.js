@@ -120,7 +120,6 @@ async function main() {
   const clientIdCol = headers.indexOf("Client ID");
   const clientNameCol = headers.indexOf("Client Name");
   const endDateCol = headers.indexOf("End Date");
-  const trainerNameCol = headers.indexOf("Trainer Name");
 
   const clientRows = new Map();
   for (let i = 1; i < rows.length; i++) {

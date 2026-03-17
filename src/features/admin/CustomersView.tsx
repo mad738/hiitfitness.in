@@ -6,15 +6,23 @@ import { createPortal } from "react-dom";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { CustomerReportModal } from "./CustomerReportModal";
+import { PlanPaymentsModal, type PaymentFormState } from "./PlanPaymentsModal";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
+import type { Payment } from "@/models/payment";
 import {
   createCustomer,
   updateCustomer,
   deleteCustomer,
 } from "@app/actions/customers";
+import {
+  listPlanPayments,
+  createPlanPayment,
+  updatePlanPayment,
+  deletePlanPayment,
+} from "@app/actions/payments";
 import { readFileAsBase64 } from "@/lib/image-utils";
-import { normalizeMobile, dedupeByMobile } from "@/lib/customer-utils";
+import { normalizeMobile, normalizeDateForStorage, isPlanCurrentlyRunning } from "@/lib/customer-utils";
 import { PLAN_CATEGORIES } from "@/data/plans";
 import { TRACKER_PAYMENT_MODE_OPTIONS } from "@/config/tracker-options";
 import { AdminDatePicker } from "@/components/ui/admin-date-picker";
@@ -50,6 +58,65 @@ function dedupeById<T extends { id: string }>(rows: T[]): T[] {
   });
 }
 
+type PlanFormValues = {
+  name: string;
+  image: string | null;
+  plan: string;
+  totalFee: number;
+  paidFee: number;
+  trainerId: string | null;
+  startDate: string;
+  endDate: string;
+  payDate: string;
+  paymentMode: string;
+  remarks: string;
+  duration: string;
+  status: string;
+  slotTiming: string;
+  mobile: string;
+  paidTo: string;
+  feedback: string;
+  receipt: boolean;
+};
+
+type CustomerGroup = {
+  key: string;
+  primary: Customer;
+  plans: Customer[];
+};
+
+function planSortValue(plan: Customer): number {
+  const start = plan.start_date ? Date.parse(plan.start_date) : NaN;
+  if (!Number.isNaN(start)) return start;
+  return Date.parse(plan.created_at) || 0;
+}
+
+function getCustomerGroupKey(plan: Customer): string {
+  return normalizeMobile(plan.mobile) || plan.customer_id || plan.id;
+}
+
+function isPlanActive(plan: Customer): boolean {
+  const status = (plan.status ?? "").toLowerCase();
+  if (status === "active") return true;
+  return isPlanCurrentlyRunning(plan.start_date, plan.end_date);
+}
+
+function getPlansHighlight(plans: Customer[]): Customer[] {
+  const active = plans.filter(isPlanActive);
+  if (active.length > 0) return active;
+  return plans;
+}
+
+function sanitizePlanDates(values: PlanFormValues, planLabel: string): PlanFormValues {
+  return {
+    ...values,
+    startDate: normalizeDateForStorage(values.startDate, `${planLabel} start date`),
+    endDate: normalizeDateForStorage(values.endDate, `${planLabel} end date`),
+    payDate: normalizeDateForStorage(values.payDate, `${planLabel} payment date`),
+  };
+}
+
+
 export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -63,6 +130,12 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileCustomer, setProfileCustomer] = useState<Customer | null>(null);
+  const [paymentsPlan, setPaymentsPlan] = useState<Customer | null>(null);
+  const [planPayments, setPlanPayments] = useState<Payment[]>([]);
+  const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsSaving, setPaymentsSaving] = useState(false);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
 
   // GT (left column)
   const [name, setName] = useState("");
@@ -238,11 +311,25 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     return true;
   });
 
-  /** One row per unique mobile in the table (no double entries for same number). */
-  const displayCustomers = useMemo(
-    () => dedupeByMobile(filteredCustomers),
-    [filteredCustomers]
-  );
+  /** One row per unique mobile/person in the table (no double entries). */
+  const customerGroups: CustomerGroup[] = useMemo(() => {
+    const grouped = new Map<string, Customer[]>();
+    filteredCustomers.forEach((planRow) => {
+      const key = getCustomerGroupKey(planRow);
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.push(planRow);
+      } else {
+        grouped.set(key, [planRow]);
+      }
+    });
+    return Array.from(grouped.entries()).map(([key, plans]) => {
+      const sorted = plans.slice().sort((a, b) => planSortValue(b) - planSortValue(a));
+      return { key, primary: sorted[0], plans: sorted } satisfies CustomerGroup;
+    });
+  }, [filteredCustomers]);
+
+  const displayCustomers = customerGroups.map((group) => group.primary);
 
   function buildFilterUrlForNewTab(): string {
     const params = new URLSearchParams();
@@ -267,6 +354,88 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setFilterPaidStatus("");
     setShowFilterDropdown(false);
     router.push(pathname);
+  }
+
+  const refreshPlanPayments = useCallback(async (planId: string) => {
+    const data = await listPlanPayments(planId);
+    setPlanPayments(data);
+  }, []);
+
+  async function openPaymentsPanel(plan: Customer) {
+    setPaymentsPlan(plan);
+    setPlanPayments([]);
+    setPaymentsError(null);
+    setPaymentsModalOpen(true);
+    setPaymentsLoading(true);
+    try {
+      await refreshPlanPayments(plan.id);
+    } catch (err) {
+      setPaymentsError((err as Error)?.message ?? "Failed to load payments.");
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
+  function closePaymentsModal() {
+    setPaymentsModalOpen(false);
+    setPaymentsPlan(null);
+    setPlanPayments([]);
+    setPaymentsError(null);
+    setPaymentsLoading(false);
+    setPaymentsSaving(false);
+  }
+
+  async function handleSavePayment(form: PaymentFormState): Promise<{ ok: boolean; error?: string }> {
+    if (!paymentsPlan) return { ok: false, error: "No plan selected." };
+    try {
+      setPaymentsSaving(true);
+      setPaymentsError(null);
+      const amount = Number(form.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Amount must be greater than 0.");
+      }
+      const isoDate = normalizeDateForStorage(form.paymentDate, "Payment date");
+      if (!isoDate) throw new Error("Payment date is required.");
+      const payload = {
+        amount,
+        payment_date: isoDate,
+        payment_mode: form.paymentMode.trim() || null,
+        paid_to: form.paidTo.trim() || null,
+        receipt_issued: form.receipt,
+      };
+      const result = form.paymentId
+        ? await updatePlanPayment(form.paymentId, payload)
+        : await createPlanPayment({ customer_plan_id: paymentsPlan.id, ...payload });
+      if (!result.ok) throw new Error(result.error ?? "Failed to save payment.");
+      await refreshPlanPayments(paymentsPlan.id);
+      router.refresh();
+      return { ok: true };
+    } catch (err) {
+      const message = (err as Error)?.message ?? "Failed to save payment.";
+      setPaymentsError(message);
+      return { ok: false, error: message };
+    } finally {
+      setPaymentsSaving(false);
+    }
+  }
+
+  async function handleDeletePayment(paymentId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!paymentsPlan) return { ok: false, error: "No plan selected." };
+    try {
+      setPaymentsSaving(true);
+      setPaymentsError(null);
+      const result = await deletePlanPayment(paymentId);
+      if (!result.ok) throw new Error(result.error ?? "Failed to delete payment.");
+      await refreshPlanPayments(paymentsPlan.id);
+      router.refresh();
+      return { ok: true };
+    } catch (err) {
+      const message = (err as Error)?.message ?? "Failed to delete payment.";
+      setPaymentsError(message);
+      return { ok: false, error: message };
+    } finally {
+      setPaymentsSaving(false);
+    }
   }
 
   function openAdd() {
@@ -415,28 +584,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
 
 
-  function buildPayload(opts: {
-    name: string;
-    image: string | null;
-    plan: string;
-    totalFee: number;
-    paidFee: number;
-    trainerId: string | null;
-    startDate: string;
-    endDate: string;
-    payDate: string;
-    paymentMode: string;
-    remarks: string;
-    duration: string;
-    status: string;
-    slotTiming: string;
-    mobile: string;
-    paidTo: string;
-    feedback: string;
-    receipt: boolean;
-  }) {
+  function buildPayload(opts: PlanFormValues, customerId?: string | null) {
     const balanceVal = Number(opts.totalFee) - Number(opts.paidFee);
-    return {
+    const payload = {
       name: opts.name.trim(),
       image: opts.image ?? null,
       plan: opts.plan,
@@ -457,6 +607,10 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       feedback: opts.feedback.trim() || null,
       receipt: opts.receipt,
     };
+    if (customerId) {
+      (payload as Record<string, unknown>).customer_id = customerId;
+    }
+    return payload;
   }
 
   /** Check if mobile is already used by another customer (optional excludeId when editing). */
@@ -546,19 +700,64 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         }
 
         const isGtMain = plan === "GT";
-        const gtPayloadInfo = {
-          name, image, plan: "GT", totalFee, paidFee, trainerId: null, startDate, endDate, payDate, paymentMode, remarks, duration, status, slotTiming, mobile, paidTo, feedback, receipt
+        const gtPayloadInfo: PlanFormValues = {
+          name,
+          image,
+          plan: "GT",
+          totalFee,
+          paidFee,
+          trainerId: null,
+          startDate,
+          endDate,
+          payDate,
+          paymentMode,
+          remarks,
+          duration,
+          status,
+          slotTiming,
+          mobile,
+          paidTo,
+          feedback,
+          receipt,
         };
-        const ptPayloadInfo = {
-          name, image: imagePt, plan: "PT", totalFee: totalFeePt, paidFee: paidFeePt, trainerId: trainerIdPt, startDate: startDatePt, endDate: endDatePt, payDate: payDatePt, paymentMode: paymentModePt, remarks: remarksPt, duration: durationPt, status: statusPt, slotTiming: slotTimingPt, mobile, paidTo: paidToPt, feedback: feedbackPt, receipt: receiptPt
+        const ptPayloadInfo: PlanFormValues = {
+          name,
+          image: imagePt,
+          plan: "PT",
+          totalFee: totalFeePt,
+          paidFee: paidFeePt,
+          trainerId: trainerIdPt,
+          startDate: startDatePt,
+          endDate: endDatePt,
+          payDate: payDatePt,
+          paymentMode: paymentModePt,
+          remarks: remarksPt,
+          duration: durationPt,
+          status: statusPt,
+          slotTiming: slotTimingPt,
+          mobile,
+          paidTo: paidToPt,
+          feedback: feedbackPt,
+          receipt: receiptPt,
         };
 
-        const payload = buildPayload(isGtMain ? gtPayloadInfo : ptPayloadInfo);
+        let sanitizedGt: PlanFormValues;
+        let sanitizedPt: PlanFormValues;
+        try {
+          sanitizedGt = sanitizePlanDates(gtPayloadInfo, "GT");
+          sanitizedPt = sanitizePlanDates(ptPayloadInfo, "PT");
+        } catch (validationErr) {
+          setError(validationErr instanceof Error ? validationErr.message : "Invalid date input.");
+          setLoading(false);
+          return;
+        }
+
+        const payload = buildPayload(isGtMain ? sanitizedGt : sanitizedPt);
         const res = await updateCustomer(editing.id, payload);
 
         if (res.ok) {
           if (editingLinkedId) {
-            const linkedPayload = buildPayload(isGtMain ? ptPayloadInfo : gtPayloadInfo);
+            const linkedPayload = buildPayload(isGtMain ? sanitizedPt : sanitizedGt);
             await updateCustomer(editingLinkedId, linkedPayload);
           } else {
             // If they entered details for the other plan type during edit, create it
@@ -566,9 +765,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
             const hasGtDetails = totalFee > 0 || paidFee > 0 || duration.trim() !== "";
 
             if (isGtMain && hasPtDetails) {
-              await createCustomer(buildPayload(ptPayloadInfo));
+              await createCustomer(buildPayload(sanitizedPt, editing.customer_id));
             } else if (!isGtMain && hasGtDetails) {
-              await createCustomer(buildPayload(gtPayloadInfo));
+              await createCustomer(buildPayload(sanitizedGt, editing.customer_id));
             }
           }
         } else {
@@ -598,10 +797,60 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         // If neither have details but they hit submit, default to creating an empty GT
         const createGt = hasGtDetails || !hasPtDetails;
 
+        const gtPayloadInfo: PlanFormValues = {
+          name: commonName,
+          image,
+          plan: "GT",
+          totalFee,
+          paidFee,
+          trainerId: null,
+          startDate,
+          endDate,
+          payDate,
+          paymentMode,
+          remarks,
+          duration,
+          status,
+          slotTiming,
+          mobile: commonMobile ?? "",
+          paidTo,
+          feedback,
+          receipt,
+        };
+        const ptPayloadInfo: PlanFormValues = {
+          name: commonName,
+          image: imagePt,
+          plan: "PT",
+          totalFee: totalFeePt,
+          paidFee: paidFeePt,
+          trainerId: trainerIdPt,
+          startDate: startDatePt,
+          endDate: endDatePt,
+          payDate: payDatePt,
+          paymentMode: paymentModePt,
+          remarks: remarksPt,
+          duration: durationPt,
+          status: statusPt,
+          slotTiming: slotTimingPt,
+          mobile: commonMobile ?? "",
+          paidTo: paidToPt,
+          feedback: feedbackPt,
+          receipt: receiptPt,
+        };
+
+        let sanitizedGt: PlanFormValues;
+        let sanitizedPt: PlanFormValues;
+        try {
+          sanitizedGt = sanitizePlanDates(gtPayloadInfo, "GT");
+          sanitizedPt = sanitizePlanDates(ptPayloadInfo, "PT");
+        } catch (validationErr) {
+          setError(validationErr instanceof Error ? validationErr.message : "Invalid date input.");
+          setLoading(false);
+          return;
+        }
+
         if (createGt) {
-          const payloadGt = buildPayload({
-            name: commonName, image, plan: "GT", totalFee, paidFee, trainerId: null, startDate, endDate, payDate, paymentMode, remarks, duration, status, slotTiming, mobile: commonMobile ?? "", paidTo, feedback, receipt,
-          });
+          const payloadGt = buildPayload(sanitizedGt);
           const resGt = await createCustomer(payloadGt);
           if (!resGt.ok) {
             setError(resGt.error ?? "Failed to add GT.");
@@ -611,9 +860,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         }
 
         if (hasPtDetails) {
-          const payloadPt = buildPayload({
-            name: commonName, image: imagePt, plan: "PT", totalFee: totalFeePt, paidFee: paidFeePt, trainerId: trainerIdPt, startDate: startDatePt, endDate: endDatePt, payDate: payDatePt, paymentMode: paymentModePt, remarks: remarksPt, duration: durationPt, status: statusPt, slotTiming: slotTimingPt, mobile: commonMobile ?? "", paidTo: paidToPt, feedback: feedbackPt, receipt: receiptPt,
-          });
+          const payloadPt = buildPayload(sanitizedPt);
           const resPt = await createCustomer(payloadPt);
           if (!resPt.ok) {
             setError(resPt.error ?? "Failed to add PT.");
@@ -1042,8 +1289,22 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           onAddEntry={openAddEntryFromReport}
           onEditEntry={openEdit}
           onDeleteEntry={handleDelete}
+          onViewPayments={openPaymentsPanel}
         />
       )}
+
+      <PlanPaymentsModal
+        plan={paymentsPlan}
+        open={paymentsModalOpen}
+        payments={planPayments}
+        loading={paymentsLoading}
+        saving={paymentsSaving}
+        error={paymentsError}
+        formatCurrency={formatCurrency}
+        onClose={closePaymentsModal}
+        onSubmit={handleSavePayment}
+        onDelete={handleDeletePayment}
+      />
 
       <div className="liquid-glass rounded-2xl overflow-hidden border border-white/10">
         {displayCustomers.length === 0 ? (
@@ -1061,14 +1322,18 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
                     <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider h-[50px]">Name</th>
                     <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider w-[200px] h-[50px]">Phone No</th>
+                    <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider min-w-[220px] h-[50px]">Active plans</th>
                     <th className="text-center py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider w-[100px] h-[50px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayCustomers.map((c, i) => {
+                  {customerGroups.map((group, i) => {
+                    const c = group.primary;
+                    const plansForDisplay = getPlansHighlight(group.plans);
+                    const remainingCount = Math.max(group.plans.length - plansForDisplay.length, 0);
                     return (
                       <tr
-                        key={`${c.id}-${i}`}
+                        key={`${group.key}-${c.id}-${i}`}
                         className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors group"
                         onClick={() => setDetailsCustomer(c)}
                       >
@@ -1079,6 +1344,36 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
                         <td className="py-3 px-6 text-stone-300 font-medium">
                           {c.mobile ?? "—"}
+                        </td>
+                        <td className="py-3 px-6">
+                          {plansForDisplay.length === 0 ? (
+                            <span className="text-stone-500 text-sm">No plans</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {plansForDisplay.map((plan) => {
+                                const active = isPlanActive(plan);
+                                return (
+                                  <button
+                                    key={plan.id}
+                                    type="button"
+                                    onClick={(event) => { event.stopPropagation(); openPaymentsPanel(plan); }}
+                                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                                      active
+                                        ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                                        : "border-white/10 bg-white/5 text-stone-200"
+                                    } hover:border-brand-red/60 hover:text-white`}
+                                    title={`${plan.plan} • ${plan.start_date ?? "?"} → ${plan.end_date ?? "?"} (click to view payments)`}
+                                  >
+                                    {plan.plan}
+                                    {active ? " • Active" : ""}
+                                  </button>
+                                );
+                              })}
+                              {remainingCount > 0 && (
+                                <span className="text-xs text-stone-500 self-center">+{remainingCount} more</span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-6 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="relative inline-block">

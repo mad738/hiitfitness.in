@@ -1,5 +1,6 @@
 export type Customer = {
   id: string;
+  customer_id: string;
   name: string;
   image: string | null;
   plan: string;
@@ -23,10 +24,11 @@ export type Customer = {
   updated_at: string;
 };
 
-export type CustomerInsert = Omit<Customer, "id" | "created_at" | "updated_at"> & {
+export type CustomerInsert = Omit<Customer, "id" | "created_at" | "updated_at" | "customer_id"> & {
   id?: string;
   created_at?: string;
   updated_at?: string;
+  customer_id?: string;
 };
 
 export type CustomerUpdate = Partial<CustomerInsert>;

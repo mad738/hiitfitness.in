@@ -34,7 +34,7 @@ export async function listTrainersInUse(): Promise<Trainer[]> {
   let page: { trainer_id: string }[];
   do {
     const { data, error } = await supabase
-      .from("customers")
+      .from("customer_plans")
       .select("trainer_id")
       .not("trainer_id", "is", null)
       .range(offset, offset + pageSize - 1);

@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable -- admin images are base64/dynamic */
 
 import Link from "next/link";
 import { useState, useEffect, useMemo, useRef } from "react";

@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable -- admin images are base64/dynamic */
 
 import { useState, useEffect } from "react";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";

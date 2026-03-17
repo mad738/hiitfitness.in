@@ -50,6 +50,8 @@ type Props = {
   onEditEntry?: (customer: Customer) => void;
   /** When provided, "Delete" calls this. */
   onDeleteEntry?: (customer: Customer) => void;
+  /** When provided, clicking Payments opens plan payments manager. */
+  onViewPayments?: (plan: Customer) => void;
 };
 
 export function CustomerReportModal({
@@ -62,6 +64,7 @@ export function CustomerReportModal({
   onAddEntry,
   onEditEntry,
   onDeleteEntry,
+  onViewPayments,
 }: Props) {
   const mobileKey = normalizeMobile(customer.mobile);
   const nameKey = (customer.name ?? "").trim();
@@ -170,6 +173,9 @@ export function CustomerReportModal({
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400">Slot</th>
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400 max-w-[120px]">Remarks</th>
                       <th className="text-center py-2.5 px-3 font-medium text-stone-400">Receipt</th>
+                      {onViewPayments && (
+                        <th className="text-center py-2.5 px-3 font-medium text-stone-400">Payments</th>
+                      )}
                       {showActions && <th className="text-center py-2.5 px-3 font-medium text-stone-400">Actions</th>}
                     </tr>
                   </thead>
@@ -209,6 +215,17 @@ export function CustomerReportModal({
                           <td className="py-2 px-3 text-stone-300">{entry.slot_timing ?? "—"}</td>
                           <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "—"}</td>
                           <td className="py-2 px-3 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>
+                          {onViewPayments && (
+                            <td className="py-2 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => onViewPayments(entry)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-white/15 text-xs font-semibold text-stone-100 hover:border-brand-red/60 hover:text-brand-red transition"
+                              >
+                                View
+                              </button>
+                            </td>
+                          )}
                           {showActions && (
                             <td className="py-2 px-3 text-center whitespace-nowrap">
                               <button
@@ -252,14 +269,14 @@ export function CustomerReportModal({
                     onClick={() => onAddEntry(customer)}
                     className="px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm"
                   >
-                    Add entry
+                    Add new plan
                   </button>
                 ) : (
                   <Link
                     href="/admin/customers"
                     className="px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm"
                   >
-                    Add entry (Customers)
+                    Add a New Customer
                   </Link>
                 )}
                 {onEditEntry ? (
@@ -268,14 +285,14 @@ export function CustomerReportModal({
                     onClick={() => { onEditEntry(customer); onClose(); }}
                     className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm"
                   >
-                    Edit current entry
+                    Edit current Plan
                   </button>
                 ) : (
                   <Link
                     href="/admin/customers"
                     className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm"
                   >
-                    Edit (Customers)
+                    Edit Customer Details
                   </Link>
                 )}
               </>
