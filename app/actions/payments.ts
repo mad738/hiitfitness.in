@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@app/actions/auth";
 import type { PaymentInsert, PaymentUpdate } from "@/models/payment";
 import * as paymentRepo from "@/repositories/payment_repository";
+import { explainError } from "@/lib/error-message";
 
 const CUSTOMERS_PATH = "/admin/customers";
 
@@ -21,7 +22,7 @@ export async function createPlanPayment(payload: PaymentInsert) {
   } catch (error) {
     return {
       ok: false as const,
-      error: error instanceof Error ? error.message : "Failed to add payment.",
+      error: explainError(error, "Unable to add payment. Please verify the values and try again."),
     };
   }
 }
@@ -35,7 +36,7 @@ export async function updatePlanPayment(id: string, payload: PaymentUpdate) {
   } catch (error) {
     return {
       ok: false as const,
-      error: error instanceof Error ? error.message : "Failed to update payment.",
+      error: explainError(error, "Unable to update payment. Please verify the values and try again."),
     };
   }
 }
@@ -49,7 +50,7 @@ export async function deletePlanPayment(id: string) {
   } catch (error) {
     return {
       ok: false as const,
-      error: error instanceof Error ? error.message : "Failed to delete payment.",
+      error: explainError(error, "Unable to delete payment. Please try again."),
     };
   }
 }

@@ -5,6 +5,7 @@ export type Payment = {
   payment_date: string;
   payment_mode: string | null;
   paid_to: string | null;
+  remarks: string | null;
   receipt_issued: boolean | null;
   created_at: string;
   updated_at: string;

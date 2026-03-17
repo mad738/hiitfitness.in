@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getPublicPlans } from "@/services/membership_service";
 import * as planRepo from "@/repositories/membership_plan_repository";
 import type { MembershipPlanInsert, MembershipPlanUpdate } from "@/models/membership_plan";
+import { explainError } from "@/lib/error-message";
 
 export async function fetchPublicPlans() {
   return getPublicPlans();
@@ -44,7 +45,7 @@ export async function createPlan(input: CreatePlanInput): Promise<{ ok: true } |
     revalidatePath("/");
     return { ok: true };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to create plan";
+    const message = explainError(e, "Unable to create plan. Please review the inputs and try again.");
     return { ok: false, error: message };
   }
 }
@@ -63,7 +64,7 @@ export async function updatePlan(id: string, input: UpdatePlanInput): Promise<{ 
     revalidatePath("/");
     return { ok: true };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to update plan";
+    const message = explainError(e, "Unable to update plan. Please review the inputs and try again.");
     return { ok: false, error: message };
   }
 }

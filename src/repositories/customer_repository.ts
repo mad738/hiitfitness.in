@@ -25,6 +25,7 @@ const PLAN_SELECT = `
   paid_amount,
   balance,
   status,
+  slot_timing,
   created_at,
   updated_at,
   customer:customers (
@@ -283,6 +284,7 @@ function buildPlanInsertPayload(customerId: string, row: CustomerInsert) {
     total_fee: sanitizeNumber(row.total_fee),
     paid_amount: sanitizeNumber(row.paid_fee),
     status: row.status ?? "active",
+    slot_timing: sanitizeText(row.slot_timing),
   };
 }
 
@@ -295,6 +297,7 @@ function buildPlanUpdatePayload(row: CustomerUpdate): Record<string, unknown> {
   if (row.total_fee !== undefined) payload.total_fee = sanitizeNumber(row.total_fee);
   if (row.paid_fee !== undefined) payload.paid_amount = sanitizeNumber(row.paid_fee);
   if (row.status !== undefined) payload.status = row.status ?? null;
+  if (row.slot_timing !== undefined) payload.slot_timing = sanitizeText(row.slot_timing);
   return payload;
 }
 
@@ -386,7 +389,7 @@ function mapPlanRowToCustomer(row: CustomerPlanRow): Customer {
     mobile: customer?.mobile ?? null,
     duration: deriveDuration(row.start_date, row.end_date),
     status: row.status ?? customer?.status ?? null,
-    slot_timing: null,
+    slot_timing: row.slot_timing ?? null,
     receipt: payment?.receipt_issued ?? false,
     created_at: row.created_at,
     updated_at: row.updated_at,

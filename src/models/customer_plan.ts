@@ -9,6 +9,7 @@ export type CustomerPlan = {
   paid_amount: number;
   balance: number;
   status: string | null;
+  slot_timing: string | null;
   created_at: string;
   updated_at: string;
 };

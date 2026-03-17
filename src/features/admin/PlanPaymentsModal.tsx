@@ -13,6 +13,7 @@ export type PaymentFormState = {
   paymentDate: string;
   paymentMode: string;
   paidTo: string;
+  remarks: string;
   receipt: boolean;
 };
 
@@ -35,6 +36,7 @@ const emptyForm: PaymentFormState = {
   paymentDate: "",
   paymentMode: "",
   paidTo: "",
+  remarks: "",
   receipt: false,
 };
 
@@ -122,6 +124,7 @@ export function PlanPaymentsModal({
       paymentDate: payment.payment_date ?? "",
       paymentMode: payment.payment_mode ?? "",
       paidTo: payment.paid_to ?? "",
+      remarks: payment.remarks ?? "",
       receipt: Boolean(payment.receipt_issued),
     });
     setFormError(null);
@@ -187,6 +190,7 @@ export function PlanPaymentsModal({
                       <th className="text-right py-2 px-3">Amount</th>
                       <th className="text-left py-2 px-3">Mode</th>
                       <th className="text-left py-2 px-3">Paid to</th>
+                      <th className="text-left py-2 px-3">Remarks</th>
                       <th className="text-center py-2 px-3">Receipt</th>
                       <th className="text-center py-2 px-3">Actions</th>
                     </tr>
@@ -198,6 +202,7 @@ export function PlanPaymentsModal({
                         <td className="py-2 px-3 text-right text-emerald-200 font-semibold">{formatCurrency(payment.amount)}</td>
                         <td className="py-2 px-3 text-stone-300">{payment.payment_mode ?? "—"}</td>
                         <td className="py-2 px-3 text-stone-300">{payment.paid_to ?? "—"}</td>
+                        <td className="py-2 px-3 text-stone-300 max-w-xs truncate" title={payment.remarks ?? undefined}>{payment.remarks ?? "—"}</td>
                         <td className="py-2 px-3 text-center text-stone-300">{payment.receipt_issued ? "Yes" : "—"}</td>
                         <td className="py-2 px-3 text-center space-x-2">
                           <button
@@ -260,20 +265,23 @@ export function PlanPaymentsModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment date</label>
+                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment date <span className="text-brand-red">*</span></label>
                     <AdminDatePicker
                       value={form.paymentDate}
                       onChange={(value) => setForm((prev) => ({ ...prev, paymentDate: value }))}
                       className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
                       aria-label="Payment date"
+                      popoverPlacement="above"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment mode</label>
+                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment mode <span className="text-brand-red">*</span></label>
                     <select
+                      name="payment_mode"
                       value={form.paymentMode}
                       onChange={(e) => setForm((prev) => ({ ...prev, paymentMode: e.target.value }))}
                       className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                      required
                     >
                       <option value="">— Select —</option>
                       {TRACKER_PAYMENT_MODE_OPTIONS.map((mode) => (
@@ -288,6 +296,15 @@ export function PlanPaymentsModal({
                       value={form.paidTo}
                       onChange={(e) => setForm((prev) => ({ ...prev, paidTo: e.target.value }))}
                       className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Remarks</label>
+                    <textarea
+                      value={form.remarks}
+                      onChange={(e) => setForm((prev) => ({ ...prev, remarks: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100 min-h-[72px]"
+                      placeholder="Optional notes about this payment"
                     />
                   </div>
                   <div className="flex items-center gap-2">

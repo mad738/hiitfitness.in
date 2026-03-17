@@ -10,6 +10,7 @@ import {
   deleteCredential as deleteCredentialRepo,
 } from "@/repositories/credential_repository";
 import { verifyPassword } from "@/lib/verify-password";
+import { explainError } from "@/lib/error-message";
 
 export type CredentialActionResult =
   | { ok: true }
@@ -45,7 +46,7 @@ export async function createCredential(
     revalidatePath(credentialsPath());
     return { ok: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Failed to add admin.";
+    const msg = explainError(e, "Unable to add admin account. Please try again.");
     return { ok: false, error: msg };
   }
 }
@@ -67,7 +68,7 @@ export async function updateCredentialPassword(
     revalidatePath(credentialsPath());
     return { ok: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Failed to update password.";
+    const msg = explainError(e, "Unable to update password. Please try again.");
     return { ok: false, error: msg };
   }
 }
@@ -96,7 +97,7 @@ export async function updateOwnPassword(
     revalidatePath(credentialsPath());
     return { ok: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Failed to update password.";
+    const msg = explainError(e, "Unable to update password. Please try again.");
     return { ok: false, error: msg };
   }
 }
@@ -115,7 +116,7 @@ export async function deleteCredential(id: string): Promise<CredentialActionResu
     revalidatePath(credentialsPath());
     return { ok: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Failed to remove admin.";
+    const msg = explainError(e, "Unable to remove admin. Please try again.");
     return { ok: false, error: msg };
   }
 }

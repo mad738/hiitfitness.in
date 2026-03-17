@@ -57,6 +57,15 @@ type Props = {
   showDurationChips?: boolean;
   /** Base date for duration chips (start date). If empty, today is used. */
   durationChipsReferenceDate?: string;
+  /** Where to render the popover relative to the input. Default is below. */
+  popoverPlacement?: "above" | "below";
+};
+
+type AnchorRect = {
+  top: number;
+  bottom: number;
+  left: number;
+  width: number;
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -104,21 +113,24 @@ export function AdminDatePicker({
   "aria-label": ariaLabel,
   showDurationChips = false,
   durationChipsReferenceDate,
+  popoverPlacement = "below",
 }: Props) {
   const [open, setOpen] = useState(false);
   const today = toDateOnly();
   const chipsBaseDate = durationChipsReferenceDate?.trim() || today;
   const [viewDate, setViewDate] = useState(() => parseDateInput(value));
-  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
+  const [anchorRect, setAnchorRect] = useState<AnchorRect | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const updatePosition = useCallback(() => {
     if (inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect();
-      setPopoverPosition({
-        top: rect.bottom + 8,
+      setAnchorRect({
+        top: rect.top,
+        bottom: rect.bottom,
         left: rect.left,
+        width: rect.width,
       });
     }
   }, []);
@@ -128,6 +140,11 @@ export function AdminDatePicker({
       setViewDate(parseDateInput(value));
     }
   }, [value, open]);
+
+  function openPopover() {
+    updatePosition();
+    setOpen(true);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -223,8 +240,8 @@ export function AdminDatePicker({
           id={id}
           aria-label={ariaLabel}
           placeholder={placeholder}
-          onClick={() => setOpen(true)}
-          onFocus={() => setOpen(true)}
+          onClick={openPopover}
+          onFocus={openPopover}
           className={className + " admin-date cursor-pointer pr-10"}
         />
         <span
@@ -241,10 +258,15 @@ export function AdminDatePicker({
         createPortal(
           <div
             ref={popoverRef}
-            className="fixed z-[100] admin-calendar-popover p-3 min-w-[280px]"
+            className="fixed z-[400] admin-calendar-popover p-3 min-w-[280px]"
             style={{
-              top: popoverPosition.top,
-              left: popoverPosition.left,
+              top: popoverPlacement === "above" ? (anchorRect?.top ?? 0) : (anchorRect?.bottom ?? 0),
+              left: anchorRect?.left ?? 0,
+              transform: anchorRect
+                ? popoverPlacement === "above"
+                  ? "translateY(calc(-100% - 8px))"
+                  : "translateY(8px)"
+                : undefined,
             }}
           >
             <div className="calendar-header flex flex-wrap items-center gap-1">

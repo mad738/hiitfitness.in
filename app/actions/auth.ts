@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { findCredentialByUsername } from "@/repositories/credential_repository";
 import { verifyPassword } from "@/lib/verify-password";
+import { explainError } from "@/lib/error-message";
 import {
   setAdminSession,
   clearAdminSession,
@@ -45,7 +46,7 @@ export async function adminLogin(
       role: credential.role,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Session setup failed.";
+    const msg = explainError(e, "Session setup failed. Please try again.");
     return { error: msg };
   }
   const target =

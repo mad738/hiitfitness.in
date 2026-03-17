@@ -56,34 +56,64 @@ export function PlansView(props: PlansViewProps) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
     const form = e.currentTarget;
-    const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
-    const description = (form.elements.namedItem("description") as HTMLInputElement).value.trim() || null;
-    const price_monthly = Number((form.elements.namedItem("price_monthly") as HTMLInputElement).value);
-    const duration_days = Number((form.elements.namedItem("duration_days") as HTMLInputElement).value);
-    const total_feeRaw = (form.elements.namedItem("total_fee") as HTMLInputElement).value;
-    const total_fee = total_feeRaw ? Number(total_feeRaw) : null;
+    const nameInput = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
+    const descriptionInput = (form.elements.namedItem("description") as HTMLInputElement).value.trim();
+    const priceValue = (form.elements.namedItem("price_monthly") as HTMLInputElement).value.trim();
+    const durationValue = (form.elements.namedItem("duration_days") as HTMLInputElement).value.trim();
+    const totalFeeValue = (form.elements.namedItem("total_fee") as HTMLInputElement).value.trim();
     const is_active = (form.elements.namedItem("is_active") as HTMLInputElement).checked;
 
-    if (isAdd) {
-      const res = await createPlan({ name, description, price_monthly, duration_days, total_fee, is_active });
-      setLoading(false);
-      if (res.ok) {
-        closeForm();
-        router.refresh();
-      } else {
-        setError(res.error);
+    if (!nameInput) {
+      setError("Plan name is required.");
+      return;
+    }
+    if (!priceValue) {
+      setError("Monthly price is required.");
+      return;
+    }
+    const price_monthly = Number(priceValue);
+    if (!Number.isFinite(price_monthly) || price_monthly <= 0) {
+      setError("Monthly price must be greater than 0.");
+      return;
+    }
+    if (!durationValue) {
+      setError("Duration (days) is required.");
+      return;
+    }
+    const duration_days = Number(durationValue);
+    if (!Number.isFinite(duration_days) || duration_days <= 0) {
+      setError("Duration must be at least 1 day.");
+      return;
+    }
+    let total_fee: number | null = null;
+    if (totalFeeValue) {
+      total_fee = Number(totalFeeValue);
+      if (!Number.isFinite(total_fee) || total_fee < 0) {
+        setError("Total fee must be zero or a positive number.");
+        return;
       }
-    } else if (formPlan) {
-      const res = await updatePlan(formPlan.id, { name, description, price_monthly, duration_days, total_fee, is_active });
-      setLoading(false);
-      if (res.ok) {
-        closeForm();
-        router.refresh();
-      } else {
-        setError(res.error);
+    }
+
+    const description = descriptionInput || null;
+    setLoading(true);
+    try {
+      if (!isAdd && !formPlan) {
+        throw new Error("Unable to determine which plan to update.");
       }
+      const payload = { name: nameInput, description, price_monthly, duration_days, total_fee, is_active };
+      const res = isAdd
+        ? await createPlan(payload)
+        : await updatePlan(formPlan!.id, payload);
+      if (!res.ok) {
+        throw new Error(res.error);
+      }
+      closeForm();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save plan.");
+    } finally {
+      setLoading(false);
     }
   }
 

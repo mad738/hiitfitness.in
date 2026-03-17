@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@app/actions/auth";
 import * as trainerRepo from "@/repositories/trainer_repository";
 import type { TrainerInsert, TrainerUpdate } from "@/models/trainer";
+import { explainError } from "@/lib/error-message";
 
 const ADMIN_PATHS = ["/admin/trainers", "/admin/customers"];
 
@@ -26,7 +27,7 @@ export async function createTrainer(data: TrainerInsert) {
     revalidatePath(ADMIN_PATHS[1]);
     return { ok: true as const };
   } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : "Failed to add trainer." };
+    return { ok: false as const, error: explainError(e, "Unable to add trainer. Please review the form and try again.") };
   }
 }
 
@@ -38,7 +39,7 @@ export async function updateTrainer(id: string, data: TrainerUpdate) {
     revalidatePath(ADMIN_PATHS[1]);
     return { ok: true as const };
   } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : "Failed to update trainer." };
+    return { ok: false as const, error: explainError(e, "Unable to update trainer. Please review the changes and try again.") };
   }
 }
 
@@ -50,6 +51,6 @@ export async function deleteTrainer(id: string) {
     revalidatePath(ADMIN_PATHS[1]);
     return { ok: true as const };
   } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : "Failed to delete trainer." };
+    return { ok: false as const, error: explainError(e, "Unable to delete trainer. Please try again.") };
   }
 }

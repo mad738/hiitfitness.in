@@ -33,6 +33,36 @@ const inputClass =
   "w-full px-3 py-2.5 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100 placeholder:text-stone-500 focus:border-brand-red focus:ring-1 focus:ring-brand-red outline-none text-sm";
 const labelClass = "block text-sm text-stone-400 mb-1.5";
 
+function requireTextField(value: string | null | undefined, label: string): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) {
+    throw new Error(`${label} is required.`);
+  }
+  return trimmed;
+}
+
+function requirePositiveNumber(value: number, label: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label} must be greater than 0.`);
+  }
+  return value;
+}
+
+function requireNonNegativeNumber(value: number, label: string): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${label} cannot be negative.`);
+  }
+  return value;
+}
+
+function requireDateValue(value: string, label: string): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) {
+    throw new Error(`${label} is required.`);
+  }
+  return normalizeDateForStorage(trimmed, label);
+}
+
 function formatCurrency(n: number) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -79,6 +109,17 @@ type PlanFormValues = {
   receipt: boolean;
 };
 
+const DEFAULT_PLAN_STATUS = "active";
+
+function isPtPlan(planId: string | null | undefined): boolean {
+  return (planId ?? "").trim().toUpperCase() === "PT";
+}
+
+function withDefaultStatus(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim();
+  return trimmed || DEFAULT_PLAN_STATUS;
+}
+
 type CustomerGroup = {
   key: string;
   primary: Customer;
@@ -115,10 +156,30 @@ function getPlansHighlight(plans: Customer[]): Customer[] {
 function sanitizePlanDates(values: PlanFormValues, planLabel: string): PlanFormValues {
   return {
     ...values,
-    startDate: normalizeDateForStorage(values.startDate, `${planLabel} start date`),
-    endDate: normalizeDateForStorage(values.endDate, `${planLabel} end date`),
-    payDate: normalizeDateForStorage(values.payDate, `${planLabel} payment date`),
+    startDate: requireDateValue(values.startDate, `${planLabel} start date`),
+    endDate: requireDateValue(values.endDate, `${planLabel} end date`),
+    payDate: requireDateValue(values.payDate, `${planLabel} payment date`),
   };
+}
+
+function hasPlanDetails(values: PlanFormValues): boolean {
+  const trainerValue = (values.trainerId ?? "").trim();
+  return (
+    values.totalFee > 0 ||
+    values.paidFee > 0 ||
+    values.startDate.trim() !== "" ||
+    values.endDate.trim() !== "" ||
+    values.payDate.trim() !== "" ||
+    values.paymentMode.trim() !== "" ||
+    values.remarks.trim() !== "" ||
+    values.duration.trim() !== "" ||
+    values.slotTiming.trim() !== "" ||
+    values.paidTo.trim() !== "" ||
+    trainerValue !== "" ||
+    values.feedback.trim() !== "" ||
+    Boolean(values.image) ||
+    values.receipt
+  );
 }
 
 function formatPromptDate(value: string | null | undefined): string {
@@ -161,7 +222,6 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   // GT (left column)
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
-  const [plan, setPlan] = useState<string>("GT");
   const [totalFee, setTotalFee] = useState<number>(0);
   const [paidFee, setPaidFee] = useState<number>(0);
   const [balance, setBalance] = useState<number>(0);
@@ -172,7 +232,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [paymentMode, setPaymentMode] = useState("");
   const [remarks, setRemarks] = useState("");
   const [duration, setDuration] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(DEFAULT_PLAN_STATUS);
   const [slotTiming, setSlotTiming] = useState("");
   const [mobile, setMobile] = useState("");
   const [paidTo, setPaidTo] = useState("");
@@ -181,7 +241,6 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   // PT (right column) – same fields, individual per column when adding new entry
   const [, setNamePt] = useState("");
   const [imagePt, setImagePt] = useState<string | null>(null);
-  const [, setPlanPt] = useState<string>("PT");
   const [totalFeePt, setTotalFeePt] = useState<number>(0);
   const [paidFeePt, setPaidFeePt] = useState<number>(0);
   const [balancePt, setBalancePt] = useState<number>(0);
@@ -192,7 +251,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [paymentModePt, setPaymentModePt] = useState("");
   const [remarksPt, setRemarksPt] = useState("");
   const [durationPt, setDurationPt] = useState("");
-  const [statusPt, setStatusPt] = useState("");
+  const [statusPt, setStatusPt] = useState(DEFAULT_PLAN_STATUS);
   const [slotTimingPt, setSlotTimingPt] = useState("");
   const [, setMobilePt] = useState("");
   const [paidToPt, setPaidToPt] = useState("");
@@ -214,6 +273,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const formErrorRef = useRef<HTMLParagraphElement | null>(null);
+  const profileErrorRef = useRef<HTMLParagraphElement | null>(null);
   useHorizontalScrollTable(
     [customers.length],
     { wheelOnBody: true }
@@ -226,6 +287,18 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       document.body.style.overflow = prev;
     };
   }, [detailsCustomer]);
+
+  useEffect(() => {
+    if (!error) return;
+    const target = formOpen ? formErrorRef.current : (profileOpen ? profileErrorRef.current : null);
+    if (!target) return;
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (typeof target.focus === "function") {
+        target.focus({ preventScroll: true });
+      }
+    });
+  }, [error, formOpen, profileOpen]);
 
   useEffect(() => {
     setSearchQuery(getStringParam(searchParams, "q"));
@@ -416,11 +489,17 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       }
       const isoDate = normalizeDateForStorage(form.paymentDate, "Payment date");
       if (!isoDate) throw new Error("Payment date is required.");
+      const paymentModeValue = form.paymentMode.trim();
+      if (!paymentModeValue) throw new Error("Payment mode is required.");
+      const paidToValue = form.paidTo.trim();
+      if (!paidToValue) throw new Error("Paid to is required.");
+      const remarksValue = form.remarks.trim();
       const payload = {
         amount,
         payment_date: isoDate,
-        payment_mode: form.paymentMode.trim() || null,
-        paid_to: form.paidTo.trim() || null,
+        payment_mode: paymentModeValue,
+        paid_to: paidToValue,
+        remarks: remarksValue || null,
         receipt_issued: form.receipt,
       };
       const result = form.paymentId
@@ -444,7 +523,6 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     // GT
     setName("");
     setImage(null);
-    setPlan("GT");
     setTotalFee(0);
     setPaidFee(0);
     setBalance(0);
@@ -455,7 +533,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setPaymentMode("");
     setRemarks("");
     setDuration("");
-    setStatus("");
+    setStatus(DEFAULT_PLAN_STATUS);
     setSlotTiming("");
     setMobile("");
     setPaidTo("");
@@ -464,7 +542,6 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     // PT
     setNamePt("");
     setImagePt(null);
-    setPlanPt("PT");
     setTotalFeePt(0);
     setPaidFeePt(0);
     setBalancePt(0);
@@ -475,7 +552,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setPaymentModePt("");
     setRemarksPt("");
     setDurationPt("");
-    setStatusPt("");
+    setStatusPt(DEFAULT_PLAN_STATUS);
     setSlotTimingPt("");
     setMobilePt("");
     setPaidToPt("");
@@ -487,14 +564,12 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
   function openAddEntryFromReport(c: Customer) {
     openAdd();
-    const isPt = (c.plan ?? "").toUpperCase() === "PT";
-    if (isPt) {
-      setNamePt(c.name ?? "");
-      setMobilePt(c.mobile ?? "");
-    } else {
-      setName(c.name ?? "");
-      setMobile(c.mobile ?? "");
-    }
+    const fallbackName = c.name ?? "";
+    const fallbackMobile = c.mobile ?? "";
+    setName(fallbackName);
+    setMobile(fallbackMobile);
+    setNamePt(fallbackName);
+    setMobilePt(fallbackMobile);
     setDetailsCustomer(null);
   }
 
@@ -510,12 +585,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     const linked = mobileKey ? customers.find(x => x.id !== c.id && normalizeMobile(x.mobile) === mobileKey && x.plan !== c.plan) : null;
     setEditingLinkedId(linked?.id ?? null);
 
-    const gtSource = c.plan === "GT" ? c : (linked?.plan === "GT" ? linked : null);
-    const ptSource = c.plan === "PT" ? c : (linked?.plan === "PT" ? linked : null);
+    const gtSource = c.plan === "GT" ? c : null;
+    const ptSource = c.plan === "PT" ? c : null;
 
     if (gtSource) {
       setImage(gtSource.image);
-      setPlan("GT");
       setTotalFee(gtSource.total_fee);
       setPaidFee(gtSource.paid_fee);
       setBalance(gtSource.balance);
@@ -526,18 +600,17 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       setPaymentMode(gtSource.payment_mode ?? "");
       setRemarks(gtSource.remarks ?? "");
       setDuration(gtSource.duration ?? "");
-      setStatus(gtSource.status ?? "");
+      setStatus(gtSource.status ?? DEFAULT_PLAN_STATUS);
       setSlotTiming(gtSource.slot_timing ?? "");
       setPaidTo(gtSource.paid_to ?? "");
       setFeedback(gtSource.feedback ?? "");
       setReceipt(gtSource.receipt ?? false);
     } else {
-      setImage(null); setTotalFee(0); setPaidFee(0); setTrainerId(null); setStartDate(""); setEndDate(""); setPayDate(""); setPaymentMode(""); setRemarks(""); setDuration(""); setStatus(""); setSlotTiming(""); setPaidTo(""); setFeedback(""); setReceipt(false);
+      setImage(null); setTotalFee(0); setPaidFee(0); setTrainerId(null); setStartDate(""); setEndDate(""); setPayDate(""); setPaymentMode(""); setRemarks(""); setDuration(""); setStatus(DEFAULT_PLAN_STATUS); setSlotTiming(""); setPaidTo(""); setFeedback(""); setReceipt(false);
     }
 
     if (ptSource) {
       setImagePt(ptSource.image);
-      setPlanPt("PT");
       setTotalFeePt(ptSource.total_fee);
       setPaidFeePt(ptSource.paid_fee);
       setBalancePt(ptSource.balance);
@@ -548,14 +621,14 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       setPaymentModePt(ptSource.payment_mode ?? "");
       setRemarksPt(ptSource.remarks ?? "");
       setDurationPt(ptSource.duration ?? "");
-      setStatusPt(ptSource.status ?? "");
+      setStatusPt(ptSource.status ?? DEFAULT_PLAN_STATUS);
       setSlotTimingPt(ptSource.slot_timing ?? "");
       setMobilePt(ptSource.mobile ?? "");
       setPaidToPt(ptSource.paid_to ?? "");
       setFeedbackPt(ptSource.feedback ?? "");
       setReceiptPt(ptSource.receipt ?? false);
     } else {
-      setImagePt(null); setTotalFeePt(0); setPaidFeePt(0); setTrainerIdPt(null); setStartDatePt(""); setEndDatePt(""); setPayDatePt(""); setPaymentModePt(""); setRemarksPt(""); setDurationPt(""); setStatusPt(""); setSlotTimingPt(""); setPaidToPt(""); setFeedbackPt(""); setReceiptPt(false);
+      setImagePt(null); setTotalFeePt(0); setPaidFeePt(0); setTrainerIdPt(null); setStartDatePt(""); setEndDatePt(""); setPayDatePt(""); setPaymentModePt(""); setRemarksPt(""); setDurationPt(""); setStatusPt(DEFAULT_PLAN_STATUS); setSlotTimingPt(""); setPaidToPt(""); setFeedbackPt(""); setReceiptPt(false);
     }
 
     setFormOpen(true);
@@ -586,25 +659,47 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
 
   function buildPayload(opts: PlanFormValues, customerId?: string | null) {
-    const balanceVal = Number(opts.totalFee) - Number(opts.paidFee);
+    const planId = opts.plan?.trim();
+    if (!planId) {
+      throw new Error("Plan type is required.");
+    }
+    const planLabel = planId.toUpperCase();
+    const trimmedName = requireTextField(opts.name, "Name");
+    const mobileValue = requireTextField(opts.mobile, "Phone number");
+    const durationValue = requireTextField(opts.duration, `${planLabel} duration`);
+    const paymentModeValue = requireTextField(opts.paymentMode, `${planLabel} payment mode`);
+    const paidToValue = requireTextField(opts.paidTo, `${planLabel} paid to`);
+    const totalFeeValue = requirePositiveNumber(opts.totalFee, `${planLabel} total fee`);
+    const paidFeeValue = requireNonNegativeNumber(opts.paidFee, `${planLabel} paid amount`);
+    const balanceVal = totalFeeValue - paidFeeValue;
+    const slotValue = opts.slotTiming.trim();
+    const ptPlan = isPtPlan(planId);
+    if (ptPlan && !slotValue) {
+      throw new Error("Slot timing is required for PT plans.");
+    }
+    const trainerValue = ptPlan ? requireTextField(opts.trainerId, "Trainer") : null;
+    const statusValue = withDefaultStatus(opts.status);
+    if (!statusValue) {
+      throw new Error(`${planLabel} status is required.`);
+    }
     const payload = {
-      name: opts.name.trim(),
+      name: trimmedName,
       image: opts.image ?? null,
-      plan: opts.plan,
-      total_fee: Number(opts.totalFee),
-      paid_fee: Number(opts.paidFee),
+      plan: planId,
+      total_fee: totalFeeValue,
+      paid_fee: paidFeeValue,
       balance: balanceVal,
-      trainer_id: opts.plan === "PT" ? opts.trainerId : null,
-      start_date: opts.startDate.trim() || null,
-      end_date: opts.endDate.trim() || null,
-      pay_date: opts.payDate.trim() || null,
-      payment_mode: opts.paymentMode.trim() || null,
+      trainer_id: ptPlan ? trainerValue : null,
+      start_date: opts.startDate,
+      end_date: opts.endDate,
+      pay_date: opts.payDate,
+      payment_mode: paymentModeValue,
       remarks: opts.remarks.trim() || null,
-      duration: opts.duration.trim() || null,
-      status: opts.status.trim() || null,
-      slot_timing: opts.slotTiming.trim() || null,
-      mobile: opts.mobile.trim() || null,
-      paid_to: opts.paidTo.trim() || null,
+      duration: durationValue,
+      status: statusValue,
+      slot_timing: ptPlan ? slotValue : (slotValue || null),
+      mobile: mobileValue,
+      paid_to: paidToValue,
       feedback: opts.feedback.trim() || null,
       receipt: opts.receipt,
     };
@@ -642,6 +737,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         return;
       }
       const newMobileRaw = mobile.trim();
+      if (!newMobileRaw) {
+        setError("Phone number is required.");
+        setLoading(false);
+        return;
+      }
       const mobileKey = profileCustomer?.mobile ? normalizeMobile(profileCustomer.mobile) : null;
       const nameKey = (profileCustomer?.name ?? "").trim();
       const historyToUpdate = customers.filter((c) => {
@@ -694,13 +794,19 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           setLoading(false);
           return;
         }
-        if (isMobileAlreadyUsed(mobile, editing.id, trimmedName)) {
+        const trimmedMobile = mobile.trim();
+        if (!trimmedMobile) {
+          setError("Phone number is required.");
+          setLoading(false);
+          return;
+        }
+        if (isMobileAlreadyUsed(trimmedMobile, editing.id, trimmedName)) {
           setError("Another customer already has this mobile number. Mobile must be unique.");
           setLoading(false);
           return;
         }
 
-        const isGtMain = plan === "GT";
+        const isGtMain = editing ? editing.plan === "GT" : true;
         const gtPayloadInfo: PlanFormValues = {
           name,
           image,
@@ -716,7 +822,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           duration,
           status,
           slotTiming,
-          mobile,
+          mobile: trimmedMobile,
           paidTo,
           feedback,
           receipt,
@@ -736,38 +842,54 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           duration: durationPt,
           status: statusPt,
           slotTiming: slotTimingPt,
-          mobile,
+          mobile: trimmedMobile,
           paidTo: paidToPt,
           feedback: feedbackPt,
           receipt: receiptPt,
         };
+        const hasGtDetails = hasPlanDetails(gtPayloadInfo);
+        const hasPtDetails = hasPlanDetails(ptPayloadInfo);
+        if (isGtMain && !hasGtDetails) {
+          setError("GT details are required while editing this plan.");
+          setLoading(false);
+          return;
+        }
+        if (!isGtMain && !hasPtDetails) {
+          setError("PT details are required while editing this plan.");
+          setLoading(false);
+          return;
+        }
 
-        let sanitizedGt: PlanFormValues;
-        let sanitizedPt: PlanFormValues;
+        let sanitizedGt: PlanFormValues | null = null;
+        let sanitizedPt: PlanFormValues | null = null;
         try {
-          sanitizedGt = sanitizePlanDates(gtPayloadInfo, "GT");
-          sanitizedPt = sanitizePlanDates(ptPayloadInfo, "PT");
+          if (hasGtDetails) {
+            sanitizedGt = sanitizePlanDates(gtPayloadInfo, "GT");
+          }
+          if (hasPtDetails) {
+            sanitizedPt = sanitizePlanDates(ptPayloadInfo, "PT");
+          }
         } catch (validationErr) {
           setError(validationErr instanceof Error ? validationErr.message : "Invalid date input.");
           setLoading(false);
           return;
         }
 
-        const payload = buildPayload(isGtMain ? sanitizedGt : sanitizedPt);
+        const payload = buildPayload(isGtMain ? sanitizedGt! : sanitizedPt!);
         const res = await updateCustomer(editing.id, payload);
 
         if (res.ok) {
           if (editingLinkedId) {
-            const linkedPayload = buildPayload(isGtMain ? sanitizedPt : sanitizedGt);
-            await updateCustomer(editingLinkedId, linkedPayload);
+            const linkedPayloadSource = isGtMain ? sanitizedPt : sanitizedGt;
+            if (linkedPayloadSource) {
+              const linkedPayload = buildPayload(linkedPayloadSource);
+              await updateCustomer(editingLinkedId, linkedPayload);
+            }
           } else {
             // If they entered details for the other plan type during edit, create it
-            const hasPtDetails = totalFeePt > 0 || paidFeePt > 0 || durationPt.trim() !== "" || !!trainerIdPt;
-            const hasGtDetails = totalFee > 0 || paidFee > 0 || duration.trim() !== "";
-
-            if (isGtMain && hasPtDetails) {
+            if (isGtMain && hasPtDetails && sanitizedPt) {
               await createCustomer(buildPayload(sanitizedPt, editing.customer_id));
-            } else if (!isGtMain && hasGtDetails) {
+            } else if (!isGtMain && hasGtDetails && sanitizedGt) {
               await createCustomer(buildPayload(sanitizedGt, editing.customer_id));
             }
           }
@@ -785,18 +907,17 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           return;
         }
         const commonMobileRaw = mobile.trim();
-        if (commonMobileRaw && isMobileAlreadyUsed(commonMobileRaw, undefined, commonName)) {
+        if (!commonMobileRaw) {
+          setError("Phone number is required.");
+          setLoading(false);
+          return;
+        }
+        if (isMobileAlreadyUsed(commonMobileRaw, undefined, commonName)) {
           setError("A customer with this mobile number already exists. Mobile must be unique.");
           setLoading(false);
           return;
         }
-        const commonMobile = commonMobileRaw || null;
-
-        const hasGtDetails = totalFee > 0 || paidFee > 0 || duration.trim() !== "" || startDate.trim() !== "";
-        const hasPtDetails = totalFeePt > 0 || paidFeePt > 0 || durationPt.trim() !== "" || !!trainerIdPt || startDatePt.trim() !== "";
-
-        // If neither have details but they hit submit, default to creating an empty GT
-        const createGt = hasGtDetails || !hasPtDetails;
+        const commonMobile = commonMobileRaw;
 
         const gtPayloadInfo: PlanFormValues = {
           name: commonName,
@@ -813,7 +934,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           duration,
           status,
           slotTiming,
-          mobile: commonMobile ?? "",
+          mobile: commonMobile,
           paidTo,
           feedback,
           receipt,
@@ -833,17 +954,31 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           duration: durationPt,
           status: statusPt,
           slotTiming: slotTimingPt,
-          mobile: commonMobile ?? "",
+          mobile: commonMobile,
           paidTo: paidToPt,
           feedback: feedbackPt,
           receipt: receiptPt,
         };
 
-        let sanitizedGt: PlanFormValues;
-        let sanitizedPt: PlanFormValues;
+        const hasGtDetails = hasPlanDetails(gtPayloadInfo);
+        const hasPtDetails = hasPlanDetails(ptPayloadInfo);
+        if (!hasGtDetails && !hasPtDetails) {
+          setError("Add at least one plan (GT or PT) before saving.");
+          setLoading(false);
+          return;
+        }
+
+        // If neither have details but they hit submit, default to creating an empty GT
+        const createGt = hasGtDetails || !hasPtDetails;
+        let sanitizedGt: PlanFormValues | null = null;
+        let sanitizedPt: PlanFormValues | null = null;
         try {
-          sanitizedGt = sanitizePlanDates(gtPayloadInfo, "GT");
-          sanitizedPt = sanitizePlanDates(ptPayloadInfo, "PT");
+          if (createGt) {
+            sanitizedGt = sanitizePlanDates(gtPayloadInfo, "GT");
+          }
+          if (hasPtDetails) {
+            sanitizedPt = sanitizePlanDates(ptPayloadInfo, "PT");
+          }
         } catch (validationErr) {
           setError(validationErr instanceof Error ? validationErr.message : "Invalid date input.");
           setLoading(false);
@@ -851,7 +986,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         }
 
         if (createGt) {
-          const payloadGt = buildPayload(sanitizedGt);
+          const payloadGt = buildPayload(sanitizedGt!);
           const resGt = await createCustomer(payloadGt);
           if (!resGt.ok) {
             setError(resGt.error ?? "Failed to add GT.");
@@ -861,7 +996,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         }
 
         if (hasPtDetails) {
-          const payloadPt = buildPayload(sanitizedPt);
+          const payloadPt = buildPayload(sanitizedPt!);
           const resPt = await createCustomer(payloadPt);
           if (!resPt.ok) {
             setError(resPt.error ?? "Failed to add PT.");
@@ -892,26 +1027,75 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setDetailsCustomer(null);
   }
 
-  function getDeletePromptMessage(prompt: DeletePrompt): string {
-    if (prompt.level === "customer") {
-      return "You are attempting to delete a customer from Database this action will delete all his past and active plans and payment histories.";
-    }
-    if (prompt.level === "payment") {
-      const planName = prompt.plan.plan ?? "this plan";
-      const customerName = prompt.plan.name?.trim() || "this customer";
-      return `You are attempting to delete payment for ${planName} taken by ${customerName}.`;
-    }
+function getDeletePromptMessage(prompt: DeletePrompt) {
+  if (prompt.level === "customer") {
+    return (
+      <>
+        You are about to{" "}
+        <span className="text-red-600 font-medium">
+          delete this customer
+        </span>.
+        <br />
+        This will permanently remove{" "}
+        <span className="text-red-600 font-medium">all plans</span> and{" "}
+        <span className="text-red-600 font-medium">
+          payment history
+        </span>.
+      </>
+    );
+  }
+
+  if (prompt.level === "payment") {
+    const planName = prompt.plan.plan ?? "this plan";
     const customerName = prompt.plan.name?.trim() || "this customer";
-    return `You are attempting to delete a plan for ${customerName} this will delete all the payments history data related to this subscription plan.`;
+
+    return (
+      <>
+        You are about to delete a{" "}
+        <span className="text-red-600 font-medium">payment</span> for{" "}
+        <span className="text-red-600 font-medium">{planName}</span>{" "}
+        belonging to{" "}
+        <span className="text-red-600 font-medium">
+          {customerName}
+        </span>.
+      </>
+    );
   }
 
-  function getDeletePromptWarning(prompt: DeletePrompt): string | null {
-    if (prompt.level !== "payment") return null;
-    return isPlanActive(prompt.plan)
-      ? "This plan is active; deleting this payment may remove important history and cause issues in future audits."
-      : "You might not retrieve this data again for future audits.";
-  }
+  const customerName = prompt.plan.name?.trim() || "this customer";
 
+  return (
+    <>
+      You are about to{" "}
+      <span className="text-red-600 font-medium">
+        delete a plan
+      </span>{" "}
+      for{" "}
+      <span className="text-red-600 font-medium">
+        {customerName}
+      </span>.
+      <br />
+      This will also remove{" "}
+      <span className="text-red-600 font-medium">
+        all related payments
+      </span>.
+    </>
+  );
+}
+
+function getDeletePromptWarning(prompt: DeletePrompt) {
+  if (prompt.level !== "payment") return null;
+
+  return isPlanActive(prompt.plan) ? (
+    <span className="text-red-600 font-medium">
+      ⚠ This plan is currently active. Deleting this payment may affect financial records.
+    </span>
+  ) : (
+    <span className="text-red-600 font-medium">
+      ⚠ This action is irreversible. Deleted data cannot be recovered.
+    </span>
+  );
+}
   async function deletePaymentForPlan(planId: string, paymentId: string): Promise<{ ok: boolean; error?: string }> {
     try {
       setPaymentsSaving(true);
@@ -1022,6 +1206,22 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     : null;
 
   const trainerOptions = trainers.filter((t) => (t.name ?? "").trim() !== "");
+  const ptFormTouched = Boolean(
+    totalFeePt > 0 ||
+    paidFeePt > 0 ||
+    startDatePt.trim() !== "" ||
+    endDatePt.trim() !== "" ||
+    payDatePt.trim() !== "" ||
+    paymentModePt.trim() !== "" ||
+    remarksPt.trim() !== "" ||
+    durationPt.trim() !== "" ||
+    slotTimingPt.trim() !== "" ||
+    (trainerIdPt ?? "").trim() !== "" ||
+    paidToPt.trim() !== "" ||
+    feedbackPt.trim() !== "" ||
+    Boolean(imagePt) ||
+    receiptPt
+  );
   // Filter dropdown: only trainers in use (assigned to ≥1 customer) with valid names, same as Trainers page
   const trainersInUseForFilter = trainers.filter(
     (t) => (t.name ?? "").trim() !== "" && customers.some((c) => c.trainer_id === t.id)
@@ -1188,19 +1388,23 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <p className="text-brand-red text-sm bg-brand-red/10 px-3 py-2 rounded">
+              <p
+                ref={formErrorRef}
+                tabIndex={-1}
+                className="text-brand-red text-sm bg-brand-red/10 px-3 py-2 rounded focus:outline-none"
+              >
                 {error}
               </p>
             )}
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-white/10">
                 <div>
-                  <label className={labelClass}>Name</label>
+                  <label className={labelClass}>Name <span className="text-brand-red">*</span></label>
                   <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="Name (common)" required />
                 </div>
                 <div>
-                  <label className={labelClass}>Number</label>
-                  <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} placeholder="Phone number (common)" />
+                  <label className={labelClass}>Number <span className="text-brand-red">*</span></label>
+                  <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} placeholder="Phone number (common)" required />
                 </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
@@ -1209,44 +1413,44 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                   <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">GT</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelClass}>Duration</label>
-                      <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
+                      <label className={labelClass}>Duration <span className="text-brand-red">*</span></label>
+                      <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" required />
                     </div>
 
                     <div>
-                      <label className={labelClass}>Total fee (₹)</label>
-                      <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} />
+                      <label className={labelClass}>Total fee (₹) <span className="text-brand-red">*</span></label>
+                      <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required />
                     </div>
                     <div>
-                      <label className={labelClass}>Paid (₹)</label>
-                      <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} />
+                      <label className={labelClass}>Paid (₹) <span className="text-brand-red">*</span></label>
+                      <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required />
                     </div>
                     <div>
                       <label className={labelClass}>Balance</label>
                       <input type="number" value={balance} readOnly onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
                     </div>
                     <div>
-                      <label className={labelClass}>Start date</label>
+                      <label className={labelClass}>Start date <span className="text-brand-red">*</span></label>
                       <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="GT start date" />
                     </div>
                     <div>
-                      <label className={labelClass}>End date</label>
+                      <label className={labelClass}>End date <span className="text-brand-red">*</span></label>
                       <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="GT end date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
                     </div>
                     <div>
-                      <label className={labelClass}>Pay date</label>
+                      <label className={labelClass}>Pay date <span className="text-brand-red">*</span></label>
                       <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="GT pay date" />
                     </div>
                     <div>
-                      <label className={labelClass}>Payment mode</label>
-                      <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass}>
+                      <label className={labelClass}>Payment mode <span className="text-brand-red">*</span></label>
+                      <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass} required>
                         <option value="">— Select —</option>
                         {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className={labelClass}>Paid to</label>
-                      <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" />
+                      <label className={labelClass}>Paid to <span className="text-brand-red">*</span></label>
+                      <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" required />
                     </div>
                     <div>
                       <label className={labelClass}>Remarks</label>
@@ -1283,55 +1487,55 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                   <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">PT</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelClass}>Duration</label>
-                      <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" />
+                      <label className={labelClass}>Duration <span className="text-brand-red">*</span></label>
+                      <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" required={ptFormTouched} aria-required={ptFormTouched} />
                     </div>
                     <div>
-                      <label className={labelClass}>Trainer</label>
-                      <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass}>
+                      <label className={labelClass}>Trainer <span className="text-brand-red">*</span></label>
+                      <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass} required={ptFormTouched} aria-required={ptFormTouched}>
                         <option value="">— Select —</option>
                         {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
                     </div>
 
                     <div>
-                      <label className={labelClass}>Total fee (₹)</label>
-                      <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} />
+                      <label className={labelClass}>Total fee (₹) <span className="text-brand-red">*</span></label>
+                      <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={ptFormTouched} aria-required={ptFormTouched} />
                     </div>
                     <div>
-                      <label className={labelClass}>Paid (₹)</label>
-                      <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} />
+                      <label className={labelClass}>Paid (₹) <span className="text-brand-red">*</span></label>
+                      <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={ptFormTouched} aria-required={ptFormTouched} />
                     </div>
                     <div>
                       <label className={labelClass}>Balance</label>
                       <input type="number" value={balancePt} readOnly onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass + " bg-stone-900/50 text-stone-400 text-xs"} />
                     </div>
                     <div>
-                      <label className={labelClass}>Start date</label>
-                      <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" />
+                      <label className={labelClass}>Start date <span className="text-brand-red">*</span></label>
+                      <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" aria-required={ptFormTouched} />
                     </div>
                     <div>
-                      <label className={labelClass}>End date</label>
-                      <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} />
+                      <label className={labelClass}>End date <span className="text-brand-red">*</span></label>
+                      <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} aria-required={ptFormTouched} />
                     </div>
                     <div>
-                      <label className={labelClass}>Pay date</label>
-                      <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" />
+                      <label className={labelClass}>Pay date <span className="text-brand-red">*</span></label>
+                      <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" aria-required={ptFormTouched} />
                     </div>
                     <div>
-                      <label className={labelClass}>Payment mode</label>
-                      <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass}>
+                      <label className={labelClass}>Payment mode <span className="text-brand-red">*</span></label>
+                      <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass} required={ptFormTouched} aria-required={ptFormTouched}>
                         <option value="">— Select —</option>
                         {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className={labelClass}>Slot timing</label>
-                      <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" />
+                      <label className={labelClass}>Slot timing <span className="text-brand-red">*</span></label>
+                      <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" required={ptFormTouched} aria-required={ptFormTouched} />
                     </div>
                     <div>
-                      <label className={labelClass}>Paid to</label>
-                      <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" />
+                      <label className={labelClass}>Paid to <span className="text-brand-red">*</span></label>
+                      <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" required={ptFormTouched} aria-required={ptFormTouched} />
                     </div>
                     <div>
                       <label className={labelClass}>Remarks</label>
@@ -1372,7 +1576,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           </h2>
           <form onSubmit={handleSubmitProfile} className="space-y-4">
             {error && (
-              <p className="text-brand-red text-sm bg-brand-red/10 px-3 py-2 rounded">
+              <p
+                ref={profileErrorRef}
+                tabIndex={-1}
+                className="text-brand-red text-sm bg-brand-red/10 px-3 py-2 rounded focus:outline-none"
+              >
                 {error}
               </p>
             )}

@@ -166,12 +166,11 @@ export function CustomerReportModal({
                       <th className="text-right py-2.5 px-3 font-medium text-stone-400">Total</th>
                       <th className="text-right py-2.5 px-3 font-medium text-stone-400">Paid</th>
                       <th className="text-right py-2.5 px-3 font-medium text-stone-400">Balance</th>
-                      <th className="text-left py-2.5 px-3 font-medium text-stone-400">Pay date</th>
-                      <th className="text-left py-2.5 px-3 font-medium text-stone-400">Payment</th>
+
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400">Trainer</th>
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400">Status</th>
-                      <th className="text-left py-2.5 px-3 font-medium text-stone-400">Slot</th>
-                      <th className="text-left py-2.5 px-3 font-medium text-stone-400 max-w-[120px]">Remarks</th>
+                      <th className="text-center py-2.5 px-3 font-medium text-stone-400 max-w-[120px]">Slot</th>
+                      <th className="text-center py-2.5 px-3 font-medium text-stone-400 max-w-[120px]">Remarks</th>
                       <th className="text-center py-2.5 px-3 font-medium text-stone-400">Receipt</th>
                       {showActions && <th className="text-center py-2.5 px-3 font-medium text-stone-400">Actions</th>}
                     </tr>
@@ -207,11 +206,10 @@ export function CustomerReportModal({
                               {formatCurrency(entry.balance)}
                             </span>
                           </td>
-                          <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.pay_date)}</td>
-                          <td className="py-2 px-3 text-stone-300">{entry.payment_mode ?? "—"}</td>
+
                           <td className="py-2 px-3 text-stone-300">{entry.plan === "PT" ? (trainer?.name ?? "—") : "—"}</td>
                           <td className="py-2 px-3 text-stone-300">{entry.status ?? "—"}</td>
-                          <td className="py-2 px-3 text-stone-300">{entry.slot_timing ?? "—"}</td>
+                          <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate">{entry.slot_timing ?? "—"}</td>
                           <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "—"}</td>
                           <td className="py-2 px-3 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>
                           {showActions && (
