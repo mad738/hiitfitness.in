@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Customer } from "@/models/customer";
 import type { Payment } from "@/models/payment";
 import { TRACKER_PAYMENT_MODE_OPTIONS } from "@/config/tracker-options";
+import { AdminDatePicker } from "@/components/ui/admin-date-picker";
 
 export type PaymentFormState = {
   paymentId?: string | null;
@@ -24,7 +26,7 @@ type Props = {
   formatCurrency: (n: number) => string;
   onClose: () => void;
   onSubmit: (form: PaymentFormState) => Promise<{ ok: boolean; error?: string }>;
-  onDelete: (paymentId: string) => Promise<{ ok: boolean; error?: string }>;
+  onDeleteRequest: (payment: Payment) => void;
 };
 
 const emptyForm: PaymentFormState = {
@@ -61,27 +63,46 @@ export function PlanPaymentsModal({
   formatCurrency,
   onClose,
   onSubmit,
-  onDelete,
+  onDeleteRequest,
 }: Props) {
   const [form, setForm] = useState<PaymentFormState>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
+  const [paymentFormVisible, setPaymentFormVisible] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setForm(emptyForm);
     setFormError(null);
+    setPaymentFormVisible(false);
   }, [open, plan?.id]);
 
+  useEffect(() => {
+    if (!form.paymentId) return;
+    if (!payments.some((payment) => payment.id === form.paymentId)) {
+      setForm(emptyForm);
+      setFormError(null);
+    }
+  }, [payments, form.paymentId]);
+
   const sortedPayments = useMemo(
-    () => payments.slice().sort((a, b) => {
-      const aDate = a.payment_date ? Date.parse(a.payment_date) : 0;
-      const bDate = b.payment_date ? Date.parse(b.payment_date) : 0;
-      return bDate - aDate || Date.parse(b.created_at) - Date.parse(a.created_at);
-    }),
+    () =>
+      payments
+        .slice()
+        .sort((a, b) => {
+          const aDate = a.payment_date ? Date.parse(a.payment_date) : 0;
+          const bDate = b.payment_date ? Date.parse(b.payment_date) : 0;
+          return bDate - aDate || Date.parse(b.created_at) - Date.parse(a.created_at);
+        }),
     [payments]
   );
 
-  if (!open || !plan) return null;
+  function togglePaymentFormVisibility() {
+    setForm(emptyForm);
+    setFormError(null);
+    setPaymentFormVisible((visible) => !visible);
+  }
+
+  if (!open || !plan || typeof document === "undefined") return null;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -91,16 +112,6 @@ export function PlanPaymentsModal({
       setForm(emptyForm);
     } else if (result.error) {
       setFormError(result.error);
-    }
-  }
-
-  async function handleDelete(paymentId: string) {
-    setFormError(null);
-    const result = await onDelete(paymentId);
-    if (!result.ok && result.error) {
-      setFormError(result.error);
-    } else if (form.paymentId === paymentId) {
-      setForm(emptyForm);
     }
   }
 
@@ -114,10 +125,11 @@ export function PlanPaymentsModal({
       receipt: Boolean(payment.receipt_issued),
     });
     setFormError(null);
+    setPaymentFormVisible(true);
   }
 
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         className="liquid-glass rounded-2xl border border-white/10 shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -197,7 +209,7 @@ export function PlanPaymentsModal({
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDelete(payment.id)}
+                            onClick={() => onDeleteRequest(payment)}
                             className="px-2 py-1 rounded-lg text-xs text-brand-red border border-brand-red/30 hover:bg-brand-red/10"
                           >
                             Delete
@@ -212,86 +224,105 @@ export function PlanPaymentsModal({
           </div>
 
           <div className="border-t border-white/10 pt-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-stone-300 mb-3">
-              {form.paymentId ? "Edit payment" : "Add payment"}
-            </h3>
-            {formError && <p className="text-sm text-brand-red bg-brand-red/10 px-3 py-2 rounded mb-3">{formError}</p>}
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Amount (₹)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.amount}
-                  onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment date</label>
-                <input
-                  type="text"
-                  value={form.paymentDate}
-                  onChange={(e) => setForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
-                  placeholder="YYYY-MM-DD or DD/MM/YYYY"
-                  className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment mode</label>
-                <select
-                  value={form.paymentMode}
-                  onChange={(e) => setForm((prev) => ({ ...prev, paymentMode: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
-                >
-                  <option value="">— Select —</option>
-                  {TRACKER_PAYMENT_MODE_OPTIONS.map((mode) => (
-                    <option key={mode} value={mode}>{mode}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Paid to</label>
-                <input
-                  type="text"
-                  value={form.paidTo}
-                  onChange={(e) => setForm((prev) => ({ ...prev, paidTo: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="payment-receipt"
-                  type="checkbox"
-                  checked={form.receipt}
-                  onChange={(e) => setForm((prev) => ({ ...prev, receipt: e.target.checked }))}
-                  className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0"
-                />
-                <label htmlFor="payment-receipt" className="text-sm text-stone-300">Receipt issued</label>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2.5 rounded-xl bg-brand-red text-white font-semibold text-sm disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : form.paymentId ? "Update" : "Add payment"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setForm(emptyForm); setFormError(null); }}
-                  className="px-4 py-2.5 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
-                >
-                  Clear
-                </button>
-              </div>
-            </form>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-stone-300">
+                {form.paymentId ? "Edit payment" : "Add payment"}
+              </h3>
+              <button
+                type="button"
+                onClick={togglePaymentFormVisibility}
+                className="px-3 py-1.5 rounded-lg border border-white/20 text-xs font-semibold tracking-wide uppercase text-stone-200 hover:border-brand-red/60 hover:text-white transition"
+              >
+                {paymentFormVisible ? "Hide form" : "Add payment"}
+              </button>
+            </div>
+            {!paymentFormVisible && (
+              <p className="text-sm text-stone-500">
+                Click “Add payment” above to log a new transaction or edit an existing entry.
+              </p>
+            )}
+            {paymentFormVisible && (
+              <>
+                {formError && <p className="text-sm text-brand-red bg-brand-red/10 px-3 py-2 rounded mb-3">{formError}</p>}
+                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Amount (₹)</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      value={form.amount}
+                      onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+                      onWheel={(event) => event.currentTarget.blur()}
+                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment date</label>
+                    <AdminDatePicker
+                      value={form.paymentDate}
+                      onChange={(value) => setForm((prev) => ({ ...prev, paymentDate: value }))}
+                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                      aria-label="Payment date"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment mode</label>
+                    <select
+                      value={form.paymentMode}
+                      onChange={(e) => setForm((prev) => ({ ...prev, paymentMode: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                    >
+                      <option value="">— Select —</option>
+                      {TRACKER_PAYMENT_MODE_OPTIONS.map((mode) => (
+                        <option key={mode} value={mode}>{mode}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Paid to</label>
+                    <input
+                      type="text"
+                      value={form.paidTo}
+                      onChange={(e) => setForm((prev) => ({ ...prev, paidTo: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="payment-receipt"
+                      type="checkbox"
+                      checked={form.receipt}
+                      onChange={(e) => setForm((prev) => ({ ...prev, receipt: e.target.checked }))}
+                      className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0"
+                    />
+                    <label htmlFor="payment-receipt" className="text-sm text-stone-300">Receipt issued</label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-4 py-2.5 rounded-xl bg-brand-red text-white font-semibold text-sm disabled:opacity-50"
+                    >
+                      {saving ? "Saving…" : form.paymentId ? "Update" : "Add payment"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setForm(emptyForm); setFormError(null); }}
+                      className="px-4 py-2.5 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

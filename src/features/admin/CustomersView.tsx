@@ -85,6 +85,11 @@ type CustomerGroup = {
   plans: Customer[];
 };
 
+type DeletePrompt =
+  | { level: "customer"; plan: Customer }
+  | { level: "plan"; plan: Customer }
+  | { level: "payment"; plan: Customer; payment: Payment };
+
 function planSortValue(plan: Customer): number {
   const start = plan.start_date ? Date.parse(plan.start_date) : NaN;
   if (!Number.isNaN(start)) return start;
@@ -116,6 +121,19 @@ function sanitizePlanDates(values: PlanFormValues, planLabel: string): PlanFormV
   };
 }
 
+function formatPromptDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = Date.parse(value);
+  if (!Number.isNaN(parsed)) {
+    return new Date(parsed).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+  return value;
+}
+
 
 export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const router = useRouter();
@@ -136,6 +154,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsSaving, setPaymentsSaving] = useState(false);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
+  const [deletePrompt, setDeletePrompt] = useState<DeletePrompt | null>(null);
+  const [deleteInFlight, setDeleteInFlight] = useState(false);
+  const [deletePromptError, setDeletePromptError] = useState<string | null>(null);
 
   // GT (left column)
   const [name, setName] = useState("");
@@ -190,7 +211,6 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
-  const [openActionRowId, setOpenActionRowId] = useState<string | null>(null);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
@@ -412,25 +432,6 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       return { ok: true };
     } catch (err) {
       const message = (err as Error)?.message ?? "Failed to save payment.";
-      setPaymentsError(message);
-      return { ok: false, error: message };
-    } finally {
-      setPaymentsSaving(false);
-    }
-  }
-
-  async function handleDeletePayment(paymentId: string): Promise<{ ok: boolean; error?: string }> {
-    if (!paymentsPlan) return { ok: false, error: "No plan selected." };
-    try {
-      setPaymentsSaving(true);
-      setPaymentsError(null);
-      const result = await deletePlanPayment(paymentId);
-      if (!result.ok) throw new Error(result.error ?? "Failed to delete payment.");
-      await refreshPlanPayments(paymentsPlan.id);
-      router.refresh();
-      return { ok: true };
-    } catch (err) {
-      const message = (err as Error)?.message ?? "Failed to delete payment.";
       setPaymentsError(message);
       return { ok: false, error: message };
     } finally {
@@ -878,19 +879,147 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     }
   }
 
-  async function handleDelete(c: Customer) {
-    if (!confirm(`Remove customer "${c.name}"?`)) return;
-    setLoading(true);
-    const res = await deleteCustomer(c.id);
-    setLoading(false);
-    if (res.ok) {
-      setCustomers((prev) => prev.filter((x) => x.id !== c.id));
-      if (editing?.id === c.id) closeForm();
-      router.refresh();
+  function openDeletePrompt(plan: Customer, level: DeletePrompt["level"], payment?: Payment) {
+    if (level === "payment" && payment) {
+      setDeletePrompt({ level, plan, payment });
     } else {
-      setError(res.error);
+      setDeletePrompt({ level, plan });
+      if (paymentsPlan?.id === plan.id) {
+        closePaymentsModal();
+      }
+    }
+    setDeletePromptError(null);
+    setDetailsCustomer(null);
+  }
+
+  function getDeletePromptMessage(prompt: DeletePrompt): string {
+    if (prompt.level === "customer") {
+      return "You are attempting to delete a customer from Database this action will delete all his past and active plans and payment histories.";
+    }
+    if (prompt.level === "payment") {
+      const planName = prompt.plan.plan ?? "this plan";
+      const customerName = prompt.plan.name?.trim() || "this customer";
+      return `You are attempting to delete payment for ${planName} taken by ${customerName}.`;
+    }
+    const customerName = prompt.plan.name?.trim() || "this customer";
+    return `You are attempting to delete a plan for ${customerName} this will delete all the payments history data related to this subscription plan.`;
+  }
+
+  function getDeletePromptWarning(prompt: DeletePrompt): string | null {
+    if (prompt.level !== "payment") return null;
+    return isPlanActive(prompt.plan)
+      ? "This plan is active; deleting this payment may remove important history and cause issues in future audits."
+      : "You might not retrieve this data again for future audits.";
+  }
+
+  async function deletePaymentForPlan(planId: string, paymentId: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      setPaymentsSaving(true);
+      setPaymentsError(null);
+      const result = await deletePlanPayment(paymentId);
+      if (!result.ok) throw new Error(result.error ?? "Failed to delete payment.");
+      await refreshPlanPayments(planId);
+      router.refresh();
+      return { ok: true };
+    } catch (err) {
+      const message = (err as Error)?.message ?? "Failed to delete payment.";
+      setPaymentsError(message);
+      return { ok: false, error: message };
+    } finally {
+      setPaymentsSaving(false);
     }
   }
+
+  async function confirmDeletePrompt() {
+    if (!deletePrompt) return;
+    const snapshot = deletePrompt;
+    setDeletePromptError(null);
+    setDeleteInFlight(true);
+    if (snapshot.level !== "payment") {
+      setLoading(true);
+    }
+    try {
+      if (snapshot.level === "payment") {
+        const result = await deletePaymentForPlan(snapshot.plan.id, snapshot.payment.id);
+        if (!result.ok) throw new Error(result.error ?? "Failed to delete payment.");
+        setDeletePrompt(null);
+        return;
+      }
+      const res = await deleteCustomer(snapshot.plan.id);
+      if (!res.ok) throw new Error(res.error ?? "Failed to delete this record.");
+      setCustomers((prev) => prev.filter((x) => x.id !== snapshot.plan.id));
+      if (editing?.id === snapshot.plan.id) closeForm();
+      setDeletePrompt(null);
+      router.refresh();
+    } catch (err) {
+      setDeletePromptError((err as Error)?.message ?? "Failed to delete this record.");
+    } finally {
+      setDeleteInFlight(false);
+      if (snapshot.level !== "payment") {
+        setLoading(false);
+      }
+    }
+  }
+
+  function handleRequestDeletePayment(payment: Payment) {
+    if (!paymentsPlan) return;
+    openDeletePrompt(paymentsPlan, "payment", payment);
+  }
+
+  const deletePromptModal = deletePrompt && mounted && typeof document !== "undefined"
+    ? createPortal(
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-8"
+        role="dialog"
+        aria-modal="true"
+        aria-live="assertive"
+        onClick={() => { if (!deleteInFlight) setDeletePrompt(null); }}
+      >
+        <div
+          className="w-full max-w-lg rounded-2xl border border-amber-400/40 bg-stone-900/95 text-stone-100 shadow-2xl p-5 space-y-3"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <p className="text-sm leading-relaxed">{deletePrompt ? getDeletePromptMessage(deletePrompt) : ""}</p>
+          {deletePrompt?.level === "plan" && (
+            <p className="text-xs text-stone-400">Plan: {deletePrompt.plan.plan ?? "—"} • {deletePrompt.plan.start_date ?? "—"} → {deletePrompt.plan.end_date ?? "—"}</p>
+          )}
+          {deletePrompt?.level === "payment" && (
+            <div className="text-xs text-stone-400 space-y-1">
+              <p>Plan: {deletePrompt.plan.plan ?? "—"} · {deletePrompt.plan.name ?? "—"}</p>
+              <p>
+                Amount: {formatCurrency(deletePrompt.payment.amount)} · Paid on {formatPromptDate(deletePrompt.payment.payment_date)} · Mode: {deletePrompt.payment.payment_mode ?? "—"}
+              </p>
+            </div>
+          )}
+          {deletePrompt?.level === "payment" && (
+            <p className="text-xs text-amber-300">{getDeletePromptWarning(deletePrompt)}</p>
+          )}
+          {deletePromptError && (
+            <p className="text-sm text-brand-red bg-brand-red/15 px-3 py-2 rounded-xl">{deletePromptError}</p>
+          )}
+          <div className="flex flex-wrap justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setDeletePrompt(null)}
+              disabled={deleteInFlight}
+              className="px-4 py-2 rounded-xl border border-white/20 text-sm text-stone-300 hover:bg-white/5 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeletePrompt}
+              disabled={deleteInFlight}
+              className="px-4 py-2 rounded-xl bg-brand-red text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            >
+              {deleteInFlight ? "Deleting…" : "Delete now"}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )
+    : null;
 
   const trainerOptions = trainers.filter((t) => (t.name ?? "").trim() !== "");
   // Filter dropdown: only trainers in use (assigned to ≥1 customer) with valid names, same as Trainers page
@@ -904,6 +1033,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
   return (
     <div className="space-y-6">
+      {deletePromptModal}
       {/* Search bar + filter - sticky so it stays visible when scrolling */}
       <div className="sticky top-0 z-10 rounded-2xl border border-white/10 bg-stone-900/95 backdrop-blur-sm shadow-inner">
         <div className="flex items-stretch gap-0">
@@ -1288,7 +1418,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           showActions
           onAddEntry={openAddEntryFromReport}
           onEditEntry={openEdit}
-          onDeleteEntry={handleDelete}
+          onDeleteEntry={(entry) => openDeletePrompt(entry, "plan")}
           onViewPayments={openPaymentsPanel}
         />
       )}
@@ -1303,7 +1433,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         formatCurrency={formatCurrency}
         onClose={closePaymentsModal}
         onSubmit={handleSavePayment}
-        onDelete={handleDeletePayment}
+        onDeleteRequest={handleRequestDeletePayment}
       />
 
       <div className="liquid-glass rounded-2xl overflow-hidden border border-white/10">
@@ -1375,38 +1505,22 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
                             </div>
                           )}
                         </td>
-                        <td className="py-3 px-6 text-center" onClick={(e) => e.stopPropagation()}>
-                          <div className="relative inline-block">
+                        <td className="py-3 px-6" onClick={(event) => event.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-2">
                             <button
                               type="button"
-                              onClick={() => setOpenActionRowId(openActionRowId === c.id ? null : c.id)}
-                              className="p-2 rounded-xl border border-white/10 text-stone-400 hover:text-stone-100 hover:bg-white/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                              onClick={(event) => { event.stopPropagation(); openProfileEdit(c); }}
+                              className="px-3 py-1 rounded-full text-xs font-semibold border border-white/10 text-stone-200 hover:border-brand-red/60 hover:text-white transition"
                             >
-                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-                              </svg>
+                              Edit
                             </button>
-                            {openActionRowId === c.id && (
-                              <>
-                                <div className="fixed inset-0 z-10" aria-hidden onClick={() => setOpenActionRowId(null)} />
-                                <div className="absolute right-0 top-full mt-2 z-20 min-w-[160px] py-2 rounded-2xl border border-white/10 bg-stone-900 shadow-2xl animate-in fade-in zoom-in duration-200">
-                                  <button
-                                    type="button"
-                                    onClick={() => { openProfileEdit(c); setOpenActionRowId(null); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-stone-100 hover:bg-white/5"
-                                  >
-                                    Edit Profile
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => { setOpenActionRowId(null); handleDelete(c); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-brand-red hover:bg-brand-red/10"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </>
-                            )}
+                            <button
+                              type="button"
+                              onClick={(event) => { event.stopPropagation(); openDeletePrompt(c, "customer"); }}
+                              className="px-3 py-1 rounded-full text-xs font-semibold border border-brand-red/40 text-brand-red hover:bg-brand-red/10 transition"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </td>
                       </tr>

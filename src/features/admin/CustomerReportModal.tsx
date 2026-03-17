@@ -173,9 +173,6 @@ export function CustomerReportModal({
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400">Slot</th>
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400 max-w-[120px]">Remarks</th>
                       <th className="text-center py-2.5 px-3 font-medium text-stone-400">Receipt</th>
-                      {onViewPayments && (
-                        <th className="text-center py-2.5 px-3 font-medium text-stone-400">Payments</th>
-                      )}
                       {showActions && <th className="text-center py-2.5 px-3 font-medium text-stone-400">Actions</th>}
                     </tr>
                   </thead>
@@ -183,10 +180,12 @@ export function CustomerReportModal({
                     {history.map((entry, idx) => {
                       const trainer = entry.trainer_id ? trainers.find((t) => t.id === entry.trainer_id) : null;
                       const isCurrentlyRunning = isPlanCurrentlyRunning(entry.start_date, entry.end_date);
+                      const rowClickable = Boolean(onViewPayments);
                       return (
                         <tr
                           key={`${entry.id}-${idx}`}
-                          className={`border-b border-white/5 ${isCurrentlyRunning ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40" : ""}`}
+                          onClick={rowClickable ? () => onViewPayments?.(entry) : undefined}
+                          className={`border-b border-white/5 ${isCurrentlyRunning ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40" : ""} ${rowClickable ? "cursor-pointer hover:bg-white/5" : ""}`}
                           title={isCurrentlyRunning ? "Currently active (today within start–end dates)" : undefined}
                         >
                           <td className="py-2 px-3 text-stone-400">{totalEntries - idx}</td>
@@ -215,22 +214,11 @@ export function CustomerReportModal({
                           <td className="py-2 px-3 text-stone-300">{entry.slot_timing ?? "—"}</td>
                           <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "—"}</td>
                           <td className="py-2 px-3 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>
-                          {onViewPayments && (
-                            <td className="py-2 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => onViewPayments(entry)}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-white/15 text-xs font-semibold text-stone-100 hover:border-brand-red/60 hover:text-brand-red transition"
-                              >
-                                View
-                              </button>
-                            </td>
-                          )}
                           {showActions && (
                             <td className="py-2 px-3 text-center whitespace-nowrap">
                               <button
                                 type="button"
-                                onClick={() => { onEditEntry?.(entry); onClose(); }}
+                                onClick={(e) => { e.stopPropagation(); onEditEntry?.(entry); onClose(); }}
                                 className="p-1 rounded text-stone-500 hover:text-brand-red hover:bg-brand-red/10 transition mr-2"
                                 title="Edit this entry"
                               >
@@ -240,7 +228,7 @@ export function CustomerReportModal({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => onDeleteEntry?.(entry)}
+                                onClick={(e) => { e.stopPropagation(); onDeleteEntry?.(entry); }}
                                 className="p-1 rounded text-stone-500 hover:text-brand-red hover:bg-brand-red/10 transition"
                                 title="Delete this entry"
                               >
