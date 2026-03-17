@@ -1018,6 +1018,10 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     if (level === "payment" && payment) {
       setDeletePrompt({ level, plan, payment });
     } else {
+      if (level === "payment") {
+        setDeletePrompt(null);
+        return;
+      }
       setDeletePrompt({ level, plan });
       if (paymentsPlan?.id === plan.id) {
         closePaymentsModal();

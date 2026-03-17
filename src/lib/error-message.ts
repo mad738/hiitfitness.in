@@ -35,7 +35,7 @@ export function explainError(error: unknown, fallback: string): string {
 
   if (error instanceof Error) {
     const base = typeof error.message === "string" ? error.message.trim() : "";
-    const extras = collectDetails(error as Record<string, unknown>, new Set(base ? ["message"] : []));
+    const extras = collectDetails(Object(error) as Record<string, unknown>, new Set(base ? ["message"] : []));
     const parts = [base, ...extras].filter((part) => part && part.length > 0);
     return parts.length > 0 ? parts.join(" ") : fallback;
   }

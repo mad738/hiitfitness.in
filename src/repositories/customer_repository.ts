@@ -62,7 +62,7 @@ export async function listCustomers(): Promise<Customer[]> {
       .limit(1, { foreignTable: PAYMENT_TABLE })
       .range(offset, offset + PAGE_SIZE - 1);
     if (error) throw error;
-    const rows = (data ?? []) as CustomerPlanRow[];
+    const rows = ((data ?? []) as unknown) as CustomerPlanRow[];
     const mapped = rows.map(mapPlanRowToCustomer);
     all.push(...mapped);
     pageLength = rows.length;
@@ -166,7 +166,7 @@ async function fetchPlanById(
     .maybeSingle();
   if (error && error.code !== "PGRST116") throw error;
   if (!data) return null;
-  return mapPlanRowToCustomer(data as CustomerPlanRow);
+  return mapPlanRowToCustomer((data as unknown) as CustomerPlanRow);
 }
 
 async function resolveCustomerProfile(
