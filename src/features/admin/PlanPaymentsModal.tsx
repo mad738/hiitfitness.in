@@ -28,6 +28,7 @@ type Props = {
   onClose: () => void;
   onSubmit: (form: PaymentFormState) => Promise<{ ok: boolean; error?: string }>;
   onDeleteRequest: (payment: Payment) => void;
+  allowManage?: boolean;
 };
 
 const emptyForm: PaymentFormState = {
@@ -66,6 +67,7 @@ export function PlanPaymentsModal({
   onClose,
   onSubmit,
   onDeleteRequest,
+  allowManage = true,
 }: Props) {
   const [form, setForm] = useState<PaymentFormState>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
@@ -172,7 +174,7 @@ export function PlanPaymentsModal({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-stone-300">Transactions</h3>
-              {saving && <p className="text-xs text-stone-500 italic">Saving…</p>}
+              {allowManage && saving && <p className="text-xs text-stone-500 italic">Saving…</p>}
             </div>
             {error && (
               <p className="text-sm text-brand-red bg-brand-red/10 px-3 py-2 rounded">{error}</p>
@@ -192,7 +194,7 @@ export function PlanPaymentsModal({
                       <th className="text-left py-2 px-3">Paid to</th>
                       <th className="text-left py-2 px-3">Remarks</th>
                       <th className="text-center py-2 px-3">Receipt</th>
-                      <th className="text-center py-2 px-3">Actions</th>
+                      {allowManage && <th className="text-center py-2 px-3">Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -204,22 +206,24 @@ export function PlanPaymentsModal({
                         <td className="py-2 px-3 text-stone-300">{payment.paid_to ?? "—"}</td>
                         <td className="py-2 px-3 text-stone-300 max-w-xs truncate" title={payment.remarks ?? undefined}>{payment.remarks ?? "—"}</td>
                         <td className="py-2 px-3 text-center text-stone-300">{payment.receipt_issued ? "Yes" : "—"}</td>
-                        <td className="py-2 px-3 text-center space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(payment)}
-                            className="px-2 py-1 rounded-lg text-xs text-stone-200 border border-white/10 hover:border-brand-red/50"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteRequest(payment)}
-                            className="px-2 py-1 rounded-lg text-xs text-brand-red border border-brand-red/30 hover:bg-brand-red/10"
-                          >
-                            Delete
-                          </button>
-                        </td>
+                        {allowManage && (
+                          <td className="py-2 px-3 text-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(payment)}
+                              className="px-2 py-1 rounded-lg text-xs text-stone-200 border border-white/10 hover:border-brand-red/50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteRequest(payment)}
+                              className="px-2 py-1 rounded-lg text-xs text-brand-red border border-brand-red/30 hover:bg-brand-red/10"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -228,7 +232,8 @@ export function PlanPaymentsModal({
             )}
           </div>
 
-          <div className="border-t border-white/10 pt-4">
+          {allowManage && (
+            <div className="border-t border-white/10 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-stone-300">
                 {form.paymentId ? "Edit payment" : "Add payment"}
@@ -336,7 +341,8 @@ export function PlanPaymentsModal({
                 </form>
               </>
             )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>,

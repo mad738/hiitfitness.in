@@ -26,6 +26,10 @@ const PLAN_SELECT = `
   balance,
   status,
   slot_timing,
+  plan_months,
+  monthly_value,
+  commission_rate,
+  trainer_commission,
   created_at,
   updated_at,
   customer:customers (
@@ -151,6 +155,27 @@ export async function deleteCustomer(id: string): Promise<void> {
   if (!count) {
     await supabase.from(CUSTOMER_TABLE).delete().eq("id", existing.customer_id);
   }
+}
+
+export async function deleteCustomerCascade(customerId: string): Promise<void> {
+  const supabase = await createServiceRoleClient();
+  const trimmedId = customerId?.trim();
+  if (!trimmedId) return;
+
+  const { data: planRows, error } = await supabase
+    .from(PLAN_TABLE)
+    .select("id")
+    .eq("customer_id", trimmedId);
+  if (error) throw error;
+
+  const planIds = (planRows ?? []).map((row) => row.id as string).filter(Boolean);
+  if (planIds.length > 0) {
+    const { error: deletePlansError } = await supabase.from(PLAN_TABLE).delete().in("id", planIds);
+    if (deletePlansError) throw deletePlansError;
+  }
+
+  const { error: deleteProfileError } = await supabase.from(CUSTOMER_TABLE).delete().eq("id", trimmedId);
+  if (deleteProfileError) throw deleteProfileError;
 }
 
 async function fetchPlanById(
@@ -369,6 +394,10 @@ function mapPlanRowToCustomer(row: CustomerPlanRow): Customer {
   const payment = row.payments?.[0] ?? null;
   const paidAmount = sanitizeNumber(row.paid_amount);
   const totalFee = sanitizeNumber(row.total_fee);
+  const planMonths = sanitizeOptionalNumber(row.plan_months);
+  const monthlyValue = sanitizeOptionalNumber(row.monthly_value);
+  const commissionRate = sanitizeOptionalNumber(row.commission_rate);
+  const trainerCommission = sanitizeOptionalNumber(row.trainer_commission);
   return {
     id: row.id,
     customer_id: row.customer_id,
@@ -393,6 +422,10 @@ function mapPlanRowToCustomer(row: CustomerPlanRow): Customer {
     receipt: payment?.receipt_issued ?? false,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    plan_months: planMonths,
+    monthly_value: monthlyValue,
+    commission_rate: commissionRate,
+    trainer_commission: trainerCommission,
   };
 }
 
@@ -426,4 +459,10 @@ function sanitizeNumber(value: number | null | undefined): number {
 function sanitizeMobile(value: string | null | undefined): string | null {
   const normalized = normalizeMobile(value ?? "");
   return normalized || null;
+}
+
+function sanitizeOptionalNumber(value: number | string | null | undefined): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }

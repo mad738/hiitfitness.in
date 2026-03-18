@@ -12,6 +12,10 @@ export type CustomerPlan = {
   slot_timing: string | null;
   created_at: string;
   updated_at: string;
+  plan_months?: number | null;
+  monthly_value?: number | null;
+  commission_rate?: number | null;
+  trainer_commission?: number | null;
 };
 
 export type CustomerPlanInsert = Omit<CustomerPlan, "id" | "created_at" | "updated_at"> & {

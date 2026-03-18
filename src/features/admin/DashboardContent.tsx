@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
+import type { Payment } from "@/models/payment";
 import { dedupeByMobile, normalizeMobile, isPlanCurrentlyRunning } from "@/lib/customer-utils";
-import type { Tracker } from "@/models/tracker";
 import { RevenueChart, type RevenueChartRow } from "./DashboardCharts";
 import { CustomerReportModal } from "./CustomerReportModal";
+import { PlanPaymentsModal, type PaymentFormState } from "./PlanPaymentsModal";
+import { TrainerReportModal } from "./TrainerReportModal";
+import type { TrainerReport, TrainerReportPlan } from "./trainer-report-types";
+import { listPlanPayments } from "@app/actions/payments";
 
 /** Format number as Indian Rupees (e.g. ₹1,47,800) */
 function formatINR(value: number): string {
@@ -51,27 +55,14 @@ function parseDashboardDateMs(dStr: string | null | undefined): number {
   return d ? d.getTime() : 0;
 }
 
-function isCustomer(e: Customer | Tracker): e is Customer {
-  return "name" in e && !("client_name" in e);
-}
-
 /** Sort key for "recent first": start_date > end_date > created_at */
-function getSortDateMs(e: Customer | Tracker): number {
+function getSortDateMs(e: Customer): number {
   const created =
     "created_at" in e && typeof (e as { created_at: string }).created_at === "string"
       ? (e as { created_at: string }).created_at
       : "";
   return parseDashboardDateMs(e.start_date) || parseDashboardDateMs(e.end_date) || parseDashboardDateMs(created) || 0;
 }
-
-export type TrainerReport = {
-  name: string;
-  entries: Customer[] | Tracker[];
-  /** Trainer commission: sum of (total_fee / duration_months) * 30% for entries that started this (business) month. */
-  commission: number;
-  /** Entry ids that contributed to commission (start_date in current business month). */
-  commissionEntryIds: Set<string>;
-};
 
 /** One customer (by mobile) with total amount paid in a period. */
 export type CustomerWithAmount = { customer: Customer; amountInPeriod: number };
@@ -107,6 +98,9 @@ function durationToMonths(duration: string | null): number {
   const num = parseFloat(s);
   if (!Number.isNaN(num)) {
     if (s.includes("year")) return Math.max(1, num * 12);
+    if (s.includes("month")) return Math.max(0.5, num);
+    if (s.includes("week")) return Math.max(0.5, (num * 7) / 30);
+    if (s.includes("day")) return Math.max(0.25, num / 30);
     return Math.max(0.5, num);
   }
   if (s.includes("year")) {
@@ -116,6 +110,14 @@ function durationToMonths(duration: string | null): number {
   if (s.includes("month")) {
     const n = parseFloat(s.replace("month", "").replace("s", "").trim());
     return Number.isNaN(n) ? 1 : Math.max(0.5, n);
+  }
+  if (s.includes("week")) {
+    const n = parseFloat(s.replace("week", "").replace("s", "").trim());
+    return Number.isNaN(n) ? 0.5 : Math.max(0.5, (n * 7) / 30);
+  }
+  if (s.includes("day")) {
+    const n = parseFloat(s.replace("day", "").replace("s", "").trim());
+    return Number.isNaN(n) ? 0.25 : Math.max(0.25, n / 30);
   }
   return 1;
 }
@@ -173,6 +175,11 @@ export function DashboardContent({
   const [chartClickedPeriod, setChartClickedPeriod] = useState<{ type: "daily" | "weekly" | "monthly"; index: number } | null>(null);
   /** Customer selected from analytics to show full report modal. */
   const [reportCustomer, setReportCustomer] = useState<Customer | null>(null);
+  const [paymentsPlan, setPaymentsPlan] = useState<Customer | null>(null);
+  const [planPayments, setPlanPayments] = useState<Payment[]>([]);
+  const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const customerPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -206,6 +213,41 @@ export function DashboardContent({
   );
   const gtCount = byPlan["GT"] ?? 0;
   const ptCount = byPlan["PT"] ?? 0;
+
+  const refreshPlanPayments = useCallback(async (planId: string) => {
+    const data = await listPlanPayments(planId);
+    setPlanPayments(data);
+  }, []);
+
+  const openPlanPaymentsPanel = useCallback(async (plan: Customer) => {
+    setPaymentsPlan(plan);
+    setPlanPayments([]);
+    setPaymentsError(null);
+    setPaymentsModalOpen(true);
+    setPaymentsLoading(true);
+    try {
+      await refreshPlanPayments(plan.id);
+    } catch (err) {
+      setPaymentsError((err as Error)?.message ?? "Failed to load payments.");
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [refreshPlanPayments]);
+
+  const closePaymentsModal = useCallback(() => {
+    setPaymentsModalOpen(false);
+    setPaymentsPlan(null);
+    setPlanPayments([]);
+    setPaymentsError(null);
+    setPaymentsLoading(false);
+  }, []);
+
+  const handleReadOnlyPaymentSubmit = useCallback(async (_form: PaymentFormState) => ({
+    ok: false as const,
+    error: "Payments can only be managed from the Customers screen.",
+  }), []);
+
+  const handleReadOnlyDelete = useCallback((_payment: Payment) => undefined, []);
 
   const { dailySummary, dailyChartData, dailyCustomers, dailyCustomersByBar, weeklySummary, weeklyChartData, weeklyCustomers, weeklyCustomersByBar, monthlySummary, monthlyChartData, monthlyCustomers, monthlyCustomersByBar, trainerReports } = useMemo(() => {
     const now = new Date();
@@ -334,25 +376,32 @@ export function DashboardContent({
       const d = parseDashboardDate(startDate);
       return d ? (d >= currentMonthStart && d <= currentMonthEnd) : false;
     };
-    // Commission = only entries that started this (business) month: (total_fee / duration_months) * 30%
+    // Commission = entries starting this (business) month, using Supabase-calculated trainer_commission with fallbacks
     const trainerReportsList: TrainerReport[] = Object.entries(byTrainer)
       .map(([name, entries]) => {
         const deduped = dedupeByNameKeepRecent(entries);
-        const commissionEntryIds = new Set<string>();
-        let commission = 0;
-        for (const c of deduped) {
-          if (!isStartInCurrentMonth(c.start_date)) continue;
-          commissionEntryIds.add(c.id);
-          const total = Number(c.total_fee ?? 0);
-          const months = durationToMonths(c.duration);
-          commission += (total / months) * 0.3;
-        }
+        const plans: TrainerReportPlan[] = deduped.map((plan) => {
+          const total = Number(plan.total_fee ?? 0);
+          const hasStoredMonths = typeof plan.plan_months === "number" && plan.plan_months > 0;
+          const months = hasStoredMonths ? plan.plan_months! : durationToMonths(plan.duration);
+          const storedMonthlyValue = typeof plan.monthly_value === "number" && plan.monthly_value > 0 ? plan.monthly_value : null;
+          const monthlyValue = storedMonthlyValue ?? (months > 0 ? total / months : 0);
+          const storedRate = typeof plan.commission_rate === "number" && plan.commission_rate > 0 ? plan.commission_rate : null;
+          const commissionRate = storedRate ?? 0.3;
+          const storedCommission = typeof plan.trainer_commission === "number" ? plan.trainer_commission : null;
+          const computedCommission = storedCommission ?? monthlyValue * commissionRate;
+          const commissionAmount = isStartInCurrentMonth(plan.start_date) ? computedCommission : 0;
+          return {
+            plan,
+            commissionAmount,
+          };
+        });
+        const totalCommission = plans.reduce((sum, entry) => sum + entry.commissionAmount, 0);
         return {
           name,
-          entries: deduped,
-          commission,
-          commissionEntryIds,
-        };
+          plans,
+          totalCommission,
+        } satisfies TrainerReport;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -577,7 +626,7 @@ export function DashboardContent({
           Trainer-wise reports (PT)
         </h2>
         <p className="text-stone-400 text-sm mb-4">
-          Active PT clients only (plan running today). Commission from clients who started this month (6th–5th): (total ÷ duration) × 30%. Highlighted = contributed to commission.
+          Active PT clients only (plan running today). Commission uses Supabase-calculated trainer values for plans that started this business month (6th to 5th). Highlighted = contributed to commission.
         </p>
         {reports.length === 0 ? (
           <div className="liquid-glass p-6 sm:p-8 rounded-2xl text-center">
@@ -598,20 +647,20 @@ export function DashboardContent({
                   {report.name}
                 </p>
                 <p className="text-stone-400 text-sm font-medium mb-1">
-                  Commission: {formatINR(report.commission)}
+                  Commission: {formatINR(report.totalCommission)}
                 </p>
                 <p className="text-stone-500 text-xs mb-2">
-                  {report.entries.length} active client
-                  {report.entries.length !== 1 ? "s" : ""} · Click for details
+                  {report.plans.length} active client
+                  {report.plans.length !== 1 ? "s" : ""} · Click for details
                 </p>
                 <ul className="text-stone-300 text-sm space-y-1 max-h-40 overflow-y-auto pr-1 scrollbar-theme">
-                  {report.entries.slice(0, 8).map((e) => {
-                    const name = isCustomer(e) ? e.name : (e.client_name ?? e.client_id ?? "—");
-                    const contributes = report.commissionEntryIds.has(e.id);
+                  {report.plans.slice(0, 8).map(({ plan, commissionAmount }) => {
+                    const name = plan.name ?? "—";
                     if (name === "—") return null;
+                    const contributes = commissionAmount > 0;
                     return (
                       <li
-                        key={e.id}
+                        key={plan.id}
                         className={`truncate pl-0 ${contributes ? "bg-emerald-950/50 text-emerald-200 font-medium rounded px-1.5 py-0.5 -mx-1.5" : ""}`}
                       >
                         {name}
@@ -621,7 +670,7 @@ export function DashboardContent({
                       </li>
                     );
                   })}
-                  {report.entries.length > 8 && (
+                  {report.plans.length > 8 && (
                     <li className="text-stone-500 text-xs">+ more</li>
                   )}
                 </ul>
@@ -632,19 +681,16 @@ export function DashboardContent({
       </section>
 
       {selectedTrainer && (
-        <ClientDetailsModal
-          trainerName={selectedTrainer.name}
-          entries={selectedTrainer.entries}
-          commissionEntryIds={selectedTrainer.commissionEntryIds}
-          customers={customers}
-          trainers={trainers}
+        <TrainerReportModal
+          report={selectedTrainer}
+          formatCurrency={formatINR}
+          formatDate={formatDate}
           onClose={() => setSelectedTrainer(null)}
+          onOpenPlanPayments={openPlanPaymentsPanel}
           onOpenCustomerReport={(customer) => {
             setSelectedTrainer(null);
             setReportCustomer(customer);
           }}
-          formatINR={formatINR}
-          formatDate={formatDate}
         />
       )}
 
@@ -656,397 +702,24 @@ export function DashboardContent({
           formatCurrency={formatINR}
           onClose={() => setReportCustomer(null)}
           showActions={false}
+          onViewPayments={openPlanPaymentsPanel}
         />
       )}
+
+      <PlanPaymentsModal
+        plan={paymentsPlan}
+        open={paymentsModalOpen}
+        payments={planPayments}
+        loading={paymentsLoading}
+        saving={false}
+        error={paymentsError}
+        formatCurrency={formatINR}
+        onClose={closePaymentsModal}
+        onSubmit={handleReadOnlyPaymentSubmit}
+        onDeleteRequest={handleReadOnlyDelete}
+        allowManage={false}
+      />
     </div>
   );
 }
 
-
-
-function ClientDetailsModal({
-  trainerName,
-  entries,
-  commissionEntryIds,
-  customers,
-  trainers,
-  onClose,
-  onOpenCustomerReport,
-  formatINR,
-  formatDate,
-}: {
-  trainerName: string;
-  entries: Customer[] | Tracker[];
-  commissionEntryIds: Set<string>;
-  customers: Customer[];
-  trainers: Trainer[];
-  onClose: () => void;
-  onOpenCustomerReport?: (customer: Customer) => void;
-  formatINR: (n: number) => string;
-  formatDate: (s: string | null) => string;
-}) {
-  const [selectedEntry, setSelectedEntry] = useState<Customer | Tracker | null>(null);
-  const { tableScrollRef, topScrollRef, headerRef } = useHorizontalScrollTable(
-    [entries.length, selectedEntry?.id ?? ""],
-    { wheelOnBody: false }
-  );
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (selectedEntry) setSelectedEntry(null);
-        else onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, selectedEntry]);
-
-  const sortedEntries = useMemo(
-    () =>
-      [...entries].sort((a, b) =>
-        getSortDateMs(b) - getSortDateMs(a)
-      ),
-    [entries]
-  );
-
-
-
-  const trainerById = useMemo(
-    () => new Map(trainers.map((t) => [t.id, t])),
-    [trainers]
-  );
-
-  const showCustomerReport = selectedEntry && isCustomer(selectedEntry);
-  const customerReportHistory = useMemo(() => {
-    if (!showCustomerReport || !selectedEntry) return [];
-    const nameKey = (selectedEntry as Customer).name?.trim() ?? "";
-    return customers
-      .filter((c) => (c.name ?? "").trim() === nameKey)
-      .sort((a, b) => parseDashboardDateMs(b.start_date ?? b.created_at) - parseDashboardDateMs(a.start_date ?? a.created_at));
-  }, [showCustomerReport, selectedEntry, customers]);
-  const totalPaidAllTime = useMemo(
-    () => customerReportHistory.reduce((s, c) => s + Number(c.paid_fee ?? 0), 0),
-    [customerReportHistory]
-  );
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
-      onClick={() => (selectedEntry ? setSelectedEntry(null) : onClose())}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="client-details-title"
-    >
-      <div
-        className="liquid-glass rounded-2xl border border-white/20 w-full max-w-4xl max-h-[90vh] flex flex-col shadow-xl bg-stone-900/95"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10">
-          <h2
-            id="client-details-title"
-            className="font-display text-lg font-bold uppercase text-stone-100"
-          >
-            {showCustomerReport ? "Customer report – all history" : `Client details — ${trainerName}`}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand-red"
-            aria-label="Close"
-          >
-            <span className="text-xl leading-none">×</span>
-          </button>
-        </div>
-        <div className="flex-1 min-h-0 flex flex-col p-4 sm:p-5 overflow-hidden">
-          {showCustomerReport ? (
-            <div className="overflow-y-auto flex-1 min-h-0 space-y-4 scrollbar-theme">
-              <div className="flex gap-4 flex-wrap">
-
-                <div className="min-w-0">
-                  <p className="text-xl font-bold text-stone-100">{(selectedEntry as Customer).name}</p>
-                  <p className="text-stone-400 text-sm">{(selectedEntry as Customer).mobile ?? "—"}</p>
-                  <p className="text-stone-500 text-sm mt-1">
-                    {customerReportHistory.length} entr{customerReportHistory.length === 1 ? "y" : "ies"} · Total paid (all time): {formatINR(totalPaidAllTime)}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <h3 className="text-stone-300 font-semibold text-sm uppercase tracking-wider mb-2">All entries & renewals</h3>
-                <div className="flex flex-col">
-                  <div
-                    ref={topScrollRef}
-                    className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
-                    aria-hidden
-                  >
-                    <div className="min-w-[800px] h-2" />
-                  </div>
-                  <div
-                    ref={tableScrollRef}
-                    className="overflow-x-auto overflow-y-visible scrollbar-theme scrollbar-horizontal-bottom flex-1 min-h-0"
-                  >
-                    <table className="w-full text-sm border-collapse min-w-[800px]">
-                      <thead ref={headerRef} className="select-none cursor-ew-resize">
-                        <tr className="border-b border-white/10 bg-white/[0.04]">
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">#</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Plan</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Start</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">End</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Duration</th>
-                          <th className="text-right py-2 px-2 text-stone-400 font-medium">Total</th>
-                          <th className="text-right py-2 px-2 text-stone-400 font-medium">Paid</th>
-                          <th className="text-right py-2 px-2 text-stone-400 font-medium">Balance</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Pay date</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Payment</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Trainer</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Status</th>
-                          <th className="text-left py-2 px-2 text-stone-400 font-medium">Remarks</th>
-                          <th className="text-center py-2 px-2 text-stone-400 font-medium">Receipt</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {customerReportHistory.map((entry, idx) => {
-                          const trainer = entry.trainer_id ? trainerById.get(entry.trainer_id) : null;
-                          const isCurrent = entry.id === (selectedEntry as Customer).id;
-                          return (
-                            <tr
-                              key={entry.id}
-                              className={`border-b border-white/5 ${isCurrent ? "bg-brand-red/10" : ""}`}
-                            >
-                              <td className="py-2 px-2 text-stone-400">{customerReportHistory.length - idx}</td>
-                              <td className="py-2 px-2 text-stone-200 font-medium">{entry.plan}</td>
-                              <td className="py-2 px-2 text-stone-300 whitespace-nowrap">{formatDate(entry.start_date)}</td>
-                              <td className="py-2 px-2 text-stone-300 whitespace-nowrap">{formatDate(entry.end_date)}</td>
-                              <td className="py-2 px-2 text-stone-300">{entry.duration ?? "—"}</td>
-                              <td className="py-2 px-2 text-right text-stone-300 tabular-nums">{formatINR(entry.total_fee)}</td>
-                              <td className="py-2 px-2 text-right text-stone-300 tabular-nums">{formatINR(entry.paid_fee)}</td>
-                              <td className="py-2 px-2 text-right tabular-nums">{formatINR(entry.balance)}</td>
-                              <td className="py-2 px-2 text-stone-300 whitespace-nowrap">{formatDate(entry.pay_date)}</td>
-                              <td className="py-2 px-2 text-stone-300">{entry.payment_mode ?? "—"}</td>
-                              <td className="py-2 px-2 text-stone-300">{entry.plan === "PT" ? (trainer?.name ?? "—") : "—"}</td>
-                              <td className="py-2 px-2 text-stone-300">{entry.status ?? "—"}</td>
-                              <td className="py-2 px-2 text-stone-300 max-w-[100px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "—"}</td>
-                              <td className="py-2 px-2 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedEntry(null)}
-                className="px-4 py-2 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
-              >
-                ← Back to list
-              </button>
-            </div>
-          ) : selectedEntry ? (
-            <ClientDetailPanel
-              entry={selectedEntry}
-              isCustomer={isCustomer(selectedEntry)}
-              formatINR={formatINR}
-              formatDate={formatDate}
-              trainerById={trainerById}
-              onBack={() => setSelectedEntry(null)}
-            />
-          ) : (
-            <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div
-                ref={topScrollRef}
-                className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
-                aria-hidden
-              >
-                <div className="min-w-[700px] h-2" />
-              </div>
-              <div
-                ref={tableScrollRef}
-                className="overflow-x-auto flex-1 min-h-0 scrollbar-theme scrollbar-horizontal-bottom"
-              >
-                <table className="w-full text-sm border-collapse min-w-[700px]">
-                  <thead ref={headerRef} className="select-none cursor-ew-resize">
-                    <tr className="border-b border-white/20">
-
-                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Name</th>
-                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Plan</th>
-                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Start</th>
-                      <th className="text-left py-2 px-2 text-stone-400 font-medium">End</th>
-                      <th className="text-right py-2 px-2 text-stone-400 font-medium">Total (₹)</th>
-                      <th className="text-right py-2 px-2 text-stone-400 font-medium">Paid (₹)</th>
-                      <th className="text-right py-2 px-2 text-stone-400 font-medium">Due / Balance (₹)</th>
-                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Pay date</th>
-                      <th className="text-left py-2 px-2 text-stone-400 font-medium">Payment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedEntries.map((row) => {
-                      const name = isCustomer(row)
-                        ? row.name
-                        : (row.client_name ?? row.client_id ?? "—");
-                      const dueOrBalance = isCustomer(row)
-                        ? row.balance
-                        : (row.due_fee ?? 0);
-                      const contributesToCommission = commissionEntryIds.has(row.id);
-                      return (
-                        <tr
-                          key={row.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            if (isCustomer(row) && onOpenCustomerReport) {
-                              onOpenCustomerReport(row);
-                              onClose();
-                            } else {
-                              setSelectedEntry(row);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return;
-                            if (isCustomer(row) && onOpenCustomerReport) {
-                              onOpenCustomerReport(row);
-                              onClose();
-                            } else {
-                              setSelectedEntry(row);
-                            }
-                          }}
-                          className={`border-b border-white/5 hover:bg-white/10 cursor-pointer transition-colors ${contributesToCommission ? "bg-emerald-950/40 ring-1 ring-inset ring-emerald-500/30" : ""}`}
-                          title={contributesToCommission ? "Contributes to this month’s commission" : undefined}
-                        >
-
-                          <td className="py-2 px-2 text-stone-200">
-                            <span className="inline-flex items-center gap-1.5">
-                              {name}
-                              {contributesToCommission && (
-                                <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-emerald-600/60 text-white">Commission</span>
-                              )}
-                            </span>
-                          </td>
-                          <td className="py-2 px-2 text-stone-300">{row.plan ?? "—"}</td>
-                          <td className="py-2 px-2 text-stone-300">
-                            {formatDate(isCustomer(row) ? row.start_date : row.start_date)}
-                          </td>
-                          <td className="py-2 px-2 text-stone-300">
-                            {formatDate(isCustomer(row) ? row.end_date : row.end_date)}
-                          </td>
-                          <td className="py-2 px-2 text-right text-stone-300">
-                            {row.total_fee != null ? formatINR(Number(row.total_fee)) : "—"}
-                          </td>
-                          <td className="py-2 px-2 text-right text-stone-300">
-                            {row.paid_fee != null ? formatINR(Number(row.paid_fee)) : "—"}
-                          </td>
-                          <td className="py-2 px-2 text-right text-stone-300">
-                            {dueOrBalance != null ? formatINR(Number(dueOrBalance)) : "—"}
-                          </td>
-                          <td className="py-2 px-2 text-stone-300">
-                            {formatDate(
-                              isCustomer(row) ? row.pay_date : row.pay_date
-                            )}
-                          </td>
-                          <td className="py-2 px-2 text-stone-300">
-                            {(isCustomer(row) ? row.payment_mode : row.payment_mode) ?? "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ClientDetailPanel({
-  entry,
-  isCustomer: isCustomerEntry,
-  formatINR,
-  formatDate,
-  trainerById,
-  onBack,
-}: {
-  entry: Customer | Tracker;
-  isCustomer: boolean;
-  formatINR: (n: number) => string;
-  formatDate: (s: string | null) => string;
-  trainerById: Map<string, Trainer>;
-  onBack: () => void;
-}) {
-  const name = isCustomerEntry
-    ? (entry as Customer).name
-    : (entry as Tracker).client_name ?? (entry as Tracker).client_id ?? "—";
-
-
-  const rows: { label: string; value: string }[] = [];
-  if (isCustomerEntry) {
-    const c = entry as Customer;
-    const trainerName = c.trainer_id ? trainerById.get(c.trainer_id)?.name ?? c.trainer_id : "—";
-    rows.push(
-      { label: "Name", value: c.name },
-      { label: "Plan", value: c.plan ?? "—" },
-      { label: "Trainer", value: trainerName },
-      { label: "Total fee", value: c.total_fee != null ? formatINR(Number(c.total_fee)) : "—" },
-      { label: "Paid fee", value: c.paid_fee != null ? formatINR(Number(c.paid_fee)) : "—" },
-      { label: "Balance", value: c.balance != null ? formatINR(Number(c.balance)) : "—" },
-      { label: "Start date", value: formatDate(c.start_date) },
-      { label: "End date", value: formatDate(c.end_date) },
-      { label: "Pay date", value: formatDate(c.pay_date) },
-      { label: "Payment mode", value: c.payment_mode ?? "—" },
-      { label: "Duration", value: c.duration ?? "—" },
-      { label: "Remarks", value: c.remarks ?? "—" },
-      { label: "Created", value: formatDate(c.created_at) },
-      { label: "Updated", value: formatDate(c.updated_at) }
-    );
-  } else {
-    const t = entry as Tracker;
-    rows.push(
-      { label: "Client name", value: t.client_name ?? "—" },
-      { label: "Client ID", value: t.client_id ?? "—" },
-      { label: "Plan", value: t.plan ?? "—" },
-      { label: "Frequency", value: t.frequency ?? "—" },
-      { label: "Trainer", value: t.trainer_name ?? "—" },
-      { label: "Total fee", value: t.total_fee != null ? formatINR(Number(t.total_fee)) : "—" },
-      { label: "Paid fee", value: t.paid_fee != null ? formatINR(Number(t.paid_fee)) : "—" },
-      { label: "Due fee", value: t.due_fee != null ? formatINR(Number(t.due_fee)) : "—" },
-      { label: "Mobile", value: t.mobile ?? "—" },
-      { label: "Start date", value: formatDate(t.start_date) },
-      { label: "End date", value: formatDate(t.end_date) },
-      { label: "Pay date", value: formatDate(t.pay_date) },
-      { label: "Payment mode", value: t.payment_mode ?? "—" },
-      { label: "Paid to", value: t.paid_to ?? "—" },
-      { label: "Remarks", value: t.remarks ?? "—" },
-      { label: "Status", value: t.status ?? "—" },
-      { label: "Created", value: formatDate(t.created_at) },
-      { label: "Updated", value: formatDate(t.updated_at) }
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-sm text-stone-400 hover:text-stone-100 font-medium mb-2"
-      >
-        ← Back to list
-      </button>
-      <div className="flex gap-6 flex-wrap">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-lg font-semibold text-stone-100 mb-4">{name}</h3>
-          <dl className="grid gap-2 sm:grid-cols-2">
-            {rows.map(({ label, value }) => (
-              <div key={label} className="flex flex-wrap gap-x-2">
-                <dt className="text-stone-500 text-sm">{label}</dt>
-                <dd className="text-stone-200 text-sm">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </div>
-    </div>
-  );
-}

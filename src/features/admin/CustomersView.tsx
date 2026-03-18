@@ -14,6 +14,7 @@ import {
   createCustomer,
   updateCustomer,
   deleteCustomer,
+  deleteCustomerCascade,
 } from "@app/actions/customers";
 import {
   listPlanPayments,
@@ -888,9 +889,19 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           } else {
             // If they entered details for the other plan type during edit, create it
             if (isGtMain && hasPtDetails && sanitizedPt) {
-              await createCustomer(buildPayload(sanitizedPt, editing.customer_id));
+              const addPt = await createCustomer(buildPayload(sanitizedPt, editing.customer_id));
+              if (!addPt.ok) {
+                setError(addPt.error ?? "Failed to add PT plan.");
+                setLoading(false);
+                return;
+              }
             } else if (!isGtMain && hasGtDetails && sanitizedGt) {
-              await createCustomer(buildPayload(sanitizedGt, editing.customer_id));
+              const addGt = await createCustomer(buildPayload(sanitizedGt, editing.customer_id));
+              if (!addGt.ok) {
+                setError(addGt.error ?? "Failed to add GT plan.");
+                setLoading(false);
+                return;
+              }
             }
           }
         } else {
@@ -968,8 +979,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           return;
         }
 
-        // If neither have details but they hit submit, default to creating an empty GT
-        const createGt = hasGtDetails || !hasPtDetails;
+        const createGt = hasGtDetails;
         let sanitizedGt: PlanFormValues | null = null;
         let sanitizedPt: PlanFormValues | null = null;
         try {
@@ -985,6 +995,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           return;
         }
 
+        let sharedCustomerId: string | null = null;
         if (createGt) {
           const payloadGt = buildPayload(sanitizedGt!);
           const resGt = await createCustomer(payloadGt);
@@ -993,15 +1004,19 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
             setLoading(false);
             return;
           }
+          sharedCustomerId = resGt.customer?.customer_id ?? null;
         }
 
         if (hasPtDetails) {
-          const payloadPt = buildPayload(sanitizedPt!);
+          const payloadPt = buildPayload(sanitizedPt!, sharedCustomerId);
           const resPt = await createCustomer(payloadPt);
           if (!resPt.ok) {
             setError(resPt.error ?? "Failed to add PT.");
             setLoading(false);
             return;
+          }
+          if (!sharedCustomerId) {
+            sharedCustomerId = resPt.customer?.customer_id ?? null;
           }
         }
       }
@@ -1042,9 +1057,7 @@ function getDeletePromptMessage(prompt: DeletePrompt) {
         <br />
         This will permanently remove{" "}
         <span className="text-red-600 font-medium">all plans</span> and{" "}
-        <span className="text-red-600 font-medium">
-          payment history
-        </span>.
+        <span className="text-red-600 font-medium">payment history</span>.
       </>
     );
   }
@@ -1055,34 +1068,26 @@ function getDeletePromptMessage(prompt: DeletePrompt) {
 
     return (
       <>
-        You are about to delete a{" "}
-        <span className="text-red-600 font-medium">payment</span> for{" "}
-        <span className="text-red-600 font-medium">{planName}</span>{" "}
-        belonging to{" "}
-        <span className="text-red-600 font-medium">
-          {customerName}
-        </span>.
+        You are about to{" "}
+        <span className="text-red-600 font-medium">delete a payment</span>{" "}
+        for{" "}
+        <span className="text-red-600 font-medium">{planName}</span> ({customerName}).
+        <br />
+        This will adjust their outstanding balance and cannot be undone.
       </>
     );
   }
 
   const customerName = prompt.plan.name?.trim() || "this customer";
-
   return (
     <>
       You are about to{" "}
-      <span className="text-red-600 font-medium">
-        delete a plan
-      </span>{" "}
+      <span className="text-red-600 font-medium">delete a plan</span>{" "}
       for{" "}
-      <span className="text-red-600 font-medium">
-        {customerName}
-      </span>.
+      <span className="text-red-600 font-medium">{customerName}</span>.
       <br />
       This will also remove{" "}
-      <span className="text-red-600 font-medium">
-        all related payments
-      </span>.
+      <span className="text-red-600 font-medium">all related payments</span>.
     </>
   );
 }
@@ -1133,10 +1138,26 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
         setDeletePrompt(null);
         return;
       }
-      const res = await deleteCustomer(snapshot.plan.id);
-      if (!res.ok) throw new Error(res.error ?? "Failed to delete this record.");
-      setCustomers((prev) => prev.filter((x) => x.id !== snapshot.plan.id));
-      if (editing?.id === snapshot.plan.id) closeForm();
+      let deletedIds = new Set<string>();
+      if (snapshot.level === "customer" && snapshot.plan.customer_id) {
+        const affectedPlans = customers.filter((plan) => plan.customer_id === snapshot.plan.customer_id);
+        const res = await deleteCustomerCascade(snapshot.plan.customer_id);
+        if (!res.ok) throw new Error(res.error ?? "Failed to delete this record.");
+        deletedIds = new Set(affectedPlans.map((plan) => plan.id));
+      } else if (snapshot.level === "customer") {
+        const fallbackPlans = customers.filter((plan) => getCustomerGroupKey(plan) === getCustomerGroupKey(snapshot.plan));
+        for (const plan of fallbackPlans) {
+          const res = await deleteCustomer(plan.id);
+          if (!res.ok) throw new Error(res.error ?? "Failed to delete this record.");
+        }
+        deletedIds = new Set(fallbackPlans.map((plan) => plan.id));
+      } else {
+        const res = await deleteCustomer(snapshot.plan.id);
+        if (!res.ok) throw new Error(res.error ?? "Failed to delete this record.");
+        deletedIds = new Set([snapshot.plan.id]);
+      }
+      setCustomers((prev) => prev.filter((x) => !deletedIds.has(x.id)));
+      if (editing && deletedIds.has(editing.id)) closeForm();
       setDeletePrompt(null);
       router.refresh();
     } catch (err) {
@@ -1210,6 +1231,22 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
     : null;
 
   const trainerOptions = trainers.filter((t) => (t.name ?? "").trim() !== "");
+  const gtFormTouched = Boolean(
+    totalFee > 0 ||
+    paidFee > 0 ||
+    startDate.trim() !== "" ||
+    endDate.trim() !== "" ||
+    payDate.trim() !== "" ||
+    paymentMode.trim() !== "" ||
+    remarks.trim() !== "" ||
+    duration.trim() !== "" ||
+    slotTiming.trim() !== "" ||
+    paidTo.trim() !== "" ||
+    feedback.trim() !== "" ||
+    Boolean(image) ||
+    receipt
+  );
+  const gtFormRequired = Boolean(editing?.plan === "GT" || gtFormTouched);
   const ptFormTouched = Boolean(
     totalFeePt > 0 ||
     paidFeePt > 0 ||
@@ -1226,6 +1263,7 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
     Boolean(imagePt) ||
     receiptPt
   );
+  const ptFormRequired = Boolean(editing?.plan === "PT" || ptFormTouched);
   // Filter dropdown: only trainers in use (assigned to ≥1 customer) with valid names, same as Trainers page
   const trainersInUseForFilter = trainers.filter(
     (t) => (t.name ?? "").trim() !== "" && customers.some((c) => c.trainer_id === t.id)
@@ -1418,16 +1456,16 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={labelClass}>Duration <span className="text-brand-red">*</span></label>
-                      <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" required />
+                      <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" required={gtFormRequired} aria-required={gtFormRequired} />
                     </div>
 
                     <div>
                       <label className={labelClass}>Total fee (₹) <span className="text-brand-red">*</span></label>
-                      <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required />
+                      <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={gtFormRequired} aria-required={gtFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Paid (₹) <span className="text-brand-red">*</span></label>
-                      <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required />
+                      <input type="number" min={0} value={paidFee || ""} onChange={(e) => setPaidFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={gtFormRequired} aria-required={gtFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Balance</label>
@@ -1435,26 +1473,26 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                     </div>
                     <div>
                       <label className={labelClass}>Start date <span className="text-brand-red">*</span></label>
-                      <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="GT start date" />
+                      <AdminDatePicker value={startDate} onChange={setStartDate} className={inputClass} aria-label="GT start date" aria-required={gtFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>End date <span className="text-brand-red">*</span></label>
-                      <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="GT end date" showDurationChips durationChipsReferenceDate={startDate || undefined} />
+                      <AdminDatePicker value={endDate} onChange={setEndDate} className={inputClass} aria-label="GT end date" showDurationChips durationChipsReferenceDate={startDate || undefined} aria-required={gtFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Pay date <span className="text-brand-red">*</span></label>
-                      <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="GT pay date" />
+                      <AdminDatePicker value={payDate} onChange={setPayDate} className={inputClass} aria-label="GT pay date" aria-required={gtFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Payment mode <span className="text-brand-red">*</span></label>
-                      <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass} required>
+                      <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className={inputClass} required={gtFormRequired} aria-required={gtFormRequired}>
                         <option value="">— Select —</option>
                         {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className={labelClass}>Paid to <span className="text-brand-red">*</span></label>
-                      <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" required />
+                      <input type="text" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className={inputClass} placeholder="Paid to" required={gtFormRequired} aria-required={gtFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Remarks</label>
@@ -1492,11 +1530,11 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={labelClass}>Duration <span className="text-brand-red">*</span></label>
-                      <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" required={ptFormTouched} aria-required={ptFormTouched} />
+                      <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" required={ptFormRequired} aria-required={ptFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Trainer <span className="text-brand-red">*</span></label>
-                      <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass} required={ptFormTouched} aria-required={ptFormTouched}>
+                      <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass} required={ptFormRequired} aria-required={ptFormRequired}>
                         <option value="">— Select —</option>
                         {trainerOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
@@ -1504,11 +1542,11 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
 
                     <div>
                       <label className={labelClass}>Total fee (₹) <span className="text-brand-red">*</span></label>
-                      <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={ptFormTouched} aria-required={ptFormTouched} />
+                      <input type="number" min={0} value={totalFeePt || ""} onChange={(e) => setTotalFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={ptFormRequired} aria-required={ptFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Paid (₹) <span className="text-brand-red">*</span></label>
-                      <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={ptFormTouched} aria-required={ptFormTouched} />
+                      <input type="number" min={0} value={paidFeePt || ""} onChange={(e) => setPaidFeePt(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={ptFormRequired} aria-required={ptFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Balance</label>
@@ -1516,30 +1554,30 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                     </div>
                     <div>
                       <label className={labelClass}>Start date <span className="text-brand-red">*</span></label>
-                      <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" aria-required={ptFormTouched} />
+                      <AdminDatePicker value={startDatePt} onChange={setStartDatePt} className={inputClass} aria-label="PT start date" aria-required={ptFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>End date <span className="text-brand-red">*</span></label>
-                      <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} aria-required={ptFormTouched} />
+                      <AdminDatePicker value={endDatePt} onChange={setEndDatePt} className={inputClass} aria-label="PT end date" showDurationChips durationChipsReferenceDate={startDatePt || undefined} aria-required={ptFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Pay date <span className="text-brand-red">*</span></label>
-                      <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" aria-required={ptFormTouched} />
+                      <AdminDatePicker value={payDatePt} onChange={setPayDatePt} className={inputClass} aria-label="PT pay date" aria-required={ptFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Payment mode <span className="text-brand-red">*</span></label>
-                      <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass} required={ptFormTouched} aria-required={ptFormTouched}>
+                      <select value={paymentModePt} onChange={(e) => setPaymentModePt(e.target.value)} className={inputClass} required={ptFormRequired} aria-required={ptFormRequired}>
                         <option value="">— Select —</option>
                         {TRACKER_PAYMENT_MODE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className={labelClass}>Slot timing <span className="text-brand-red">*</span></label>
-                      <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" required={ptFormTouched} aria-required={ptFormTouched} />
+                      <input type="text" value={slotTimingPt} onChange={(e) => setSlotTimingPt(e.target.value)} className={inputClass} placeholder="e.g. 6–7 AM" required={ptFormRequired} aria-required={ptFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Paid to <span className="text-brand-red">*</span></label>
-                      <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" required={ptFormTouched} aria-required={ptFormTouched} />
+                      <input type="text" value={paidToPt} onChange={(e) => setPaidToPt(e.target.value)} className={inputClass} placeholder="Paid to" required={ptFormRequired} aria-required={ptFormRequired} />
                     </div>
                     <div>
                       <label className={labelClass}>Remarks</label>

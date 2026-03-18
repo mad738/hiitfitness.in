@@ -22,6 +22,10 @@ export type Customer = {
   receipt: boolean;
   created_at: string;
   updated_at: string;
+  plan_months?: number | null;
+  monthly_value?: number | null;
+  commission_rate?: number | null;
+  trainer_commission?: number | null;
 };
 
 export type CustomerInsert = Omit<Customer, "id" | "created_at" | "updated_at" | "customer_id"> & {

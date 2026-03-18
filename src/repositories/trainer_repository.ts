@@ -2,7 +2,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import type { Trainer, TrainerInsert, TrainerUpdate } from "@/models/trainer";
 
 const TABLE = "trainers";
-const COLS = "id, name, image, phone_number, address, created_at, updated_at";
+const COLS = "id, name, image, phone_number, address, bio, commission, created_at, updated_at";
 
 const PAGE_SIZE = 1000;
 

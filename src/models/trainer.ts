@@ -6,6 +6,8 @@ export type Trainer = {
   address: string | null;
   created_at: string;
   updated_at: string;
+  bio?: string | null;
+  commission?: number | null;
 };
 
 export type TrainerInsert = Omit<Trainer, "id" | "created_at" | "updated_at"> & {
