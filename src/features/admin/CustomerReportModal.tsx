@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
 import { normalizeMobile, isPlanCurrentlyRunning } from "@/lib/customer-utils";
+import { getPlanStatusMeta } from "@/lib/status-styles";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 
 function formatDateShort(s: string | null): string {
@@ -141,7 +142,7 @@ export function CustomerReportModal({
               All entries & renewals
             </h3>
             <p className="text-stone-500 text-xs mb-3">
-              Rows highlighted in green are currently active (today is between start and end date). Mobile is the unique identifier for this client.
+              Rows highlighted in green are active plans, while red rows are inactive. Mobile is the unique identifier for this client.
             </p>
             <div className="flex flex-col rounded-xl border border-white/10 overflow-hidden">
               <div
@@ -179,13 +180,26 @@ export function CustomerReportModal({
                     {history.map((entry, idx) => {
                       const trainer = entry.trainer_id ? trainers.find((t) => t.id === entry.trainer_id) : null;
                       const isCurrentlyRunning = isPlanCurrentlyRunning(entry.start_date, entry.end_date);
+                      const statusMeta = getPlanStatusMeta(entry.status);
                       const rowClickable = Boolean(onViewPayments);
+                      const rowHighlightClass = statusMeta?.isActive
+                        ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40"
+                        : statusMeta?.isInactive
+                          ? "bg-rose-950/40 ring-1 ring-inset ring-rose-500/30"
+                          : isCurrentlyRunning
+                            ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40"
+                            : "";
+                      const rowTitle = statusMeta?.isInactive
+                        ? "Inactive plan"
+                        : isCurrentlyRunning
+                          ? "Currently active (today within start–end dates)"
+                          : undefined;
                       return (
                         <tr
                           key={`${entry.id}-${idx}`}
                           onClick={rowClickable ? () => onViewPayments?.(entry) : undefined}
-                          className={`border-b border-white/5 ${isCurrentlyRunning ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40" : ""} ${rowClickable ? "cursor-pointer hover:bg-white/5" : ""}`}
-                          title={isCurrentlyRunning ? "Currently active (today within start–end dates)" : undefined}
+                          className={`border-b border-white/5 ${rowHighlightClass} ${rowClickable ? "cursor-pointer hover:bg-white/5" : ""}`}
+                          title={rowTitle}
                         >
                           <td className="py-2 px-3 text-stone-400">{totalEntries - idx}</td>
                           <td className="py-2 px-3 text-stone-200 font-medium">
@@ -208,7 +222,15 @@ export function CustomerReportModal({
                           </td>
 
                           <td className="py-2 px-3 text-stone-300">{entry.plan === "PT" ? (trainer?.name ?? "—") : "—"}</td>
-                          <td className="py-2 px-3 text-stone-300">{entry.status ?? "—"}</td>
+                          <td className="py-2 px-3">
+                            {statusMeta ? (
+                              <span className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${statusMeta.className}`}>
+                                {statusMeta.label}
+                              </span>
+                            ) : (
+                              <span className="text-stone-500">—</span>
+                            )}
+                          </td>
                           <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate">{entry.slot_timing ?? "—"}</td>
                           <td className="py-2 px-3 text-stone-300 max-w-[120px] truncate" title={entry.remarks ?? undefined}>{entry.remarks ?? "—"}</td>
                           <td className="py-2 px-3 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>

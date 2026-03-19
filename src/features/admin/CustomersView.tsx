@@ -196,6 +196,61 @@ function formatPromptDate(value: string | null | undefined): string {
   return value;
 }
 
+function formatMonthsLabel(months: number): string {
+  if (!Number.isFinite(months)) return "";
+  const safeMonths = Math.max(0.25, months);
+  const rounded = Math.max(1, Math.floor(safeMonths));
+  return `${rounded}M`;
+}
+
+function parseDurationToMonths(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const raw = value.trim().toLowerCase();
+  if (!raw) return null;
+  const toNumber = parseFloat(raw);
+  if (!Number.isNaN(toNumber)) {
+    if (raw.includes("year")) return Math.max(1, toNumber * 12);
+    if (raw.includes("month")) return Math.max(0.5, toNumber);
+    if (raw.includes("week")) return Math.max(0.5, (toNumber * 7) / 30);
+    if (raw.includes("day")) return Math.max(0.25, toNumber / 30);
+    return Math.max(0.5, toNumber);
+  }
+  if (raw.includes("year")) {
+    const num = parseFloat(raw.replace(/year(s)?/g, "").trim());
+    return Number.isNaN(num) ? 12 : Math.max(1, num * 12);
+  }
+  if (raw.includes("month")) {
+    const num = parseFloat(raw.replace(/month(s)?/g, "").trim());
+    return Number.isNaN(num) ? 1 : Math.max(0.5, num);
+  }
+  if (raw.includes("week")) {
+    const num = parseFloat(raw.replace(/week(s)?/g, "").trim());
+    return Number.isNaN(num) ? 0.5 : Math.max(0.5, (num * 7) / 30);
+  }
+  if (raw.includes("day")) {
+    const num = parseFloat(raw.replace(/day(s)?/g, "").trim());
+    return Number.isNaN(num) ? 0.25 : Math.max(0.25, num / 30);
+  }
+  return null;
+}
+
+function monthsFromDateRange(start: string | null | undefined, end: string | null | undefined): number | null {
+  if (!start || !end) return null;
+  const startMs = Date.parse(start);
+  const endMs = Date.parse(end);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) return null;
+  const days = (endMs - startMs) / (1000 * 60 * 60 * 24);
+  return Math.max(0.25, Math.round((days / 30) * 10) / 10);
+}
+
+function getPrefilledDurationValue(plan: Customer | null): string {
+  if (!plan) return "";
+  const storedMonths = typeof plan.plan_months === "number" && plan.plan_months > 0 ? plan.plan_months : null;
+  const parsedMonths = storedMonths ?? parseDurationToMonths(plan.duration) ?? monthsFromDateRange(plan.start_date, plan.end_date);
+  if (!parsedMonths) return plan.duration ?? "";
+  return formatMonthsLabel(parsedMonths);
+}
+
 
 export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const router = useRouter();
@@ -600,7 +655,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       setPayDate(gtSource.pay_date ?? "");
       setPaymentMode(gtSource.payment_mode ?? "");
       setRemarks(gtSource.remarks ?? "");
-      setDuration(gtSource.duration ?? "");
+      setDuration(getPrefilledDurationValue(gtSource));
       setStatus(gtSource.status ?? DEFAULT_PLAN_STATUS);
       setSlotTiming(gtSource.slot_timing ?? "");
       setPaidTo(gtSource.paid_to ?? "");
@@ -621,7 +676,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       setPayDatePt(ptSource.pay_date ?? "");
       setPaymentModePt(ptSource.payment_mode ?? "");
       setRemarksPt(ptSource.remarks ?? "");
-      setDurationPt(ptSource.duration ?? "");
+      setDurationPt(getPrefilledDurationValue(ptSource));
       setStatusPt(ptSource.status ?? DEFAULT_PLAN_STATUS);
       setSlotTimingPt(ptSource.slot_timing ?? "");
       setMobilePt(ptSource.mobile ?? "");

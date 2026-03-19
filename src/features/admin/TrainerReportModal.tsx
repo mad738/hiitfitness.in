@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { Customer } from "@/models/customer";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import { isPlanCurrentlyRunning } from "@/lib/customer-utils";
+import { getPlanStatusMeta } from "@/lib/status-styles";
 import type { TrainerReport } from "./trainer-report-types";
 
 function formatDateShort(value: string | null, fallback: (value: string | null) => string): string {
@@ -164,14 +165,20 @@ export function TrainerReportModal({
                       const plan = entry.plan;
                       const contributes = entry.commissionAmount > 0;
                       const active = isPlanCurrentlyRunning(plan.start_date, plan.end_date);
+                      const statusMeta = getPlanStatusMeta(plan.status ?? (active ? "active" : "inactive"));
+                      const rowHighlightClass = statusMeta?.isActive
+                        ? "bg-emerald-950/40 ring-1 ring-inset ring-emerald-500/30"
+                        : statusMeta?.isInactive
+                          ? "bg-rose-950/30 ring-1 ring-inset ring-rose-500/25"
+                          : "";
                       return (
                         <tr
                           key={plan.id}
                           onClick={() => onOpenPlanPayments(plan)}
-                          className={`border-b border-white/5 transition-colors cursor-pointer ${
-                            contributes ? "bg-emerald-950/40 ring-1 ring-inset ring-emerald-500/30" : "hover:bg-white/5"
+                          className={`border-b border-white/5 transition-colors cursor-pointer ${rowHighlightClass} ${
+                            rowHighlightClass ? "" : "hover:bg-white/5"
                           }`}
-                          title="Click to view payment history"
+                          title={statusMeta?.isInactive ? "Inactive plan – click to view payment history" : "Click to view payment history"}
                         >
                           <td className="py-2.5 px-3 text-stone-200 font-medium">
                             <span className="inline-flex flex-col">
@@ -182,8 +189,10 @@ export function TrainerReportModal({
                           <td className="py-2.5 px-3 text-stone-300">
                             <span className="inline-flex items-center gap-2">
                               {plan.plan ?? "PT"}
-                              {active && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-600/80 text-white uppercase">Active</span>
+                              {statusMeta && (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${statusMeta.className}`}>
+                                  {statusMeta.label}
+                                </span>
                               )}
                               {contributes && (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-400/20 text-emerald-200 uppercase">Commission</span>
