@@ -10,6 +10,7 @@ export type CustomerPlan = {
   balance: number;
   status: string | null;
   slot_timing: string | null;
+  remarks: string | null;
   created_at: string;
   updated_at: string;
   plan_months?: number | null;

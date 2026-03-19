@@ -6,6 +6,8 @@ import type { Customer } from "@/models/customer";
 import type { Payment } from "@/models/payment";
 import { TRACKER_PAYMENT_MODE_OPTIONS } from "@/config/tracker-options";
 import { AdminDatePicker } from "@/components/ui/admin-date-picker";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { formatDateForInput } from "@/lib/customer-utils";
 
 export type PaymentFormState = {
   paymentId?: string | null;
@@ -100,6 +102,20 @@ export function PlanPaymentsModal({
     [payments]
   );
 
+  const holdEntries = useMemo(() => {
+    if (!plan) return [] as NonNullable<Customer["hold_history"]>;
+    const history = plan.hold_history ?? [];
+    const entries = history.slice();
+    if (plan.active_hold) {
+      entries.push(plan.active_hold);
+    }
+    return entries.sort((a, b) => {
+      const aTime = a.hold_start_date ? Date.parse(a.hold_start_date) : 0;
+      const bTime = b.hold_start_date ? Date.parse(b.hold_start_date) : 0;
+      return bTime - aTime;
+    });
+  }, [plan]);
+
   function togglePaymentFormVisibility() {
     setForm(emptyForm);
     setFormError(null);
@@ -123,7 +139,7 @@ export function PlanPaymentsModal({
     setForm({
       paymentId: payment.id,
       amount: payment.amount != null ? String(payment.amount) : "",
-      paymentDate: payment.payment_date ?? "",
+      paymentDate: formatDateForInput(payment.payment_date),
       paymentMode: payment.payment_mode ?? "",
       paidTo: payment.paid_to ?? "",
       remarks: payment.remarks ?? "",
@@ -156,31 +172,148 @@ export function PlanPaymentsModal({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          <div className="grid grid-cols-2 gap-4 text-sm text-stone-300">
+          <div className="grid grid-cols-1 gap-4 text-sm text-stone-300 lg:grid-cols-2">
             <div>
               <p className="text-stone-500 uppercase text-xs tracking-wider">Plan window</p>
               <p className="font-medium">{formatDateShort(plan.start_date)} → {formatDateShort(plan.end_date)}</p>
             </div>
             <div>
               <p className="text-stone-500 uppercase text-xs tracking-wider">Totals</p>
-              <p>
-                <span className="font-medium mr-2">Total: {formatCurrency(plan.total_fee)}</span>
-                <span className="text-emerald-300 mr-2">Paid: {formatCurrency(plan.paid_fee)}</span>
-                <span className="text-amber-300">Balance: {formatCurrency(plan.balance)}</span>
-              </p>
+              <div className="grid grid-cols-3 gap-3 mt-2">
+                {[
+                  { label: "Total", value: plan.total_fee, accent: "text-stone-100 border-white/15" },
+                  { label: "Paid", value: plan.paid_fee, accent: "text-emerald-200 border-emerald-300/30" },
+                  { label: "Balance", value: plan.balance, accent: "text-amber-200 border-amber-300/30" },
+                ].map((chip) => (
+                  <div
+                    key={chip.label}
+                    className={`rounded-2xl bg-stone-950/60 px-3 py-2 border text-left ${chip.accent}`}
+                  >
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">{chip.label}</p>
+                    <p className="text-base font-semibold">{formatCurrency(chip.value)}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-stone-300">Transactions</h3>
-              {allowManage && saving && <p className="text-xs text-stone-500 italic">Saving…</p>}
+              {allowManage && (
+                <button
+                  type="button"
+                  onClick={togglePaymentFormVisibility}
+                  className="px-3 py-1.5 rounded-lg border border-white/20 text-xs font-semibold tracking-wide uppercase text-stone-200 hover:border-brand-red/60 hover:text-white transition"
+                >
+                  {paymentFormVisible ? "Hide form" : "Add payment"}
+                </button>
+              )}
             </div>
+            {allowManage && (
+              <>
+                {saving && <p className="text-xs text-stone-500 italic">Saving…</p>}
+                {paymentFormVisible ? (
+                  <>
+                    {formError && <p className="text-sm text-brand-red bg-brand-red/10 px-3 py-2 rounded">{formError}</p>}
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Amount (₹)</label>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step="0.01"
+                          value={form.amount}
+                          onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+                          onWheel={(event) => event.currentTarget.blur()}
+                          className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment date <span className="text-brand-red">*</span></label>
+                        <AdminDatePicker
+                          value={form.paymentDate}
+                          onChange={(value) => setForm((prev) => ({ ...prev, paymentDate: value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                          aria-label="Payment date"
+                          popoverPlacement="above"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment mode <span className="text-brand-red">*</span></label>
+                        <select
+                          name="payment_mode"
+                          value={form.paymentMode}
+                          onChange={(e) => setForm((prev) => ({ ...prev, paymentMode: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                          required
+                        >
+                          <option value="">— Select —</option>
+                          {TRACKER_PAYMENT_MODE_OPTIONS.map((mode) => (
+                            <option key={mode} value={mode}>{mode}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Paid to</label>
+                        <input
+                          type="text"
+                          value={form.paidTo}
+                          onChange={(e) => setForm((prev) => ({ ...prev, paidTo: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Remarks</label>
+                        <textarea
+                          value={form.remarks}
+                          onChange={(e) => setForm((prev) => ({ ...prev, remarks: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100 min-h-[72px]"
+                          placeholder="Optional notes about this payment"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="payment-receipt"
+                          type="checkbox"
+                          checked={form.receipt}
+                          onChange={(e) => setForm((prev) => ({ ...prev, receipt: e.target.checked }))}
+                          className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0"
+                        />
+                        <label htmlFor="payment-receipt" className="text-sm text-stone-300">Receipt issued</label>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="px-4 py-2.5 rounded-xl bg-brand-red text-white font-semibold text-sm disabled:opacity-50"
+                        >
+                          {saving ? "Saving…" : form.paymentId ? "Update" : "Add payment"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setForm(emptyForm); setFormError(null); }}
+                          className="px-4 py-2.5 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                ) : (
+                  <p className="text-sm text-stone-500">
+                    Click “Add payment” above to log a new transaction or edit an existing entry.
+                  </p>
+                )}
+              </>
+            )}
             {error && (
               <p className="text-sm text-brand-red bg-brand-red/10 px-3 py-2 rounded">{error}</p>
             )}
             {loading ? (
-              <div className="text-stone-400 text-sm">Loading payments…</div>
+              <LoadingSpinner label="Loading payments…" size="sm" className="py-6" />
             ) : sortedPayments.length === 0 ? (
               <p className="text-stone-500 text-sm">No payments recorded yet.</p>
             ) : (
@@ -232,117 +365,44 @@ export function PlanPaymentsModal({
             )}
           </div>
 
-          {allowManage && (
-            <div className="border-t border-white/10 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-stone-300">
-                {form.paymentId ? "Edit payment" : "Add payment"}
-              </h3>
-              <button
-                type="button"
-                onClick={togglePaymentFormVisibility}
-                className="px-3 py-1.5 rounded-lg border border-white/20 text-xs font-semibold tracking-wide uppercase text-stone-200 hover:border-brand-red/60 hover:text-white transition"
-              >
-                {paymentFormVisible ? "Hide form" : "Add payment"}
-              </button>
+          <div className="space-y-3 border-t border-white/10 pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-stone-300">Hold history</h3>
+              {plan.active_hold && (
+                <span className="text-xs text-amber-300 font-semibold">Currently on hold</span>
+              )}
             </div>
-            {!paymentFormVisible && (
-              <p className="text-sm text-stone-500">
-                Click “Add payment” above to log a new transaction or edit an existing entry.
-              </p>
+            {holdEntries.length === 0 ? (
+              <p className="text-stone-500 text-sm">No hold periods recorded for this plan.</p>
+            ) : (
+              <div className="overflow-x-auto border border-white/10 rounded-xl">
+                <table className="w-full text-sm">
+                  <thead className="bg-white/5 text-stone-400 uppercase text-xs">
+                    <tr>
+                      <th className="text-left py-2 px-3">Hold start</th>
+                      <th className="text-left py-2 px-3">Hold end</th>
+                      <th className="text-left py-2 px-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {holdEntries.map((hold) => {
+                      const isActive = !hold.hold_end_date;
+                      return (
+                        <tr key={hold.id} className="border-t border-white/10">
+                          <td className="py-2 px-3 text-stone-200">{formatDateShort(hold.hold_start_date)}</td>
+                          <td className="py-2 px-3 text-stone-300">{isActive ? "—" : formatDateShort(hold.hold_end_date)}</td>
+                          <td className={`py-2 px-3 text-xs font-semibold uppercase tracking-wide ${isActive ? "text-amber-300" : "text-stone-400"}`}>
+                            {isActive ? "Active hold" : "Completed"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
-            {paymentFormVisible && (
-              <>
-                {formError && <p className="text-sm text-brand-red bg-brand-red/10 px-3 py-2 rounded mb-3">{formError}</p>}
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Amount (₹)</label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      step="0.01"
-                      value={form.amount}
-                      onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
-                      onWheel={(event) => event.currentTarget.blur()}
-                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment date <span className="text-brand-red">*</span></label>
-                    <AdminDatePicker
-                      value={form.paymentDate}
-                      onChange={(value) => setForm((prev) => ({ ...prev, paymentDate: value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
-                      aria-label="Payment date"
-                      popoverPlacement="above"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Payment mode <span className="text-brand-red">*</span></label>
-                    <select
-                      name="payment_mode"
-                      value={form.paymentMode}
-                      onChange={(e) => setForm((prev) => ({ ...prev, paymentMode: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
-                      required
-                    >
-                      <option value="">— Select —</option>
-                      {TRACKER_PAYMENT_MODE_OPTIONS.map((mode) => (
-                        <option key={mode} value={mode}>{mode}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Paid to</label>
-                    <input
-                      type="text"
-                      value={form.paidTo}
-                      onChange={(e) => setForm((prev) => ({ ...prev, paidTo: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs uppercase tracking-wider text-stone-400 mb-1">Remarks</label>
-                    <textarea
-                      value={form.remarks}
-                      onChange={(e) => setForm((prev) => ({ ...prev, remarks: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100 min-h-[72px]"
-                      placeholder="Optional notes about this payment"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="payment-receipt"
-                      type="checkbox"
-                      checked={form.receipt}
-                      onChange={(e) => setForm((prev) => ({ ...prev, receipt: e.target.checked }))}
-                      className="w-4 h-4 rounded border-white/20 bg-stone-900/80 text-brand-red focus:ring-brand-red focus:ring-offset-0"
-                    />
-                    <label htmlFor="payment-receipt" className="text-sm text-stone-300">Receipt issued</label>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="px-4 py-2.5 rounded-xl bg-brand-red text-white font-semibold text-sm disabled:opacity-50"
-                    >
-                      {saving ? "Saving…" : form.paymentId ? "Update" : "Add payment"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setForm(emptyForm); setFormError(null); }}
-                      className="px-4 py-2.5 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
-            </div>
-          )}
+          </div>
+
         </div>
       </div>
     </div>,

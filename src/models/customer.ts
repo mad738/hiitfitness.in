@@ -1,3 +1,5 @@
+import type { PlanHold } from "./plan_hold";
+
 export type Customer = {
   id: string;
   customer_id: string;
@@ -26,6 +28,9 @@ export type Customer = {
   monthly_value?: number | null;
   commission_rate?: number | null;
   trainer_commission?: number | null;
+  friend_ids?: string[];
+  active_hold?: PlanHold | null;
+  hold_history?: PlanHold[];
 };
 
 export type CustomerInsert = Omit<Customer, "id" | "created_at" | "updated_at" | "customer_id"> & {

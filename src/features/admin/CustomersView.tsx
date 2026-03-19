@@ -15,6 +15,8 @@ import {
   updateCustomer,
   deleteCustomer,
   deleteCustomerCascade,
+  holdCustomerPlan,
+  resumeCustomerPlan,
 } from "@app/actions/customers";
 import {
   listPlanPayments,
@@ -23,7 +25,13 @@ import {
   deletePlanPayment,
 } from "@app/actions/payments";
 import { readFileAsBase64 } from "@/lib/image-utils";
-import { normalizeMobile, normalizeDateForStorage, isPlanCurrentlyRunning } from "@/lib/customer-utils";
+import {
+  normalizeMobile,
+  normalizeDateForStorage,
+  isPlanCurrentlyRunning,
+  formatDateForInput,
+  ensureDdMmYyyyFormat,
+} from "@/lib/customer-utils";
 import { PLAN_CATEGORIES } from "@/data/plans";
 import { TRACKER_PAYMENT_MODE_OPTIONS } from "@/config/tracker-options";
 import { AdminDatePicker } from "@/components/ui/admin-date-picker";
@@ -61,7 +69,8 @@ function requireDateValue(value: string, label: string): string {
   if (!trimmed) {
     throw new Error(`${label} is required.`);
   }
-  return normalizeDateForStorage(trimmed, label);
+  const formatted = ensureDdMmYyyyFormat(trimmed, label);
+  return normalizeDateForStorage(formatted, label);
 }
 
 function formatCurrency(n: number) {
@@ -127,10 +136,26 @@ type CustomerGroup = {
   plans: Customer[];
 };
 
+type FriendOption = {
+  id: string;
+  name: string;
+  mobile: string | null;
+  label: string;
+};
+
+type FriendViewerState = {
+  customer: Customer;
+  friends: FriendOption[];
+};
+
 type DeletePrompt =
   | { level: "customer"; plan: Customer }
   | { level: "plan"; plan: Customer }
   | { level: "payment"; plan: Customer; payment: Payment };
+
+type PlanHoldPrompt =
+  | { mode: "hold"; plan: Customer }
+  | { mode: "resume"; plan: Customer };
 
 function planSortValue(plan: Customer): number {
   const start = plan.start_date ? Date.parse(plan.start_date) : NaN;
@@ -143,6 +168,7 @@ function getCustomerGroupKey(plan: Customer): string {
 }
 
 function isPlanActive(plan: Customer): boolean {
+  if (plan.active_hold) return false;
   const status = (plan.status ?? "").toLowerCase();
   if (status === "active") return true;
   return isPlanCurrentlyRunning(plan.start_date, plan.end_date);
@@ -151,7 +177,17 @@ function isPlanActive(plan: Customer): boolean {
 function getPlansHighlight(plans: Customer[]): Customer[] {
   const active = plans.filter(isPlanActive);
   if (active.length > 0) return active;
+  const onHold = plans.filter((plan) => Boolean(plan.active_hold));
+  if (onHold.length > 0) return onHold;
   return plans;
+}
+
+function findLatestActivePlan(plans: Customer[], planType: "GT" | "PT"): Customer | null {
+  const normalizedType = planType.toUpperCase();
+  const matching = plans
+    .filter((plan) => (plan.plan ?? "").trim().toUpperCase() === normalizedType && isPlanActive(plan))
+    .sort((a, b) => planSortValue(b) - planSortValue(a));
+  return matching[0] ?? null;
 }
 
 function sanitizePlanDates(values: PlanFormValues, planLabel: string): PlanFormValues {
@@ -274,6 +310,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [deletePrompt, setDeletePrompt] = useState<DeletePrompt | null>(null);
   const [deleteInFlight, setDeleteInFlight] = useState(false);
   const [deletePromptError, setDeletePromptError] = useState<string | null>(null);
+  const [planHoldPrompt, setPlanHoldPrompt] = useState<PlanHoldPrompt | null>(null);
+  const [planHoldInFlight, setPlanHoldInFlight] = useState(false);
+  const [planHoldError, setPlanHoldError] = useState<string | null>(null);
 
   // GT (left column)
   const [name, setName] = useState("");
@@ -313,6 +352,14 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [paidToPt, setPaidToPt] = useState("");
   const [feedbackPt, setFeedbackPt] = useState("");
   const [receiptPt, setReceiptPt] = useState(false);
+  const [friendIds, setFriendIds] = useState<string[]>([]);
+  const [friendSearch, setFriendSearch] = useState("");
+  const friendComboboxRef = useRef<HTMLDivElement>(null);
+  const friendProfileComboboxRef = useRef<HTMLDivElement>(null);
+  const friendInputRef = useRef<HTMLInputElement>(null);
+  const [friendDropdownAnchor, setFriendDropdownAnchor] = useState<"main" | "profile" | null>(null);
+  const friendDropdownOpen = friendDropdownAnchor !== null;
+  const [friendViewer, setFriendViewer] = useState<FriendViewerState | null>(null);
 
   const [searchQuery, setSearchQuery] = useState(() => getStringParam(searchParams, "q"));
   const [filterPlan, setFilterPlan] = useState(() => getStringParam(searchParams, "plan"));
@@ -433,6 +480,27 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showFilterDropdown]);
 
+  useEffect(() => {
+    function handleFriendClickOutside(e: MouseEvent) {
+      if (!friendDropdownOpen) return;
+      const target = e.target as Node;
+      const containers = [friendComboboxRef.current, friendProfileComboboxRef.current];
+      const clickedInside = containers.some((container) => container && container.contains(target));
+      if (!clickedInside) {
+        setFriendDropdownAnchor(null);
+        setFriendSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleFriendClickOutside);
+    return () => document.removeEventListener("mousedown", handleFriendClickOutside);
+  }, [friendDropdownOpen]);
+
+  useEffect(() => {
+    if (friendDropdownOpen && friendInputRef.current) {
+      friendInputRef.current.focus();
+    }
+  }, [friendDropdownOpen]);
+
   const hasFilterParamsInUrl =
     searchParams.has("q") ||
     searchParams.has("plan") ||
@@ -479,6 +547,81 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   }, [filteredCustomers]);
 
   const displayCustomers = customerGroups.map((group) => group.primary);
+  const currentProfileId = editing?.customer_id ?? null;
+
+  const friendOptions = useMemo<FriendOption[]>(() => {
+    const map = new Map<string, FriendOption>();
+    customers.forEach((plan) => {
+      const profileId = plan.customer_id;
+      if (!profileId || map.has(profileId)) return;
+      const nameValue = (plan.name ?? "").trim() || "Unnamed";
+      const mobileValue = (plan.mobile ?? "").trim() || null;
+      const label = mobileValue ? `${nameValue} • ${mobileValue}` : nameValue;
+      map.set(profileId, { id: profileId, name: nameValue, mobile: mobileValue, label });
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }, [customers]);
+
+  const friendLookup = useMemo(() => new Map(friendOptions.map((option) => [option.id, option])), [friendOptions]);
+
+  const friendSummaryByCustomerId = useMemo(() => {
+    const map = new Map<string, FriendOption[]>();
+    customers.forEach((plan) => {
+      if (!plan.customer_id) return;
+      const summaries = (plan.friend_ids ?? [])
+        .map((id) => friendLookup.get(id))
+        .filter((option): option is FriendOption => Boolean(option));
+      map.set(plan.customer_id, summaries);
+    });
+    return map;
+  }, [customers, friendLookup]);
+
+  const selectedFriendOptions = friendIds.map((id) => {
+    const option = friendLookup.get(id);
+    if (option) return option;
+    return { id, name: "Unknown member", mobile: null, label: id } satisfies FriendOption;
+  });
+
+  const normalizedFriendSearch = friendSearch.trim().toLowerCase();
+  const filteredFriendOptions = friendOptions
+    .filter((option) => option.id !== currentProfileId)
+    .filter((option) => !friendIds.includes(option.id))
+    .filter((option) => {
+      if (!normalizedFriendSearch) return true;
+      const mobile = option.mobile ?? "";
+      return (
+        option.name.toLowerCase().includes(normalizedFriendSearch) ||
+        mobile.toLowerCase().includes(normalizedFriendSearch) ||
+        option.label.toLowerCase().includes(normalizedFriendSearch)
+      );
+    })
+    .slice(0, 8);
+
+  function handleSelectFriendOption(optionId: string) {
+    setFriendIds((prev) => (prev.includes(optionId) ? prev : [...prev, optionId]));
+    setFriendSearch("");
+    if (friendInputRef.current) {
+      friendInputRef.current.focus();
+    }
+  }
+
+  function handleRemoveFriend(optionId: string) {
+    setFriendIds((prev) => prev.filter((id) => id !== optionId));
+  }
+
+  function toggleFriendDropdown(anchor: "main" | "profile") {
+    setFriendDropdownAnchor((current) => {
+      const nextAnchor = current === anchor ? null : anchor;
+      setFriendSearch("");
+      return nextAnchor;
+    });
+  }
+
+  function normalizeFriendIdList(ids: string[]): string[] {
+    return ids
+      .map((id) => id.trim())
+      .filter((id, index, arr) => id && arr.indexOf(id) === index);
+  }
 
   function buildFilterUrlForNewTab(): string {
     const params = new URLSearchParams();
@@ -511,6 +654,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   }, []);
 
   async function openPaymentsPanel(plan: Customer) {
+    closeFormsForOtherActions();
     setPaymentsPlan(plan);
     setPlanPayments([]);
     setPaymentsError(null);
@@ -543,8 +687,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       if (!Number.isFinite(amount) || amount <= 0) {
         throw new Error("Amount must be greater than 0.");
       }
-      const isoDate = normalizeDateForStorage(form.paymentDate, "Payment date");
-      if (!isoDate) throw new Error("Payment date is required.");
+      const paymentDateDisplay = ensureDdMmYyyyFormat(form.paymentDate, "Payment date");
+      const isoDate = normalizeDateForStorage(paymentDateDisplay, "Payment date");
       const paymentModeValue = form.paymentMode.trim();
       if (!paymentModeValue) throw new Error("Payment mode is required.");
       const paidToValue = form.paidTo.trim();
@@ -575,6 +719,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   }
 
   function openAdd() {
+    if (profileOpen) {
+      closeProfileForm();
+    }
     setEditing(null);
     // GT
     setName("");
@@ -614,6 +761,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setPaidToPt("");
     setFeedbackPt("");
     setReceiptPt(false);
+    setFriendIds([]);
+    setFriendSearch("");
+    setFriendDropdownAnchor(null);
     setFormOpen(true);
     setError(null);
   }
@@ -626,33 +776,46 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setMobile(fallbackMobile);
     setNamePt(fallbackName);
     setMobilePt(fallbackMobile);
+    setFriendIds(c.friend_ids ?? []);
+    setFriendSearch("");
+    setFriendDropdownAnchor(null);
     setDetailsCustomer(null);
   }
 
   function openEdit(c: Customer) {
-    setEditing(c);
     setError(null);
-    // Common fields
-    setName(c.name);
-    setMobile(c.mobile ?? "");
+    if (profileOpen) {
+      closeProfileForm();
+    }
+    const isGtPrimary = (c.plan ?? "").trim().toUpperCase() === "GT";
+    const clickedIsActive = isPlanActive(c);
+    const groupKey = getCustomerGroupKey(c);
+    const relatedPlans = customers.filter((plan) => getCustomerGroupKey(plan) === groupKey);
+    const activeGt = findLatestActivePlan(relatedPlans, "GT");
+    const activePt = findLatestActivePlan(relatedPlans, "PT");
 
-    // Attempt to find matching PT/GT to show in the two-column template
-    const mobileKey = normalizeMobile(c.mobile);
-    const linked = mobileKey ? customers.find(x => x.id !== c.id && normalizeMobile(x.mobile) === mobileKey && x.plan !== c.plan) : null;
-    setEditingLinkedId(linked?.id ?? null);
+    const primaryActive = isGtPrimary ? activeGt : activePt;
+    const editingTarget = clickedIsActive ? (primaryActive ?? c) : c;
+    setEditing(editingTarget);
+    setName(editingTarget.name);
+    setMobile(editingTarget.mobile ?? "");
+    setFriendIds(editingTarget.friend_ids ?? []);
+    setFriendSearch("");
+    setFriendDropdownAnchor(null);
 
-    const gtSource = c.plan === "GT" ? c : null;
-    const ptSource = c.plan === "PT" ? c : null;
+    const linkedActive = clickedIsActive ? (isGtPrimary ? activePt : activeGt) : null;
+    setEditingLinkedId(linkedActive?.id ?? null);
 
+    const gtSource = clickedIsActive ? activeGt : (isGtPrimary ? c : null);
     if (gtSource) {
       setImage(gtSource.image);
       setTotalFee(gtSource.total_fee);
       setPaidFee(gtSource.paid_fee);
       setBalance(gtSource.balance);
       setTrainerId(gtSource.trainer_id);
-      setStartDate(gtSource.start_date ?? "");
-      setEndDate(gtSource.end_date ?? "");
-      setPayDate(gtSource.pay_date ?? "");
+      setStartDate(formatDateForInput(gtSource.start_date));
+      setEndDate(formatDateForInput(gtSource.end_date));
+      setPayDate(formatDateForInput(gtSource.pay_date));
       setPaymentMode(gtSource.payment_mode ?? "");
       setRemarks(gtSource.remarks ?? "");
       setDuration(getPrefilledDurationValue(gtSource));
@@ -662,18 +825,34 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       setFeedback(gtSource.feedback ?? "");
       setReceipt(gtSource.receipt ?? false);
     } else {
-      setImage(null); setTotalFee(0); setPaidFee(0); setTrainerId(null); setStartDate(""); setEndDate(""); setPayDate(""); setPaymentMode(""); setRemarks(""); setDuration(""); setStatus(DEFAULT_PLAN_STATUS); setSlotTiming(""); setPaidTo(""); setFeedback(""); setReceipt(false);
+      setImage(null);
+      setTotalFee(0);
+      setPaidFee(0);
+      setBalance(0);
+      setTrainerId(null);
+      setStartDate("");
+      setEndDate("");
+      setPayDate("");
+      setPaymentMode("");
+      setRemarks("");
+      setDuration("");
+      setStatus(DEFAULT_PLAN_STATUS);
+      setSlotTiming("");
+      setPaidTo("");
+      setFeedback("");
+      setReceipt(false);
     }
 
+    const ptSource = clickedIsActive ? activePt : (isGtPrimary ? null : c);
     if (ptSource) {
       setImagePt(ptSource.image);
       setTotalFeePt(ptSource.total_fee);
       setPaidFeePt(ptSource.paid_fee);
       setBalancePt(ptSource.balance);
       setTrainerIdPt(ptSource.trainer_id);
-      setStartDatePt(ptSource.start_date ?? "");
-      setEndDatePt(ptSource.end_date ?? "");
-      setPayDatePt(ptSource.pay_date ?? "");
+      setStartDatePt(formatDateForInput(ptSource.start_date));
+      setEndDatePt(formatDateForInput(ptSource.end_date));
+      setPayDatePt(formatDateForInput(ptSource.pay_date));
       setPaymentModePt(ptSource.payment_mode ?? "");
       setRemarksPt(ptSource.remarks ?? "");
       setDurationPt(getPrefilledDurationValue(ptSource));
@@ -684,7 +863,23 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       setFeedbackPt(ptSource.feedback ?? "");
       setReceiptPt(ptSource.receipt ?? false);
     } else {
-      setImagePt(null); setTotalFeePt(0); setPaidFeePt(0); setTrainerIdPt(null); setStartDatePt(""); setEndDatePt(""); setPayDatePt(""); setPaymentModePt(""); setRemarksPt(""); setDurationPt(""); setStatusPt(DEFAULT_PLAN_STATUS); setSlotTimingPt(""); setPaidToPt(""); setFeedbackPt(""); setReceiptPt(false);
+      setImagePt(null);
+      setTotalFeePt(0);
+      setPaidFeePt(0);
+      setBalancePt(0);
+      setTrainerIdPt(null);
+      setStartDatePt("");
+      setEndDatePt("");
+      setPayDatePt("");
+      setPaymentModePt("");
+      setRemarksPt("");
+      setDurationPt("");
+      setStatusPt(DEFAULT_PLAN_STATUS);
+      setSlotTimingPt("");
+      setMobilePt("");
+      setPaidToPt("");
+      setFeedbackPt("");
+      setReceiptPt(false);
     }
 
     setFormOpen(true);
@@ -695,13 +890,37 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setEditing(null);
     setEditingLinkedId(null);
     setError(null);
+    setFriendIds([]);
+    setFriendSearch("");
+    setFriendDropdownAnchor(null);
+  }
+
+  function openFriendViewer(customer: Customer) {
+    closeFormsForOtherActions();
+    if (!customer.customer_id) {
+      setFriendViewer({ customer, friends: [] });
+      return;
+    }
+    const summary = friendSummaryByCustomerId.get(customer.customer_id) ?? [];
+    setFriendViewer({ customer, friends: summary });
+  }
+
+  function openCustomerDetails(customer: Customer) {
+    closeFormsForOtherActions();
+    setDetailsCustomer(customer);
   }
 
   function openProfileEdit(c: Customer) {
+    if (formOpen) {
+      closeForm();
+    }
     setProfileCustomer(c);
     setName(c.name);
     setMobile(c.mobile || "");
     setImage(c.image || null);
+    setFriendIds(c.friend_ids ?? []);
+    setFriendSearch("");
+    setFriendDropdownAnchor(null);
     setError(null);
     setProfileOpen(true);
   }
@@ -710,11 +929,23 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setProfileOpen(false);
     setProfileCustomer(null);
     setError(null);
+    setFriendIds([]);
+    setFriendSearch("");
+    setFriendDropdownAnchor(null);
+  }
+
+  function closeFormsForOtherActions() {
+    if (formOpen) {
+      closeForm();
+    }
+    if (profileOpen) {
+      closeProfileForm();
+    }
   }
 
 
 
-  function buildPayload(opts: PlanFormValues, customerId?: string | null) {
+  function buildPayload(opts: PlanFormValues, customerId?: string | null, friendIdsParam?: string[]) {
     const planId = opts.plan?.trim();
     if (!planId) {
       throw new Error("Plan type is required.");
@@ -762,6 +993,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     if (customerId) {
       (payload as Record<string, unknown>).customer_id = customerId;
     }
+    if (friendIdsParam !== undefined) {
+      (payload as Record<string, unknown>).friend_ids = friendIdsParam;
+    }
     return payload;
   }
 
@@ -786,6 +1020,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setError(null);
     setLoading(true);
     try {
+      const normalizedFriendIds = normalizeFriendIdList(friendIds);
       const trimmedName = name.trim();
       if (!trimmedName) {
         setError("Name is required.");
@@ -821,7 +1056,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         updateCustomer(h.id, {
           name: trimmedName,
           mobile: newMobileRaw || null,
-          image: image || null
+          image: image || null,
+          friend_ids: normalizedFriendIds,
         })
       );
 
@@ -843,6 +1079,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setError(null);
     setLoading(true);
     try {
+      const normalizedFriendIds = normalizeFriendIdList(friendIds);
       if (editing) {
         const trimmedName = name.trim();
         if (!trimmedName) {
@@ -931,7 +1168,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           return;
         }
 
-        const payload = buildPayload(isGtMain ? sanitizedGt! : sanitizedPt!);
+        const payload = buildPayload(isGtMain ? sanitizedGt! : sanitizedPt!, undefined, normalizedFriendIds);
         const res = await updateCustomer(editing.id, payload);
 
         if (res.ok) {
@@ -1052,7 +1289,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
         let sharedCustomerId: string | null = null;
         if (createGt) {
-          const payloadGt = buildPayload(sanitizedGt!);
+          const payloadGt = buildPayload(sanitizedGt!, null, normalizedFriendIds);
           const resGt = await createCustomer(payloadGt);
           if (!resGt.ok) {
             setError(resGt.error ?? "Failed to add GT.");
@@ -1063,7 +1300,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
         }
 
         if (hasPtDetails) {
-          const payloadPt = buildPayload(sanitizedPt!, sharedCustomerId);
+          const payloadPt = buildPayload(
+            sanitizedPt!,
+            sharedCustomerId,
+            createGt ? undefined : normalizedFriendIds
+          );
           const resPt = await createCustomer(payloadPt);
           if (!resPt.ok) {
             setError(resPt.error ?? "Failed to add PT.");
@@ -1085,6 +1326,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   }
 
   function openDeletePrompt(plan: Customer, level: DeletePrompt["level"], payment?: Payment) {
+    closeFormsForOtherActions();
     if (level === "payment" && payment) {
       setDeletePrompt({ level, plan, payment });
     } else {
@@ -1227,8 +1469,130 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
 
   function handleRequestDeletePayment(payment: Payment) {
     if (!paymentsPlan) return;
+    closeFormsForOtherActions();
     openDeletePrompt(paymentsPlan, "payment", payment);
   }
+
+  function requestPlanHold(plan: Customer) {
+    closeFormsForOtherActions();
+    setPlanHoldPrompt({ mode: "hold", plan });
+    setPlanHoldError(null);
+  }
+
+  function requestPlanResume(plan: Customer) {
+    closeFormsForOtherActions();
+    setPlanHoldPrompt({ mode: "resume", plan });
+    setPlanHoldError(null);
+  }
+
+  function closePlanHoldPrompt() {
+    if (planHoldInFlight) return;
+    setPlanHoldPrompt(null);
+    setPlanHoldError(null);
+  }
+
+  async function confirmPlanHoldAction() {
+    if (!planHoldPrompt) return;
+    setPlanHoldInFlight(true);
+    setPlanHoldError(null);
+    try {
+      const action = planHoldPrompt.mode === "hold" ? holdCustomerPlan : resumeCustomerPlan;
+      const result = await action(planHoldPrompt.plan.id);
+      if (!result.ok) {
+        throw new Error(result.error ?? "Failed to update this plan.");
+      }
+      setPlanHoldPrompt(null);
+      router.refresh();
+    } catch (err) {
+      setPlanHoldError((err as Error)?.message ?? "Unable to update this plan right now.");
+    } finally {
+      setPlanHoldInFlight(false);
+    }
+  }
+
+  const planHoldModal = planHoldPrompt && mounted && typeof document !== "undefined"
+    ? createPortal(
+      (() => {
+        const plan = planHoldPrompt.plan;
+        const isHoldMode = planHoldPrompt.mode === "hold";
+        const planLabel = plan.plan ?? "Plan";
+        const customerLabel = plan.name?.trim() || "this customer";
+        const todayIso = new Date().toISOString().slice(0, 10);
+        const todayDisplay = formatPromptDate(todayIso);
+        const bulletPoints = isHoldMode
+          ? [
+            "Freeze trainer allocation, attendance, and reminders until you resume.",
+            "Extend the plan end date by the number of days it stays on hold.",
+            "Stop auto-payment nudges so the member is not charged while paused.",
+          ]
+          : [
+            "Reactivate attendance tracking and trainer allocation immediately.",
+            "Capture today as the hold end date for audit history.",
+            "Restart reminders and billing so the member shows as active again.",
+          ];
+        return (
+          <div
+            className="fixed inset-0 z-[195] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-8"
+            role="dialog"
+            aria-modal="true"
+            onClick={closePlanHoldPrompt}
+          >
+            <div
+              className="w-full max-w-lg rounded-2xl border border-white/15 bg-stone-950/95 text-stone-100 shadow-2xl p-5"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+                  {isHoldMode ? "Hold plan" : "Resume plan"}
+                </p>
+                <h3 className="text-xl font-semibold text-white">
+                  {isHoldMode ? `Pause ${planLabel} for ${customerLabel}?` : `Resume ${planLabel} for ${customerLabel}?`}
+                </h3>
+                <p className="text-sm text-stone-300">
+                  Plan window: {formatPromptDate(plan.start_date)} → {formatPromptDate(plan.end_date)}
+                </p>
+                <p className="text-sm text-stone-400">
+                  Here is what will happen when you {isHoldMode ? "pause" : "resume"} this plan:
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-stone-100">
+                  {bulletPoints.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-stone-500">
+                  {isHoldMode
+                    ? `We use ${todayDisplay} as the hold start date so you can track how long the pause lasted.`
+                    : `We use ${todayDisplay} as the hold end date so the history remains auditable.`}
+                </p>
+                {planHoldError && (
+                  <p className="text-sm text-brand-red bg-brand-red/15 px-3 py-2 rounded-xl">{planHoldError}</p>
+                )}
+              </div>
+              <div className="mt-5 flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closePlanHoldPrompt}
+                  disabled={planHoldInFlight}
+                  className="px-4 py-2 rounded-xl border border-white/20 text-sm text-stone-300 hover:bg-white/5 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmPlanHoldAction}
+                  disabled={planHoldInFlight}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold text-white ${isHoldMode ? "bg-amber-500 hover:bg-amber-400" : "bg-emerald-500 hover:bg-emerald-400"} disabled:opacity-60`}
+                >
+                  {planHoldInFlight ? "Applying…" : isHoldMode ? "Put on hold" : "Resume now"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })(),
+      document.body
+    )
+    : null;
 
   const deletePromptModal = deletePrompt && mounted && typeof document !== "undefined"
     ? createPortal(
@@ -1285,6 +1649,54 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
     )
     : null;
 
+  const friendViewerModal = friendViewer && mounted && typeof document !== "undefined"
+    ? createPortal(
+      <div
+        className="fixed inset-0 z-[190] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-8"
+        role="dialog"
+        aria-modal="true"
+        onClick={() => setFriendViewer(null)}
+      >
+        <div
+          className="w-full max-w-md rounded-2xl border border-white/15 bg-stone-900/95 text-stone-100 shadow-2xl p-5 space-y-4"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div>
+            <p className="text-xs uppercase tracking-wider text-stone-500">Friends</p>
+            <p className="text-lg font-semibold text-stone-100">{friendViewer.customer.name ?? "Unnamed"}</p>
+            {friendViewer.customer.mobile && (
+              <p className="text-sm text-stone-400">{friendViewer.customer.mobile}</p>
+            )}
+          </div>
+          {friendViewer.friends.length === 0 ? (
+            <p className="text-sm text-stone-400">No friends have been linked to this customer yet.</p>
+          ) : (
+            <ul className="space-y-2 max-h-64 overflow-y-auto pr-1 scrollbar-theme">
+              {friendViewer.friends.map((friend) => (
+                <li key={friend.id} className="rounded-xl border border-white/10 px-3 py-2 bg-white/5">
+                  <p className="text-sm text-stone-100 font-medium">{friend.name}</p>
+                  {friend.mobile && (
+                    <p className="text-xs text-stone-400">{friend.mobile}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setFriendViewer(null)}
+              className="px-4 py-2 rounded-xl border border-white/20 text-sm text-stone-300 hover:bg-white/5"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )
+    : null;
+
   const trainerOptions = trainers.filter((t) => (t.name ?? "").trim() !== "");
   const gtFormTouched = Boolean(
     totalFee > 0 ||
@@ -1330,7 +1742,9 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
 
   return (
     <div className="space-y-6">
+      {planHoldModal}
       {deletePromptModal}
+      {friendViewerModal}
       {/* Search bar + filter - sticky so it stays visible when scrolling */}
       <div className="sticky top-0 z-10 rounded-2xl border border-white/10 bg-stone-900/95 backdrop-blur-sm shadow-inner">
         <div className="flex items-stretch gap-0">
@@ -1494,7 +1908,7 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
               </p>
             )}
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-white/10">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-4 border-b border-white/10">
                 <div>
                   <label className={labelClass}>Name <span className="text-brand-red">*</span></label>
                   <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="Name (common)" required />
@@ -1502,6 +1916,90 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                 <div>
                   <label className={labelClass}>Number <span className="text-brand-red">*</span></label>
                   <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} placeholder="Phone number (common)" required />
+                </div>
+                <div ref={friendComboboxRef} className="lg:col-span-1">
+                  <p className="text-sm text-stone-400 mb-1.5">Friends (existing customers)</p>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleFriendDropdown("main")}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          setFriendDropdownAnchor(null);
+                          setFriendSearch("");
+                        }
+                      }}
+                      className={`${inputClass} flex items-center justify-between text-left`}
+                    >
+                      <div className="flex w-full items-center justify-between gap-3 whitespace-nowrap">
+                        <span className="text-sm font-medium text-stone-100">
+                          Friends
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs text-stone-100">
+                          {selectedFriendOptions.length}
+                          <span className="text-stone-400">selected</span>
+                        </span>
+                      </div>
+                      <svg className={`w-4 h-4 transition-transform ${friendDropdownAnchor === "main" ? "rotate-180" : ""}`} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    {friendDropdownAnchor === "main" && (
+                      <div className="absolute left-0 right-0 z-20 mt-2 rounded-xl border border-white/10 bg-stone-950/95 shadow-2xl">
+                        <div className="p-3 border-b border-white/10">
+                          <input
+                            ref={friendInputRef}
+                            type="text"
+                            value={friendSearch}
+                            onChange={(e) => setFriendSearch(e.target.value)}
+                            className={`${inputClass} bg-stone-900/80`}
+                            placeholder="Search customers…"
+                          />
+                          {selectedFriendOptions.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1 scrollbar-theme">
+                              {selectedFriendOptions.map((friend) => (
+                                <span
+                                  key={friend.id}
+                                  className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2 py-1 text-xs text-stone-100"
+                                >
+                                  <span>{friend.name}</span>
+                                  {friend.mobile && <span className="text-[10px] text-stone-400">{friend.mobile}</span>}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveFriend(friend.id)}
+                                    className="text-stone-400 hover:text-white focus:outline-none"
+                                    aria-label={`Remove ${friend.name}`}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="max-h-56 overflow-y-auto">
+                          {filteredFriendOptions.length === 0 ? (
+                            <p className="px-3 py-2 text-xs text-stone-500">No matches. Try a different name or number.</p>
+                          ) : (
+                            filteredFriendOptions.map((option) => (
+                              <button
+                                type="button"
+                                key={option.id}
+                                onClick={() => handleSelectFriendOption(option.id)}
+                                className="block w-full px-3 py-2 text-left text-sm text-stone-100 hover:bg-white/5"
+                              >
+                                <span>{option.name}</span>
+                                {option.mobile && (
+                                  <span className="block text-xs text-stone-400">{option.mobile}</span>
+                                )}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                 
                 </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
@@ -1681,7 +2179,7 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                 {error}
               </p>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div>
                 <label className={labelClass}>Name</label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} required />
@@ -1690,7 +2188,88 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                 <label className={labelClass}>Number</label>
                 <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} className={inputClass} />
               </div>
-
+              <div ref={friendProfileComboboxRef} className="lg:col-span-1">
+                <p className="text-sm text-stone-400 mb-1.5">Friends (existing customers)</p>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => toggleFriendDropdown("profile")}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        setFriendDropdownAnchor(null);
+                        setFriendSearch("");
+                      }
+                    }}
+                    className={`${inputClass} flex items-center justify-between text-left`}
+                  >
+                    <div className="flex w-full items-center justify-between gap-3 whitespace-nowrap">
+                      <span className="text-sm font-medium text-stone-100">Friends</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs text-stone-100">
+                        {selectedFriendOptions.length}
+                        <span className="text-stone-400">selected</span>
+                      </span>
+                    </div>
+                    <svg className={`w-4 h-4 transition-transform ${friendDropdownAnchor === "profile" ? "rotate-180" : ""}`} viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  {friendDropdownAnchor === "profile" && (
+                    <div className="absolute left-0 right-0 z-20 mt-2 rounded-xl border border-white/10 bg-stone-950/95 shadow-2xl">
+                      <div className="p-3 border-b border-white/10">
+                        <input
+                          ref={friendInputRef}
+                          type="text"
+                          value={friendSearch}
+                          onChange={(e) => setFriendSearch(e.target.value)}
+                          className={`${inputClass} bg-stone-900/80`}
+                          placeholder="Search customers…"
+                        />
+                        {selectedFriendOptions.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1 scrollbar-theme">
+                            {selectedFriendOptions.map((friend) => (
+                              <span
+                                key={friend.id}
+                                className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2 py-1 text-xs text-stone-100"
+                              >
+                                <span>{friend.name}</span>
+                                {friend.mobile && <span className="text-[10px] text-stone-400">{friend.mobile}</span>}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveFriend(friend.id)}
+                                  className="text-stone-400 hover:text-white focus:outline-none"
+                                  aria-label={`Remove ${friend.name}`}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        {filteredFriendOptions.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-stone-500">No matches. Try a different name or number.</p>
+                        ) : (
+                          filteredFriendOptions.map((option) => (
+                            <button
+                              type="button"
+                              key={option.id}
+                              onClick={() => handleSelectFriendOption(option.id)}
+                              className="block w-full px-3 py-2 text-left text-sm text-stone-100 hover:bg-white/5"
+                            >
+                              <span>{option.name}</span>
+                              {option.mobile && (
+                                <span className="block text-xs text-stone-400">{option.mobile}</span>
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              
+              </div>
             </div>
             <div className="flex gap-2">
               <button
@@ -1725,6 +2304,8 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
           onEditEntry={openEdit}
           onDeleteEntry={(entry) => openDeletePrompt(entry, "plan")}
           onViewPayments={openPaymentsPanel}
+          onHoldPlan={requestPlanHold}
+          onResumePlan={requestPlanResume}
         />
       )}
 
@@ -1766,11 +2347,13 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                     const c = group.primary;
                     const plansForDisplay = getPlansHighlight(group.plans);
                     const remainingCount = Math.max(group.plans.length - plansForDisplay.length, 0);
+                    const friendsForCustomer = c.customer_id ? friendSummaryByCustomerId.get(c.customer_id) ?? [] : [];
+                    const friendCount = friendsForCustomer.length;
                     return (
                       <tr
                         key={`${group.key}-${c.id}-${i}`}
                         className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors group"
-                        onClick={() => setDetailsCustomer(c)}
+                        onClick={() => openCustomerDetails(c)}
                       >
 
                         <td className="py-3 px-6">
@@ -1787,20 +2370,23 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                             <div className="flex flex-wrap gap-2">
                               {plansForDisplay.map((plan) => {
                                 const active = isPlanActive(plan);
+                                const onHold = Boolean(plan.active_hold);
+                                const badgeClass = onHold
+                                  ? "border-amber-400/50 bg-amber-500/15 text-amber-100"
+                                  : active
+                                    ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                                    : "border-white/10 bg-white/5 text-stone-200";
+                                const statusLabel = onHold ? " • Hold" : active ? " • Active" : "";
                                 return (
                                   <button
                                     key={plan.id}
                                     type="button"
                                     onClick={(event) => { event.stopPropagation(); openPaymentsPanel(plan); }}
-                                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
-                                      active
-                                        ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
-                                        : "border-white/10 bg-white/5 text-stone-200"
-                                    } hover:border-brand-red/60 hover:text-white`}
+                                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${badgeClass} hover:border-brand-red/60 hover:text-white`}
                                     title={`${plan.plan} • ${plan.start_date ?? "?"} → ${plan.end_date ?? "?"} (click to view payments)`}
                                   >
                                     {plan.plan}
-                                    {active ? " • Active" : ""}
+                                    {statusLabel}
                                   </button>
                                 );
                               })}
@@ -1812,6 +2398,13 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                         </td>
                         <td className="py-3 px-6" onClick={(event) => event.stopPropagation()}>
                           <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(event) => { event.stopPropagation(); openFriendViewer(c); }}
+                              className="px-3 py-1 rounded-full text-xs font-semibold border border-white/10 text-stone-200 hover:border-brand-red/60 hover:text-white transition whitespace-nowrap"
+                            >
+                              Friends{friendCount ? ` (${friendCount})` : ""}
+                            </button>
                             <button
                               type="button"
                               onClick={(event) => { event.stopPropagation(); openProfileEdit(c); }}

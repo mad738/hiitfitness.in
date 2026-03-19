@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Line,
 } from "recharts";
 
 export type RevenueChartRow = {
@@ -26,6 +27,7 @@ type Props = {
 };
 
 const barColor = "#EE2A24";
+const lineColor = "#F9DB6D";
 
 export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue", onBarClick }: Props) {
   const id = gradientId.replace(/\s/g, "-");
@@ -79,6 +81,14 @@ export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue
               radius={[4, 4, 0, 0]}
               cursor={onBarClick ? "pointer" : "default"}
               onClick={onBarClick ? (_data: unknown, index: number) => onBarClick(index) : undefined}
+            />
+            <Line
+              type="monotone"
+              dataKey="revenue"
+              stroke={lineColor}
+              strokeWidth={2.5}
+              dot={{ r: 3.5, stroke: "#fff", strokeWidth: 1, fill: lineColor }}
+              activeDot={{ r: 5, stroke: "#fff", strokeWidth: 1.5, fill: lineColor }}
             />
           </BarChart>
         </ResponsiveContainer>

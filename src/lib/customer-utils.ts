@@ -82,6 +82,42 @@ export function parseFlexibleDate(value: string): string | null {
   return date.toISOString().slice(0, 10);
 }
 
+const DD_MM_YYYY_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+
+export function ensureDdMmYyyyFormat(value: string, label?: string): string {
+  const trimmed = (value ?? "").trim();
+  const field = label ?? "Date";
+  if (!trimmed) {
+    throw new Error(`${field} is required.`);
+  }
+  const match = trimmed.match(DD_MM_YYYY_REGEX);
+  if (!match) {
+    throw new Error(`${field} must be in DD/MM/YYYY format (received "${value}").`);
+  }
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    throw new Error(`${field} must be a valid date in DD/MM/YYYY format.`);
+  }
+  return `${match[1].padStart(2, "0")}/${match[2].padStart(2, "0")}/${match[3]}`;
+}
+
+export function formatDateForInput(value: string | null | undefined): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (DD_MM_YYYY_REGEX.test(trimmed)) return trimmed;
+  const iso = parseFlexibleDate(trimmed);
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 export function normalizeDateForStorage(value: string, label?: string): string {
   const trimmed = (value ?? "").trim();
   if (!trimmed) return "";

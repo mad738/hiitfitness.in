@@ -3,12 +3,15 @@ import { normalizeMobile } from "@/lib/customer-utils";
 import type { Customer, CustomerInsert, CustomerUpdate } from "@/models/customer";
 import type { CustomerProfile } from "@/models/customer_profile";
 import type { CustomerPlan } from "@/models/customer_plan";
+import type { PlanHold } from "@/models/plan_hold";
 import type { Payment } from "@/models/payment";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const CUSTOMER_TABLE = "customers";
 const PLAN_TABLE = "customer_plans";
 const PAYMENT_TABLE = "payments";
+const FRIEND_TABLE = "friends";
+const PLAN_HOLD_TABLE = "plan_holds";
 const PAGE_SIZE = 1000;
 
 const PROFILE_COLS =
@@ -26,6 +29,7 @@ const PLAN_SELECT = `
   balance,
   status,
   slot_timing,
+  remarks,
   plan_months,
   monthly_value,
   commission_rate,
@@ -44,12 +48,20 @@ const PLAN_SELECT = `
     receipt_issued,
     created_at,
     updated_at
+  ),
+  plan_holds:plan_holds!fk_plan_holds_customer_plan (
+    id,
+    customer_plan_id,
+    hold_start_date,
+    hold_end_date,
+    created_at
   )
 `;
 
 type CustomerPlanRow = CustomerPlan & {
   customer: CustomerProfile | null;
   payments: Payment[] | null;
+  plan_holds: PlanHold[] | null;
 };
 
 export async function listCustomers(): Promise<Customer[]> {
@@ -72,7 +84,21 @@ export async function listCustomers(): Promise<Customer[]> {
     pageLength = rows.length;
     offset += PAGE_SIZE;
   } while (pageLength === PAGE_SIZE);
-  return all;
+  const customerIds = Array.from(
+    new Set(
+      all
+        .map((customer) => customer.customer_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  if (customerIds.length === 0) {
+    return all.map((customer) => ({ ...customer, friend_ids: [] }));
+  }
+  const friendMap = await fetchFriendMap(supabase, customerIds);
+  return all.map((customer) => ({
+    ...customer,
+    friend_ids: customer.customer_id ? friendMap.get(customer.customer_id) ?? [] : [],
+  }));
 }
 
 export async function findCustomerById(id: string): Promise<Customer | null> {
@@ -101,6 +127,11 @@ export async function insertCustomer(row: CustomerInsert): Promise<Customer> {
     receipt: row.receipt ?? false,
     fallbackDate: sanitizeDate(row.start_date) ?? sanitizeDate(row.end_date),
   });
+
+  if (row.friend_ids !== undefined) {
+    const requestedFriendIds = sanitizeFriendIdsInput(row.friend_ids, profile.id);
+    await syncCustomerFriends(supabase, profile.id, requestedFriendIds);
+  }
 
   return (await fetchPlanById(supabase, planId))!;
 }
@@ -135,6 +166,11 @@ export async function updateCustomer(
     receipt: updates.receipt ?? existing.receipt ?? false,
     fallbackDate: sanitizeDate(updates.start_date) ?? existing.start_date ?? existing.end_date,
   });
+
+  if (updates.friend_ids !== undefined) {
+    const requestedFriendIds = sanitizeFriendIdsInput(updates.friend_ids, existing.customer_id);
+    await syncCustomerFriends(supabase, existing.customer_id, requestedFriendIds);
+  }
 
   return (await fetchPlanById(supabase, id))!;
 }
@@ -178,6 +214,45 @@ export async function deleteCustomerCascade(customerId: string): Promise<void> {
   if (deleteProfileError) throw deleteProfileError;
 }
 
+export async function placePlanOnHold(planId: string, holdStartDate?: string): Promise<void> {
+  const supabase = await createServiceRoleClient();
+  const normalizedDate = sanitizeDate(holdStartDate) ?? todayIsoDate();
+  const { data: existing, error: existingError } = await supabase
+    .from(PLAN_HOLD_TABLE)
+    .select("id")
+    .eq("customer_plan_id", planId)
+    .is("hold_end_date", null)
+    .maybeSingle();
+  if (existingError && existingError.code !== "PGRST116") throw existingError;
+  if (existing) {
+    throw new Error("This plan already has an active hold.");
+  }
+  const { error } = await supabase
+    .from(PLAN_HOLD_TABLE)
+    .insert({ customer_plan_id: planId, hold_start_date: normalizedDate });
+  if (error) throw error;
+}
+
+export async function resumePlanFromHold(planId: string, holdEndDate?: string): Promise<void> {
+  const supabase = await createServiceRoleClient();
+  const normalizedDate = sanitizeDate(holdEndDate) ?? todayIsoDate();
+  const { data: activeHold, error } = await supabase
+    .from(PLAN_HOLD_TABLE)
+    .select("id")
+    .eq("customer_plan_id", planId)
+    .is("hold_end_date", null)
+    .maybeSingle();
+  if (error && error.code !== "PGRST116") throw error;
+  if (!activeHold) {
+    throw new Error("No active hold found for this plan.");
+  }
+  const { error: updateError } = await supabase
+    .from(PLAN_HOLD_TABLE)
+    .update({ hold_end_date: normalizedDate })
+    .eq("id", (activeHold as { id: string }).id);
+  if (updateError) throw updateError;
+}
+
 async function fetchPlanById(
   supabase: SupabaseClient,
   planId: string
@@ -192,6 +267,110 @@ async function fetchPlanById(
   if (error && error.code !== "PGRST116") throw error;
   if (!data) return null;
   return mapPlanRowToCustomer((data as unknown) as CustomerPlanRow);
+}
+
+function sanitizeFriendIdsInput(input: unknown, selfId: string): string[] {
+  if (!Array.isArray(input)) return [];
+  const unique = new Set<string>();
+  for (const value of input) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === selfId) continue;
+    unique.add(trimmed);
+  }
+  return Array.from(unique);
+}
+
+async function fetchFriendMap(
+  supabase: SupabaseClient,
+  customerIds: string[]
+): Promise<Map<string, string[]>> {
+  if (customerIds.length === 0) return new Map();
+  const accumulator = new Map<string, Set<string>>();
+
+  const { data: asCustomer, error: asCustomerError } = await supabase
+    .from(FRIEND_TABLE)
+    .select("customer_id, friend_id")
+    .in("customer_id", customerIds);
+  if (asCustomerError) throw asCustomerError;
+
+  const { data: asFriend, error: asFriendError } = await supabase
+    .from(FRIEND_TABLE)
+    .select("customer_id, friend_id")
+    .in("friend_id", customerIds);
+  if (asFriendError) throw asFriendError;
+
+  const rows = [...(asCustomer ?? []), ...(asFriend ?? [])];
+  for (const row of rows) {
+    const customerId = (row as { customer_id: string | null }).customer_id;
+    const friendId = (row as { friend_id: string | null }).friend_id;
+    if (!customerId || !friendId) continue;
+    addFriendEdge(accumulator, customerId, friendId);
+    addFriendEdge(accumulator, friendId, customerId);
+  }
+
+  return new Map(
+    Array.from(accumulator.entries()).map(([key, value]) => [key, Array.from(value)])
+  );
+}
+
+function addFriendEdge(target: Map<string, Set<string>>, key: string, friendId: string) {
+  if (!target.has(key)) {
+    target.set(key, new Set());
+  }
+  target.get(key)!.add(friendId);
+}
+
+function makeFriendPairKey(a: string, b: string): string {
+  return a < b ? `${a}::${b}` : `${b}::${a}`;
+}
+
+async function syncCustomerFriends(
+  supabase: SupabaseClient,
+  primaryCustomerId: string,
+  nextFriendIds: string[]
+): Promise<void> {
+  const desiredFriends = Array.from(
+    new Set(nextFriendIds.filter((id) => id && id !== primaryCustomerId))
+  );
+  const { data, error } = await supabase
+    .from(FRIEND_TABLE)
+    .select("id, customer_id, friend_id")
+    .or(`customer_id.eq.${primaryCustomerId},friend_id.eq.${primaryCustomerId}`);
+  if (error) throw error;
+
+  const existingMap = new Map<string, string>();
+  for (const row of data ?? []) {
+    const customerId = (row as { customer_id: string | null }).customer_id;
+    const friendId = (row as { friend_id: string | null }).friend_id;
+    const rowId = (row as { id: string | null }).id;
+    if (!customerId || !friendId || !rowId) continue;
+    existingMap.set(makeFriendPairKey(customerId, friendId), rowId);
+  }
+
+  const desiredKeys = new Set(desiredFriends.map((friendId) => makeFriendPairKey(primaryCustomerId, friendId)));
+
+  const deleteIds = Array.from(existingMap.entries())
+    .filter(([key]) => !desiredKeys.has(key))
+    .map(([, rowId]) => rowId);
+  if (deleteIds.length > 0) {
+    const { error: deleteError } = await supabase.from(FRIEND_TABLE).delete().in("id", deleteIds);
+    if (deleteError) throw deleteError;
+  }
+
+  const inserts = desiredFriends
+    .filter((friendId) => !existingMap.has(makeFriendPairKey(primaryCustomerId, friendId)))
+    .map((friendId) => {
+      const [first, second] = primaryCustomerId < friendId
+        ? [primaryCustomerId, friendId]
+        : [friendId, primaryCustomerId];
+      return { customer_id: first, friend_id: second };
+    });
+
+  if (inserts.length > 0) {
+    const { error: insertError } = await supabase.from(FRIEND_TABLE).insert(inserts);
+    if (insertError) throw insertError;
+  }
 }
 
 async function resolveCustomerProfile(
@@ -310,6 +489,7 @@ function buildPlanInsertPayload(customerId: string, row: CustomerInsert) {
     paid_amount: sanitizeNumber(row.paid_fee),
     status: row.status ?? "active",
     slot_timing: sanitizeText(row.slot_timing),
+    remarks: sanitizeText(row.remarks),
   };
 }
 
@@ -323,6 +503,7 @@ function buildPlanUpdatePayload(row: CustomerUpdate): Record<string, unknown> {
   if (row.paid_fee !== undefined) payload.paid_amount = sanitizeNumber(row.paid_fee);
   if (row.status !== undefined) payload.status = row.status ?? null;
   if (row.slot_timing !== undefined) payload.slot_timing = sanitizeText(row.slot_timing);
+  if (row.remarks !== undefined) payload.remarks = sanitizeText(row.remarks);
   return payload;
 }
 
@@ -398,6 +579,11 @@ function mapPlanRowToCustomer(row: CustomerPlanRow): Customer {
   const monthlyValue = sanitizeOptionalNumber(row.monthly_value);
   const commissionRate = sanitizeOptionalNumber(row.commission_rate);
   const trainerCommission = sanitizeOptionalNumber(row.trainer_commission);
+  const normalizedHolds = normalizePlanHolds(row.plan_holds);
+  const activeHold = normalizedHolds.find((hold) => !hold.hold_end_date) ?? null;
+  const holdHistory = activeHold
+    ? normalizedHolds.filter((hold) => hold.id !== activeHold.id)
+    : normalizedHolds;
   return {
     id: row.id,
     customer_id: row.customer_id,
@@ -413,7 +599,7 @@ function mapPlanRowToCustomer(row: CustomerPlanRow): Customer {
     pay_date: payment?.payment_date ?? null,
     payment_mode: payment?.payment_mode ?? null,
     paid_to: payment?.paid_to ?? null,
-    remarks: null,
+    remarks: row.remarks ?? null,
     feedback: null,
     mobile: customer?.mobile ?? null,
     duration: deriveDuration(row.start_date, row.end_date),
@@ -426,7 +612,40 @@ function mapPlanRowToCustomer(row: CustomerPlanRow): Customer {
     monthly_value: monthlyValue,
     commission_rate: commissionRate,
     trainer_commission: trainerCommission,
+    friend_ids: [],
+    active_hold: activeHold ?? null,
+    hold_history: holdHistory,
   };
+}
+
+function normalizePlanHolds(rawHolds: PlanHold[] | null | undefined): PlanHold[] {
+  if (!rawHolds) return [];
+  return rawHolds
+    .map((hold) => {
+      if (!hold || !hold.id || !hold.customer_plan_id || !hold.hold_start_date || !hold.created_at) {
+        return null;
+      }
+      return {
+        id: hold.id,
+        customer_plan_id: hold.customer_plan_id,
+        hold_start_date: hold.hold_start_date,
+        hold_end_date: hold.hold_end_date ?? null,
+        created_at: hold.created_at,
+      } satisfies PlanHold;
+    })
+    .filter((hold): hold is PlanHold => Boolean(hold))
+    .sort((a, b) => compareDatesDesc(a.hold_start_date, b.hold_start_date));
+}
+
+function compareDatesDesc(aDate: string, bDate: string): number {
+  const aTime = Date.parse(aDate);
+  const bTime = Date.parse(bDate);
+  const aValid = !Number.isNaN(aTime);
+  const bValid = !Number.isNaN(bTime);
+  if (aValid && bValid) return bTime - aTime;
+  if (aValid) return -1;
+  if (bValid) return 1;
+  return bDate.localeCompare(aDate);
 }
 
 function deriveDuration(startDate: string | null, endDate: string | null): string | null {
@@ -436,6 +655,10 @@ function deriveDuration(startDate: string | null, endDate: string | null): strin
   if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
   const days = Math.round((end - start) / (1000 * 60 * 60 * 24));
   return `${days} days`;
+}
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function sanitizeDate(date: string | null | undefined): string | null {

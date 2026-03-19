@@ -53,6 +53,10 @@ type Props = {
   onDeleteEntry?: (customer: Customer) => void;
   /** When provided, clicking Payments opens plan payments manager. */
   onViewPayments?: (plan: Customer) => void;
+  /** Triggered when the user wants to place a plan on hold. */
+  onHoldPlan?: (plan: Customer) => void;
+  /** Triggered when the user wants to resume a held plan. */
+  onResumePlan?: (plan: Customer) => void;
 };
 
 export function CustomerReportModal({
@@ -66,6 +70,8 @@ export function CustomerReportModal({
   onEditEntry,
   onDeleteEntry,
   onViewPayments,
+  onHoldPlan,
+  onResumePlan,
 }: Props) {
   const mobileKey = normalizeMobile(customer.mobile);
   const nameKey = (customer.name ?? "").trim();
@@ -181,19 +187,25 @@ export function CustomerReportModal({
                       const trainer = entry.trainer_id ? trainers.find((t) => t.id === entry.trainer_id) : null;
                       const isCurrentlyRunning = isPlanCurrentlyRunning(entry.start_date, entry.end_date);
                       const statusMeta = getPlanStatusMeta(entry.status);
+                      const activeHold = entry.active_hold ?? null;
+                      const isOnHold = Boolean(activeHold);
                       const rowClickable = Boolean(onViewPayments);
-                      const rowHighlightClass = statusMeta?.isActive
-                        ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40"
+                      const rowHighlightClass = isOnHold
+                        ? "bg-amber-950/50 ring-1 ring-inset ring-amber-500/30"
+                        : statusMeta?.isActive
+                          ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40"
+                          : statusMeta?.isInactive
+                            ? "bg-rose-950/40 ring-1 ring-inset ring-rose-500/30"
+                            : isCurrentlyRunning
+                              ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40"
+                              : "";
+                      const rowTitle = isOnHold
+                        ? "Plan is currently on hold"
                         : statusMeta?.isInactive
-                          ? "bg-rose-950/40 ring-1 ring-inset ring-rose-500/30"
+                          ? "Inactive plan"
                           : isCurrentlyRunning
-                            ? "bg-emerald-950/50 ring-1 ring-inset ring-emerald-500/40"
-                            : "";
-                      const rowTitle = statusMeta?.isInactive
-                        ? "Inactive plan"
-                        : isCurrentlyRunning
-                          ? "Currently active (today within start–end dates)"
-                          : undefined;
+                            ? "Currently active (today within start–end dates)"
+                            : undefined;
                       return (
                         <tr
                           key={`${entry.id}-${idx}`}
@@ -202,14 +214,7 @@ export function CustomerReportModal({
                           title={rowTitle}
                         >
                           <td className="py-2 px-3 text-stone-400">{totalEntries - idx}</td>
-                          <td className="py-2 px-3 text-stone-200 font-medium">
-                            <span className="inline-flex items-center gap-1.5">
-                              {entry.plan}
-                              {isCurrentlyRunning && (
-                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-600/80 text-white uppercase">Active</span>
-                              )}
-                            </span>
-                          </td>
+                          <td className="py-2 px-3 text-stone-200 font-medium">{entry.plan}</td>
                           <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.start_date)}</td>
                           <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.end_date)}</td>
                           <td className="py-2 px-3 text-stone-300">{entry.duration ?? "—"}</td>
@@ -236,26 +241,46 @@ export function CustomerReportModal({
                           <td className="py-2 px-3 text-center text-stone-300">{entry.receipt ? "Yes" : "—"}</td>
                           {showActions && (
                             <td className="py-2 px-3 text-center whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); onEditEntry?.(entry); onClose(); }}
-                                className="p-1 rounded text-stone-500 hover:text-brand-red hover:bg-brand-red/10 transition mr-2"
-                                title="Edit this entry"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); onDeleteEntry?.(entry); }}
-                                className="p-1 rounded text-stone-500 hover:text-brand-red hover:bg-brand-red/10 transition"
-                                title="Delete this entry"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
+                              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                                {onHoldPlan && !activeHold && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); onHoldPlan(entry); }}
+                                    className="px-2.5 py-1 rounded-full text-[11px] font-semibold border border-amber-400/60 text-amber-200 hover:bg-amber-500/15 transition"
+                                  >
+                                    Hold plan
+                                  </button>
+                                )}
+                                {onResumePlan && activeHold && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); onResumePlan(entry); }}
+                                    className="px-2.5 py-1 rounded-full text-[11px] font-semibold border border-emerald-400/60 text-emerald-200 hover:bg-emerald-500/15 transition"
+                                  >
+                                    Resume plan
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); onEditEntry?.(entry); onClose(); }}
+                                  className="p-1 rounded text-stone-500 hover:text-brand-red hover:bg-brand-red/10 transition"
+                                  title="Edit this entry"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); onDeleteEntry?.(entry); }}
+                                  className="p-1 rounded text-stone-500 hover:text-brand-red hover:bg-brand-red/10 transition"
+                                  title="Delete this entry"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
                             </td>
                           )}
                         </tr>

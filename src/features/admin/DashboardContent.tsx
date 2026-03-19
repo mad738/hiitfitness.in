@@ -172,7 +172,7 @@ export function DashboardContent({
   /** Which analytics period's customer list is shown (click chip to open). */
   const [analyticsPanel, setAnalyticsPanel] = useState<"daily" | "weekly" | "monthly" | null>(null);
   /** Chart bar clicked: show customer list for that bar's period. */
-  const [chartClickedPeriod, setChartClickedPeriod] = useState<{ type: "daily" | "weekly" | "monthly"; index: number } | null>(null);
+  const [chartClickedPeriod, setChartClickedPeriod] = useState<{ type: "daily" | "weekly" | "monthly" | "yearly"; index: number } | null>(null);
   /** Customer selected from analytics to show full report modal. */
   const [reportCustomer, setReportCustomer] = useState<Customer | null>(null);
   const [paymentsPlan, setPaymentsPlan] = useState<Customer | null>(null);
@@ -249,100 +249,122 @@ export function DashboardContent({
 
   const handleReadOnlyDelete = useCallback((_payment: Payment) => undefined, []);
 
-  const { dailySummary, dailyChartData, dailyCustomers, dailyCustomersByBar, weeklySummary, weeklyChartData, weeklyCustomers, weeklyCustomersByBar, monthlySummary, monthlyChartData, monthlyCustomers, monthlyCustomersByBar, trainerReports } = useMemo(() => {
+  const {
+    dailySummary,
+    dailySummaryLabel,
+    dailyChartData,
+    dailyCustomers,
+    dailyCustomersByBar,
+    dailyPanelLabels,
+    weeklySummary,
+    weeklySummaryLabel,
+    weeklyChartData,
+    weeklyCustomers,
+    weeklyCustomersByBar,
+    weeklyPanelLabels,
+    monthlySummary,
+    monthlySummaryLabel,
+    monthlyChartData,
+    monthlyCustomers,
+    monthlyCustomersByBar,
+    monthlyPanelLabels,
+    yearlyChartData,
+    yearlyCustomersByBar,
+    yearlyPanelLabels,
+    trainerReports,
+  } = useMemo(() => {
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+    const endOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+    const formatFullDate = (date: Date) =>
+      date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
-    // Daily summary = today only (for chip)
-    const dailyTotal = customers
-      .filter((c) => {
-        const pd = parseDashboardDate(c.pay_date);
-        return pd && pd >= todayStart && pd <= todayEnd;
-      })
-      .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
-    // Daily graph = last 7 completed days only (no today) + per-bar customer list for chart click
-    const dailyRows: RevenueChartRow[] = [];
-    const dailyCustomersByBar: CustomerWithAmount[][] = [];
-    for (let i = 7; i >= 1; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      d.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(d);
-      dayEnd.setHours(23, 59, 59, 999);
-      const label = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-      const revenue = customers
-        .filter((c) => {
-          const pd = parseDashboardDate(c.pay_date);
-          return pd && pd >= d && pd <= dayEnd;
-        })
-        .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
-      dailyRows.push({ label, revenue });
-      dailyCustomersByBar.push(getCustomersInPeriod(customers, d, dayEnd));
-    }
+    const buildPeriod = (start: Date, end: Date, axisLabel: string, displayLabel: string) => {
+      const customersInPeriod = getCustomersInPeriod(customers, start, end);
+      const revenue = customersInPeriod.reduce((sum, entry) => sum + entry.amountInPeriod, 0);
+      return { axisLabel, displayLabel, revenue, customers: customersInPeriod };
+    };
 
-    // Weekly summary = last complete week only (for chip)
+    // Daily periods: today + six trailing days
+    const dayPeriods = Array.from({ length: 7 }, (_, idx) => {
+      const base = new Date(now);
+      base.setDate(base.getDate() - idx);
+      const start = startOfDay(base);
+      const end = endOfDay(base);
+      const axisLabel = idx === 0 ? "Today" : start.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      const displayLabel = idx === 0 ? `Today (${formatFullDate(start)})` : formatFullDate(start);
+      return buildPeriod(start, end, axisLabel, displayLabel);
+    });
+    const chronologicalDayPeriods = [...dayPeriods].reverse();
+    const dailyChartData = chronologicalDayPeriods.map((period) => ({ label: period.axisLabel, revenue: period.revenue }));
+    const dailyCustomersByBar = chronologicalDayPeriods.map((period) => period.customers);
+    const dailyPanelLabels = chronologicalDayPeriods.map((period) => period.displayLabel);
+    const dailySummary = dayPeriods[0]?.revenue ?? 0;
+    const dailySummaryLabel = dayPeriods[0]?.displayLabel ?? "Today";
+    const dailyCustomers = dayPeriods[0]?.customers ?? [];
+
+    // Weekly periods: current week (Sat–Fri) + four trailing weeks
     const currentWeekStart = getWeekStart(now);
-    const lastCompleteWeekStart = new Date(currentWeekStart);
-    lastCompleteWeekStart.setDate(lastCompleteWeekStart.getDate() - 7);
-    const lastCompleteWeekEnd = new Date(lastCompleteWeekStart);
-    lastCompleteWeekEnd.setDate(lastCompleteWeekEnd.getDate() + 6);
-    lastCompleteWeekEnd.setHours(23, 59, 59, 999);
-    const weeklyTotal = customers
-      .filter((c) => {
-        const pd = parseDashboardDate(c.pay_date);
-        return pd && pd >= lastCompleteWeekStart && pd <= lastCompleteWeekEnd;
-      })
-      .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
-    // Weekly graph = last 4 completed weeks only (Sat–Fri each) + per-bar customer list
-    const weeks: RevenueChartRow[] = [];
-    const weeklyCustomersByBar: CustomerWithAmount[][] = [];
-    for (let w = 4; w >= 1; w--) {
-      const weekCurr = new Date(currentWeekStart);
-      weekCurr.setDate(weekCurr.getDate() - w * 7);
-      const weekEnd = new Date(weekCurr);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-      const label = `${weekCurr.getDate()}–${weekEnd.getDate()} ${weekEnd.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}`;
-      const revenue = customers
-        .filter((c) => {
-          const pd = parseDashboardDate(c.pay_date);
-          return pd && pd >= weekCurr && pd <= weekEnd;
-        })
-        .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
-      weeks.push({ label, revenue });
-      weeklyCustomersByBar.push(getCustomersInPeriod(customers, weekCurr, weekEnd));
-    }
+    const weekPeriods = Array.from({ length: 5 }, (_, idx) => {
+      const start = new Date(currentWeekStart);
+      start.setDate(start.getDate() - idx * 7);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      const rangeLabel = `${start.getDate()}–${end.getDate()} ${end.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}`;
+      const axisLabel = idx === 0 ? "This wk" : rangeLabel;
+      const displayLabel = idx === 0 ? "This week (Sat–Fri)" : `${rangeLabel} (Sat–Fri)`;
+      return buildPeriod(start, end, axisLabel, displayLabel);
+    });
+    const chronologicalWeekPeriods = [...weekPeriods].reverse();
+    const weeklyChartData = chronologicalWeekPeriods.map((period) => ({ label: period.axisLabel, revenue: period.revenue }));
+    const weeklyCustomersByBar = chronologicalWeekPeriods.map((period) => period.customers);
+    const weeklyPanelLabels = chronologicalWeekPeriods.map((period) => period.displayLabel);
+    const weeklySummary = weekPeriods[0]?.revenue ?? 0;
+    const weeklySummaryLabel = weekPeriods[0]?.displayLabel ?? "This week";
+    const weeklyCustomers = weekPeriods[0]?.customers ?? [];
 
-    // Monthly summary = last complete business month only (for chip)
-    const lastCompleteMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 6);
-    const lastCompleteMonthEnd = new Date(now.getFullYear(), now.getMonth(), 5, 23, 59, 59, 999);
-    const monthlyTotal = customers
-      .filter((c) => {
-        const pd = parseDashboardDate(c.pay_date);
-        return pd && pd >= lastCompleteMonthStart && pd <= lastCompleteMonthEnd;
-      })
-      .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
-    // Monthly graph = last 6 completed business months only (6th–5th each) + per-bar customer list
-    const months: RevenueChartRow[] = [];
-    const monthlyCustomersByBar: CustomerWithAmount[][] = [];
-    for (let m = 6; m >= 1; m--) {
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - m, 6);
-      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 5, 23, 59, 59, 999);
-      const label = `6 ${monthStart.toLocaleDateString("en-IN", { month: "short" })} – 5 ${monthEnd.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}`;
-      const revenue = customers
-        .filter((c) => {
-          const pd = parseDashboardDate(c.pay_date);
-          return pd && pd >= monthStart && pd <= monthEnd;
-        })
-        .reduce((s, c) => s + Number(c.paid_fee ?? 0), 0);
-      months.push({ label, revenue });
-      monthlyCustomersByBar.push(getCustomersInPeriod(customers, monthStart, monthEnd));
+    // Business months: current month (6th–5th) + six trailing business months
+    const currentMonthStart = getBusinessMonthStart(now);
+    const currentMonthEnd = getBusinessMonthEnd(now);
+    const monthPeriods = Array.from({ length: 7 }, (_, idx) => {
+      const start = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() - idx, 6);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 5, 23, 59, 59, 999);
+      const rangeLabel = `6 ${start.toLocaleDateString("en-IN", { month: "short" })} – 5 ${end.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}`;
+      const axisLabel = idx === 0 ? "This mo" : start.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+      const displayLabel = idx === 0 ? `This month (${rangeLabel})` : rangeLabel;
+      return buildPeriod(start, end, axisLabel, displayLabel);
+    });
+    const chronologicalMonthPeriods = [...monthPeriods].reverse();
+    const monthlyChartData = chronologicalMonthPeriods.map((period) => ({ label: period.axisLabel, revenue: period.revenue }));
+    const monthlyCustomersByBar = chronologicalMonthPeriods.map((period) => period.customers);
+    const monthlyPanelLabels = chronologicalMonthPeriods.map((period) => period.displayLabel);
+    const monthlySummary = monthPeriods[0]?.revenue ?? 0;
+    const monthlySummaryLabel = monthPeriods[0]?.displayLabel ?? "This month";
+    const monthlyCustomers = monthPeriods[0]?.customers ?? [];
+
+    // Yearly periods: this calendar year followed by all previous years with data
+    const payDates = customers
+      .map((c) => parseDashboardDate(c.pay_date))
+      .filter((date): date is Date => Boolean(date));
+    const years = payDates.length > 0 ? payDates.map((d) => d.getFullYear()) : [now.getFullYear()];
+    const minYear = Math.min(...years);
+    const yearPeriods = [] as ReturnType<typeof buildPeriod>[];
+    for (let year = now.getFullYear(); year >= minYear; year--) {
+      const start = new Date(year, 0, 1);
+      const end = new Date(year, 11, 31, 23, 59, 59, 999);
+      const axisLabel = year === now.getFullYear() ? "This yr" : `${year}`;
+      const displayLabel = year === now.getFullYear() ? `This year (${year})` : `${year}`;
+      yearPeriods.push(buildPeriod(start, end, axisLabel, displayLabel));
     }
+    const chronologicalYearPeriods = [...yearPeriods].reverse();
+    const yearlyChartData = chronologicalYearPeriods.map((period) => ({ label: period.axisLabel, revenue: period.revenue }));
+    const yearlyCustomersByBar = chronologicalYearPeriods.map((period) => period.customers);
+    const yearlyPanelLabels = chronologicalYearPeriods.map((period) => period.displayLabel);
+
     const trainerById = new Map<string, Trainer>(
       trainers.map((t) => [t.id, t])
     );
-    // PT only, and only active (today between start_date and end_date)
     const allPtActive = customers.filter(
       (c) =>
         c.plan === "PT" &&
@@ -357,26 +379,20 @@ export function DashboardContent({
     }
     const dedupeByNameKeepRecent = (entries: Customer[]): Customer[] => {
       const byName = new Map<string, Customer>();
-      for (const c of entries) {
-        const name = c.name ?? "";
+      for (const entry of entries) {
+        const name = entry.name ?? "";
         const existing = byName.get(name);
-        const cStart = parseDashboardDateMs(c.start_date);
+        const entryStart = parseDashboardDateMs(entry.start_date);
         const existingStart = parseDashboardDateMs(existing?.start_date);
-        if (!existing || cStart > existingStart) byName.set(name, c);
+        if (!existing || entryStart > existingStart) byName.set(name, entry);
       }
-      return Array.from(byName.values()).sort((a, b) =>
-        getSortDateMs(b) - getSortDateMs(a)
-      );
+      return Array.from(byName.values()).sort((a, b) => getSortDateMs(b) - getSortDateMs(a));
     };
-    // Current business month (6th–5th) for "this month" commission
-    const currentMonthStart = getBusinessMonthStart(now);
-    const currentMonthEnd = getBusinessMonthEnd(now);
     const isStartInCurrentMonth = (startDate: string | null): boolean => {
       if (!startDate) return false;
-      const d = parseDashboardDate(startDate);
-      return d ? (d >= currentMonthStart && d <= currentMonthEnd) : false;
+      const date = parseDashboardDate(startDate);
+      return date ? date >= currentMonthStart && date <= currentMonthEnd : false;
     };
-    // Commission = entries starting this (business) month, using Supabase-calculated trainer_commission with fallbacks
     const trainerReportsList: TrainerReport[] = Object.entries(byTrainer)
       .map(([name, entries]) => {
         const deduped = dedupeByNameKeepRecent(entries);
@@ -405,24 +421,28 @@ export function DashboardContent({
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    // Customer profiles per period (same boundaries: today, last complete week, last complete month)
-    const dailyCustomers = getCustomersInPeriod(customers, todayStart, todayEnd);
-    const weeklyCustomers = getCustomersInPeriod(customers, lastCompleteWeekStart, lastCompleteWeekEnd);
-    const monthlyCustomers = getCustomersInPeriod(customers, lastCompleteMonthStart, lastCompleteMonthEnd);
-
     return {
-      dailySummary: dailyTotal,
-      dailyChartData: dailyRows,
+      dailySummary,
+      dailySummaryLabel,
+      dailyChartData,
       dailyCustomers,
       dailyCustomersByBar,
-      weeklySummary: weeklyTotal,
-      weeklyChartData: weeks,
+      dailyPanelLabels,
+      weeklySummary,
+      weeklySummaryLabel,
+      weeklyChartData,
       weeklyCustomers,
       weeklyCustomersByBar,
-      monthlySummary: monthlyTotal,
-      monthlyChartData: months,
+      weeklyPanelLabels,
+      monthlySummary,
+      monthlySummaryLabel,
+      monthlyChartData,
       monthlyCustomers,
       monthlyCustomersByBar,
+      monthlyPanelLabels,
+      yearlyChartData,
+      yearlyCustomersByBar,
+      yearlyPanelLabels,
       trainerReports: trainerReportsList,
     };
   }, [customers, trainers]);
@@ -490,7 +510,7 @@ export function DashboardContent({
           Analytics
         </h2>
         <p className="text-stone-400 text-sm">
-          Revenue by pay date — today; last complete week (Sat–Fri); last complete month (6th–5th). Current week/month not included until finished. Click a chip or a graph point to see customers for that period.
+          Revenue by pay date — live totals for today, this business week (Sat–Fri), and this business month (6th–5th). Charts include the current periods plus trailing history, and a yearly view keeps growing as new years are added. Click a chip or any chart to see the customer list for that span.
         </p>
 
         {/* Three summary chips in one row – click to see customer profiles for that period */}
@@ -500,55 +520,67 @@ export function DashboardContent({
             onClick={() => setAnalyticsPanel((p) => (p === "daily" ? null : "daily"))}
             className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
-            <p className="text-stone-400 text-sm font-medium mb-1">Today</p>
+            <p className="text-stone-400 text-sm font-medium mb-1">Today sale</p>
             <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(dailySummary)}</p>
-            <p className="text-stone-500 text-xs mt-1">Click to see customer profiles</p>
+            <p className="text-stone-500 text-xs mt-1">{dailySummaryLabel}</p>
+            <p className="text-stone-500 text-xs">Tap to see customer profiles</p>
           </button>
           <button
             type="button"
             onClick={() => setAnalyticsPanel((p) => (p === "weekly" ? null : "weekly"))}
             className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
-            <p className="text-stone-400 text-sm font-medium mb-1">Last week (Sat–Fri)</p>
+            <p className="text-stone-400 text-sm font-medium mb-1">This week's sale</p>
             <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(weeklySummary)}</p>
-            <p className="text-stone-500 text-xs mt-1">Click to see customer profiles</p>
+            <p className="text-stone-500 text-xs mt-1">{weeklySummaryLabel}</p>
+            <p className="text-stone-500 text-xs">Tap to see customer profiles</p>
           </button>
           <button
             type="button"
             onClick={() => setAnalyticsPanel((p) => (p === "monthly" ? null : "monthly"))}
             className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
-            <p className="text-stone-400 text-sm font-medium mb-1">Last month (6th–5th)</p>
+            <p className="text-stone-400 text-sm font-medium mb-1">This month's sale</p>
             <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(monthlySummary)}</p>
-            <p className="text-stone-500 text-xs mt-1">Click to see customer profiles</p>
+            <p className="text-stone-500 text-xs mt-1">{monthlySummaryLabel}</p>
+            <p className="text-stone-500 text-xs">Tap to see customer profiles</p>
           </button>
         </div>
 
         {/* Customer profiles for selected period – from chip or from chart bar click; click a profile to open full report */}
         {(analyticsPanel || chartClickedPeriod) && (() => {
           const fromChart = chartClickedPeriod !== null;
-          const label = fromChart
-            ? (chartClickedPeriod!.type === "daily"
-              ? dailyChartData[chartClickedPeriod!.index]?.label
-              : chartClickedPeriod!.type === "weekly"
-                ? weeklyChartData[chartClickedPeriod!.index]?.label
-                : monthlyChartData[chartClickedPeriod!.index]?.label) ?? "Period"
-            : analyticsPanel === "daily"
-              ? "Today"
-              : analyticsPanel === "weekly"
-                ? "Last week (Sat–Fri)"
-                : "Last month (6th–5th)";
-          const list = fromChart
-            ? (chartClickedPeriod!.type === "daily"
-              ? dailyCustomersByBar[chartClickedPeriod!.index]
-              : chartClickedPeriod!.type === "weekly"
-                ? weeklyCustomersByBar[chartClickedPeriod!.index]
-                : monthlyCustomersByBar[chartClickedPeriod!.index]) ?? []
-            : analyticsPanel === "daily"
-              ? dailyCustomers
-              : analyticsPanel === "weekly"
-                ? weeklyCustomers
-                : monthlyCustomers;
+          const label = (() => {
+            if (!fromChart || !chartClickedPeriod) {
+              if (analyticsPanel === "daily") return dailySummaryLabel;
+              if (analyticsPanel === "weekly") return weeklySummaryLabel;
+              if (analyticsPanel === "monthly") return monthlySummaryLabel;
+              return "Period";
+            }
+            if (chartClickedPeriod.type === "daily") {
+              return dailyPanelLabels[chartClickedPeriod.index] ?? dailyChartData[chartClickedPeriod.index]?.label ?? "Daily period";
+            }
+            if (chartClickedPeriod.type === "weekly") {
+              return weeklyPanelLabels[chartClickedPeriod.index] ?? weeklyChartData[chartClickedPeriod.index]?.label ?? "Weekly period";
+            }
+            if (chartClickedPeriod.type === "monthly") {
+              return monthlyPanelLabels[chartClickedPeriod.index] ?? monthlyChartData[chartClickedPeriod.index]?.label ?? "Monthly period";
+            }
+            return yearlyPanelLabels[chartClickedPeriod.index] ?? yearlyChartData[chartClickedPeriod.index]?.label ?? "Year";
+          })();
+
+          const list = (() => {
+            if (!fromChart || !chartClickedPeriod) {
+              if (analyticsPanel === "daily") return dailyCustomers;
+              if (analyticsPanel === "weekly") return weeklyCustomers;
+              if (analyticsPanel === "monthly") return monthlyCustomers;
+              return [];
+            }
+            if (chartClickedPeriod.type === "daily") return dailyCustomersByBar[chartClickedPeriod.index] ?? [];
+            if (chartClickedPeriod.type === "weekly") return weeklyCustomersByBar[chartClickedPeriod.index] ?? [];
+            if (chartClickedPeriod.type === "monthly") return monthlyCustomersByBar[chartClickedPeriod.index] ?? [];
+            return yearlyCustomersByBar[chartClickedPeriod.index] ?? [];
+          })();
           return (
             <div ref={customerPanelRef} className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10">
               <div className="flex items-center justify-between mb-4">
@@ -595,28 +627,35 @@ export function DashboardContent({
         <div className="grid gap-4 sm:grid-cols-2">
           <RevenueChart
             data={dailyChartData}
-            title="Revenue by day (last 7 completed days)"
+            title="Revenue by day"
             formatINR={formatINR}
             gradientId="revenue-daily"
             onBarClick={(index) => setChartClickedPeriod({ type: "daily", index })}
           />
           <RevenueChart
             data={weeklyChartData}
-            title="Revenue by week (last 4 completed weeks, Sat–Fri)"
+            title="Revenue by week"
             formatINR={formatINR}
             gradientId="revenue-weekly"
             onBarClick={(index) => setChartClickedPeriod({ type: "weekly", index })}
           />
         </div>
 
-        {/* Completed months only. Click a point to see customers for that month. */}
-        <div>
+        {/* Completed months and yearly totals. */}
+        <div className="grid gap-4 sm:grid-cols-2">
           <RevenueChart
             data={monthlyChartData}
-            title="Revenue by month (last 6 completed months, 6th–5th)"
+            title="Revenue by month"
             formatINR={formatINR}
             gradientId="revenue-monthly"
             onBarClick={(index) => setChartClickedPeriod({ type: "monthly", index })}
+          />
+          <RevenueChart
+            data={yearlyChartData}
+            title="Revenue by year"
+            formatINR={formatINR}
+            gradientId="revenue-yearly"
+            onBarClick={(index) => setChartClickedPeriod({ type: "yearly", index })}
           />
         </div>
       </section>

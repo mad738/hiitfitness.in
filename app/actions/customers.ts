@@ -59,3 +59,25 @@ export async function deleteCustomerCascade(customerId: string) {
     return { ok: false as const, error: explainError(e, "Unable to delete this customer group. Please try again.") };
   }
 }
+
+export async function holdCustomerPlan(planId: string) {
+  try {
+    await requireAdminSession();
+    await customerRepo.placePlanOnHold(planId);
+    revalidatePath(CUSTOMERS_PATH);
+    return { ok: true as const };
+  } catch (e) {
+    return { ok: false as const, error: explainError(e, "Unable to place this plan on hold. Please try again.") };
+  }
+}
+
+export async function resumeCustomerPlan(planId: string) {
+  try {
+    await requireAdminSession();
+    await customerRepo.resumePlanFromHold(planId);
+    revalidatePath(CUSTOMERS_PATH);
+    return { ok: true as const };
+  } catch (e) {
+    return { ok: false as const, error: explainError(e, "Unable to resume this plan. Please try again.") };
+  }
+}
