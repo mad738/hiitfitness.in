@@ -37,6 +37,60 @@ function parseDateToMs(dStr: string | null | undefined): number {
   return new Date(dStr).getTime() || 0;
 }
 
+function formatMonthsLabel(months: number): string {
+  if (!Number.isFinite(months)) return "";
+  const safeMonths = Math.max(0.25, months);
+  const rounded = Math.max(1, Math.floor(safeMonths));
+  return `${rounded}M`;
+}
+
+function parseDurationToMonths(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const raw = value.trim().toLowerCase();
+  if (!raw) return null;
+  const toNumber = parseFloat(raw);
+  if (!Number.isNaN(toNumber)) {
+    if (raw.includes("year")) return Math.max(1, toNumber * 12);
+    if (raw.includes("month")) return Math.max(0.5, toNumber);
+    if (raw.includes("week")) return Math.max(0.5, (toNumber * 7) / 30);
+    if (raw.includes("day")) return Math.max(0.25, toNumber / 30);
+    return Math.max(0.5, toNumber);
+  }
+  if (raw.includes("year")) {
+    const num = parseFloat(raw.replace(/year(s)?/g, "").trim());
+    return Number.isNaN(num) ? 12 : Math.max(1, num * 12);
+  }
+  if (raw.includes("month")) {
+    const num = parseFloat(raw.replace(/month(s)?/g, "").trim());
+    return Number.isNaN(num) ? 1 : Math.max(0.5, num);
+  }
+  if (raw.includes("week")) {
+    const num = parseFloat(raw.replace(/week(s)?/g, "").trim());
+    return Number.isNaN(num) ? 0.5 : Math.max(0.5, (num * 7) / 30);
+  }
+  if (raw.includes("day")) {
+    const num = parseFloat(raw.replace(/day(s)?/g, "").trim());
+    return Number.isNaN(num) ? 0.25 : Math.max(0.25, num / 30);
+  }
+  return null;
+}
+
+function monthsFromDateRange(start: string | null | undefined, end: string | null | undefined): number | null {
+  if (!start || !end) return null;
+  const startMs = Date.parse(start);
+  const endMs = Date.parse(end);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) return null;
+  const days = (endMs - startMs) / (1000 * 60 * 60 * 24);
+  return Math.max(0.25, Math.round((days / 30) * 10) / 10);
+}
+
+function formatDurationDisplay(plan: Customer): string {
+  const storedMonths = typeof plan.plan_months === "number" && plan.plan_months > 0 ? plan.plan_months : null;
+  const parsedMonths = storedMonths ?? parseDurationToMonths(plan.duration) ?? monthsFromDateRange(plan.start_date, plan.end_date);
+  if (!parsedMonths) return plan.duration?.trim() ? plan.duration : "—";
+  return formatMonthsLabel(parsedMonths);
+}
+
 type Props = {
   customer: Customer;
   customers: Customer[];
@@ -189,6 +243,7 @@ export function CustomerReportModal({
                       const statusMeta = getPlanStatusMeta(entry.status);
                       const activeHold = entry.active_hold ?? null;
                       const isOnHold = Boolean(activeHold);
+                      const durationLabel = formatDurationDisplay(entry);
                       const rowClickable = Boolean(onViewPayments);
                       const rowHighlightClass = isOnHold
                         ? "bg-amber-950/50 ring-1 ring-inset ring-amber-500/30"
@@ -217,7 +272,7 @@ export function CustomerReportModal({
                           <td className="py-2 px-3 text-stone-200 font-medium">{entry.plan}</td>
                           <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.start_date)}</td>
                           <td className="py-2 px-3 text-stone-300 whitespace-nowrap">{formatDateShort(entry.end_date)}</td>
-                          <td className="py-2 px-3 text-stone-300">{entry.duration ?? "—"}</td>
+                          <td className="py-2 px-3 text-stone-300">{durationLabel}</td>
                           <td className="py-2 px-3 text-right text-stone-300 tabular-nums">{formatCurrency(entry.total_fee)}</td>
                           <td className="py-2 px-3 text-right text-stone-300 tabular-nums">{formatCurrency(entry.paid_fee)}</td>
                           <td className="py-2 px-3 text-right tabular-nums">
