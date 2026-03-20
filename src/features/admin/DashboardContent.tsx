@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
 import type { Payment } from "@/models/payment";
 import { dedupeByMobile, normalizeMobile, isPlanCurrentlyRunning } from "@/lib/customer-utils";
-import { RevenueChart, type RevenueChartRow } from "./DashboardCharts";
+import { RevenueChart } from "./DashboardCharts";
 import { CustomerReportModal } from "./CustomerReportModal";
 import { PlanPaymentsModal, type PaymentFormState } from "./PlanPaymentsModal";
 import { TrainerReportModal } from "./TrainerReportModal";
@@ -242,12 +241,17 @@ export function DashboardContent({
     setPaymentsLoading(false);
   }, []);
 
-  const handleReadOnlyPaymentSubmit = useCallback(async (_form: PaymentFormState) => ({
-    ok: false as const,
-    error: "Payments can only be managed from the Customers screen.",
-  }), []);
+  const handleReadOnlyPaymentSubmit = useCallback(async (form: PaymentFormState) => {
+    void form;
+    return {
+      ok: false as const,
+      error: "Payments can only be managed from the Customers screen.",
+    };
+  }, []);
 
-  const handleReadOnlyDelete = useCallback((_payment: Payment) => undefined, []);
+  const handleReadOnlyDelete = useCallback((payment: Payment) => {
+    void payment;
+  }, []);
 
   const {
     dailySummary,
@@ -530,7 +534,7 @@ export function DashboardContent({
             onClick={() => setAnalyticsPanel((p) => (p === "weekly" ? null : "weekly"))}
             className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
-            <p className="text-stone-400 text-sm font-medium mb-1">This week's sale</p>
+            <p className="text-stone-400 text-sm font-medium mb-1">This week&rsquo;s sale</p>
             <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(weeklySummary)}</p>
             <p className="text-stone-500 text-xs mt-1">{weeklySummaryLabel}</p>
             <p className="text-stone-500 text-xs">Tap to see customer profiles</p>
@@ -540,7 +544,7 @@ export function DashboardContent({
             onClick={() => setAnalyticsPanel((p) => (p === "monthly" ? null : "monthly"))}
             className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
-            <p className="text-stone-400 text-sm font-medium mb-1">This month's sale</p>
+            <p className="text-stone-400 text-sm font-medium mb-1">This month&rsquo;s sale</p>
             <p className="text-xl sm:text-2xl font-bold text-stone-100">{formatINR(monthlySummary)}</p>
             <p className="text-stone-500 text-xs mt-1">{monthlySummaryLabel}</p>
             <p className="text-stone-500 text-xs">Tap to see customer profiles</p>

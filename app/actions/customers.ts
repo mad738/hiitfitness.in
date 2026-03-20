@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@app/actions/auth";
 import * as customerRepo from "@/repositories/customer_repository";
-import type { Customer, CustomerInsert, CustomerUpdate } from "@/models/customer";
+import type { CustomerInsert, CustomerUpdate } from "@/models/customer";
 import { explainError } from "@/lib/error-message";
 
 const CUSTOMERS_PATH = "/admin/customers";

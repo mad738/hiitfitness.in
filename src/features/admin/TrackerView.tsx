@@ -20,7 +20,7 @@ type Props = {
 
 export function TrackerView({ initialList, initialFilters = {}, initialPlans = [] }: Props) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const [list, setList] = useState<Tracker[]>(initialList);
   const [editing, setEditing] = useState<Tracker | null>(null);
   const [showForm, setShowForm] = useState(false);

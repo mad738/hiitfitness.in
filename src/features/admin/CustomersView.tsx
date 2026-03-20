@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import type { ReadonlyURLSearchParams } from "next/navigation";
 import { CustomerReportModal } from "./CustomerReportModal";
 import { PlanPaymentsModal, type PaymentFormState } from "./PlanPaymentsModal";
 import type { Customer } from "@/models/customer";
@@ -82,9 +83,10 @@ function formatCurrency(n: number) {
 }
 
 function getStringParam(
-  params: URLSearchParams,
+  params: URLSearchParams | ReadonlyURLSearchParams | null,
   key: string
 ): string {
+  if (!params) return "";
   const v = params.get(key);
   return typeof v === "string" ? v : "";
 }
@@ -290,7 +292,7 @@ function getPrefilledDurationValue(plan: Customer | null): string {
 
 export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>(() => dedupeById(initialCustomers));
   const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
@@ -501,12 +503,13 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     }
   }, [friendDropdownOpen]);
 
-  const hasFilterParamsInUrl =
-    searchParams.has("q") ||
-    searchParams.has("plan") ||
-    searchParams.has("trainer") ||
-    searchParams.has("payment_mode") ||
-    searchParams.has("paid_status");
+  const hasFilterParamsInUrl = Boolean(
+    searchParams?.has("q") ||
+    searchParams?.has("plan") ||
+    searchParams?.has("trainer") ||
+    searchParams?.has("payment_mode") ||
+    searchParams?.has("paid_status")
+  );
 
   const hasFilters =
     !!filterPlan || !!filterTrainerId || !!filterPaymentMode || !!filterPaidStatus || searchQuery.trim() !== "";

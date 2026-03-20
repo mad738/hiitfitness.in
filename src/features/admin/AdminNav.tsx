@@ -17,7 +17,7 @@ const navLinks = [
 
 export function AdminNav() {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function handleSignOut() {
