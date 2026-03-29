@@ -14,7 +14,7 @@ import type { TrainerReport, TrainerReportPlan } from "./trainer-report-types";
 import { listPlanPayments } from "@app/actions/payments";
 
 /** Format number as Indian Rupees (e.g. ₹1,47,800) */
-function formatINR(value: number): string {
+export function formatINR(value: number): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
@@ -24,7 +24,7 @@ function formatINR(value: number): string {
 }
 
 /** Format date for display (e.g. 15 Jan 2026) */
-function formatDate(s: string | null): string {
+export function formatDate(s: string | null): string {
   if (!s) return "—";
   try {
     return new Date(s).toLocaleDateString("en-IN", {
@@ -160,6 +160,72 @@ function getCustomersInPeriod(
   }));
 }
 
+export function buildTrainerReports(
+  customers: Customer[],
+  trainers: Trainer[],
+  referenceDate: Date = new Date()
+): TrainerReport[] {
+  const trainerById = new Map<string, Trainer>(trainers.map((t) => [t.id, t]));
+  const allPtActive = customers.filter(
+    (c) =>
+      c.plan === "PT" &&
+      c.trainer_id &&
+      isPlanCurrentlyRunning(c.start_date, c.end_date)
+  );
+  const byTrainer: Record<string, Customer[]> = {};
+  for (const c of allPtActive) {
+    const trainerName = trainerById.get(c.trainer_id!)?.name ?? "Unknown trainer";
+    if (!byTrainer[trainerName]) byTrainer[trainerName] = [];
+    byTrainer[trainerName].push(c);
+  }
+  const dedupeByNameKeepRecent = (entries: Customer[]): Customer[] => {
+    const byName = new Map<string, Customer>();
+    for (const entry of entries) {
+      const name = entry.name ?? "";
+      const existing = byName.get(name);
+      const entryStart = parseDashboardDateMs(entry.start_date);
+      const existingStart = parseDashboardDateMs(existing?.start_date);
+      if (!existing || entryStart > existingStart) byName.set(name, entry);
+    }
+    return Array.from(byName.values()).sort((a, b) => getSortDateMs(b) - getSortDateMs(a));
+  };
+  const currentMonthStart = getBusinessMonthStart(referenceDate);
+  const currentMonthEnd = getBusinessMonthEnd(referenceDate);
+  const isStartInCurrentMonth = (startDate: string | null): boolean => {
+    if (!startDate) return false;
+    const date = parseDashboardDate(startDate);
+    return date ? date >= currentMonthStart && date <= currentMonthEnd : false;
+  };
+
+  return Object.entries(byTrainer)
+    .map(([name, entries]) => {
+      const deduped = dedupeByNameKeepRecent(entries);
+      const plans: TrainerReportPlan[] = deduped.map((plan) => {
+        const total = Number(plan.total_fee ?? 0);
+        const hasStoredMonths = typeof plan.plan_months === "number" && plan.plan_months > 0;
+        const months = hasStoredMonths ? plan.plan_months! : durationToMonths(plan.duration);
+        const storedMonthlyValue = typeof plan.monthly_value === "number" && plan.monthly_value > 0 ? plan.monthly_value : null;
+        const monthlyValue = storedMonthlyValue ?? (months > 0 ? total / months : 0);
+        const storedRate = typeof plan.commission_rate === "number" && plan.commission_rate > 0 ? plan.commission_rate : null;
+        const commissionRate = storedRate ?? 0.3;
+        const storedCommission = typeof plan.trainer_commission === "number" ? plan.trainer_commission : null;
+        const computedCommission = storedCommission ?? monthlyValue * commissionRate;
+        const commissionAmount = isStartInCurrentMonth(plan.start_date) ? computedCommission : 0;
+        return {
+          plan,
+          commissionAmount,
+        } satisfies TrainerReportPlan;
+      });
+      const totalCommission = plans.reduce((sum, entry) => sum + entry.commissionAmount, 0);
+      return {
+        name,
+        plans,
+        totalCommission,
+      } satisfies TrainerReport;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function DashboardContent({
   customers,
   trainers,
@@ -170,8 +236,8 @@ export function DashboardContent({
   );
   /** Which analytics period's customer list is shown (click chip to open). */
   const [analyticsPanel, setAnalyticsPanel] = useState<"daily" | "weekly" | "monthly" | null>(null);
-  /** Chart bar clicked: show customer list for that bar's period. */
-  const [chartClickedPeriod, setChartClickedPeriod] = useState<{ type: "daily" | "weekly" | "monthly" | "yearly"; index: number } | null>(null);
+  type ChartSelection = { type: "daily" | "weekly" | "monthly" | "yearly"; index: number };
+  const [chartSelection, setChartSelection] = useState<ChartSelection | null>(null);
   /** Customer selected from analytics to show full report modal. */
   const [reportCustomer, setReportCustomer] = useState<Customer | null>(null);
   const [paymentsPlan, setPaymentsPlan] = useState<Customer | null>(null);
@@ -182,10 +248,10 @@ export function DashboardContent({
   const customerPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (chartClickedPeriod !== null && customerPanelRef.current) {
+    if (chartSelection && customerPanelRef.current) {
       customerPanelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [chartClickedPeriod]);
+  }, [chartSelection]);
 
   // Lock body scroll only when a modal overlay is open (not when inline customer profiles panel is open)
   useEffect(() => {
@@ -330,7 +396,6 @@ export function DashboardContent({
 
     // Business months: current month (6th–5th) + six trailing business months
     const currentMonthStart = getBusinessMonthStart(now);
-    const currentMonthEnd = getBusinessMonthEnd(now);
     const monthPeriods = Array.from({ length: 7 }, (_, idx) => {
       const start = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() - idx, 6);
       const end = new Date(start.getFullYear(), start.getMonth() + 1, 5, 23, 59, 59, 999);
@@ -366,64 +431,7 @@ export function DashboardContent({
     const yearlyCustomersByBar = chronologicalYearPeriods.map((period) => period.customers);
     const yearlyPanelLabels = chronologicalYearPeriods.map((period) => period.displayLabel);
 
-    const trainerById = new Map<string, Trainer>(
-      trainers.map((t) => [t.id, t])
-    );
-    const allPtActive = customers.filter(
-      (c) =>
-        c.plan === "PT" &&
-        c.trainer_id &&
-        isPlanCurrentlyRunning(c.start_date, c.end_date)
-    );
-    const byTrainer: Record<string, Customer[]> = {};
-    for (const c of allPtActive) {
-      const trainerName = trainerById.get(c.trainer_id!)?.name ?? "Unknown trainer";
-      if (!byTrainer[trainerName]) byTrainer[trainerName] = [];
-      byTrainer[trainerName].push(c);
-    }
-    const dedupeByNameKeepRecent = (entries: Customer[]): Customer[] => {
-      const byName = new Map<string, Customer>();
-      for (const entry of entries) {
-        const name = entry.name ?? "";
-        const existing = byName.get(name);
-        const entryStart = parseDashboardDateMs(entry.start_date);
-        const existingStart = parseDashboardDateMs(existing?.start_date);
-        if (!existing || entryStart > existingStart) byName.set(name, entry);
-      }
-      return Array.from(byName.values()).sort((a, b) => getSortDateMs(b) - getSortDateMs(a));
-    };
-    const isStartInCurrentMonth = (startDate: string | null): boolean => {
-      if (!startDate) return false;
-      const date = parseDashboardDate(startDate);
-      return date ? date >= currentMonthStart && date <= currentMonthEnd : false;
-    };
-    const trainerReportsList: TrainerReport[] = Object.entries(byTrainer)
-      .map(([name, entries]) => {
-        const deduped = dedupeByNameKeepRecent(entries);
-        const plans: TrainerReportPlan[] = deduped.map((plan) => {
-          const total = Number(plan.total_fee ?? 0);
-          const hasStoredMonths = typeof plan.plan_months === "number" && plan.plan_months > 0;
-          const months = hasStoredMonths ? plan.plan_months! : durationToMonths(plan.duration);
-          const storedMonthlyValue = typeof plan.monthly_value === "number" && plan.monthly_value > 0 ? plan.monthly_value : null;
-          const monthlyValue = storedMonthlyValue ?? (months > 0 ? total / months : 0);
-          const storedRate = typeof plan.commission_rate === "number" && plan.commission_rate > 0 ? plan.commission_rate : null;
-          const commissionRate = storedRate ?? 0.3;
-          const storedCommission = typeof plan.trainer_commission === "number" ? plan.trainer_commission : null;
-          const computedCommission = storedCommission ?? monthlyValue * commissionRate;
-          const commissionAmount = isStartInCurrentMonth(plan.start_date) ? computedCommission : 0;
-          return {
-            plan,
-            commissionAmount,
-          };
-        });
-        const totalCommission = plans.reduce((sum, entry) => sum + entry.commissionAmount, 0);
-        return {
-          name,
-          plans,
-          totalCommission,
-        } satisfies TrainerReport;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const trainerReportsList = buildTrainerReports(customers, trainers, now);
 
     return {
       dailySummary,
@@ -450,6 +458,12 @@ export function DashboardContent({
       trainerReports: trainerReportsList,
     };
   }, [customers, trainers]);
+
+  const handleChartBarClick = useCallback((type: ChartSelection["type"], index: number) => {
+    if (index < 0) return;
+    setAnalyticsPanel(null);
+    setChartSelection({ type, index });
+  }, []);
 
   const cards = [
     {
@@ -521,7 +535,10 @@ export function DashboardContent({
         <div className="grid grid-cols-3 gap-4">
           <button
             type="button"
-            onClick={() => setAnalyticsPanel((p) => (p === "daily" ? null : "daily"))}
+            onClick={() => {
+              setChartSelection(null);
+              setAnalyticsPanel((p) => (p === "daily" ? null : "daily"));
+            }}
             className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
             <p className="text-stone-400 text-sm font-medium mb-1">Today sale</p>
@@ -531,7 +548,10 @@ export function DashboardContent({
           </button>
           <button
             type="button"
-            onClick={() => setAnalyticsPanel((p) => (p === "weekly" ? null : "weekly"))}
+            onClick={() => {
+              setChartSelection(null);
+              setAnalyticsPanel((p) => (p === "weekly" ? null : "weekly"));
+            }}
             className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
             <p className="text-stone-400 text-sm font-medium mb-1">This week&rsquo;s sale</p>
@@ -541,7 +561,10 @@ export function DashboardContent({
           </button>
           <button
             type="button"
-            onClick={() => setAnalyticsPanel((p) => (p === "monthly" ? null : "monthly"))}
+            onClick={() => {
+              setChartSelection(null);
+              setAnalyticsPanel((p) => (p === "monthly" ? null : "monthly"));
+            }}
             className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 text-left transition-all duration-200 hover:border-brand-red/40 hover:shadow-[0_0_20px_rgba(238,42,36,0.1)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
           >
             <p className="text-stone-400 text-sm font-medium mb-1">This month&rsquo;s sale</p>
@@ -552,38 +575,60 @@ export function DashboardContent({
         </div>
 
         {/* Customer profiles for selected period – from chip or from chart bar click; click a profile to open full report */}
-        {(analyticsPanel || chartClickedPeriod) && (() => {
-          const fromChart = chartClickedPeriod !== null;
+        {(analyticsPanel || chartSelection) && (() => {
+          const fromChart = chartSelection !== null;
           const label = (() => {
-            if (!fromChart || !chartClickedPeriod) {
+            if (!fromChart || !chartSelection) {
               if (analyticsPanel === "daily") return dailySummaryLabel;
               if (analyticsPanel === "weekly") return weeklySummaryLabel;
               if (analyticsPanel === "monthly") return monthlySummaryLabel;
               return "Period";
             }
-            if (chartClickedPeriod.type === "daily") {
-              return dailyPanelLabels[chartClickedPeriod.index] ?? dailyChartData[chartClickedPeriod.index]?.label ?? "Daily period";
+            if (chartSelection.type === "daily") {
+              return (
+                dailyPanelLabels[chartSelection.index] ??
+                dailyChartData[chartSelection.index]?.label ??
+                "Daily period"
+              );
             }
-            if (chartClickedPeriod.type === "weekly") {
-              return weeklyPanelLabels[chartClickedPeriod.index] ?? weeklyChartData[chartClickedPeriod.index]?.label ?? "Weekly period";
+            if (chartSelection.type === "weekly") {
+              return (
+                weeklyPanelLabels[chartSelection.index] ??
+                weeklyChartData[chartSelection.index]?.label ??
+                "Weekly period"
+              );
             }
-            if (chartClickedPeriod.type === "monthly") {
-              return monthlyPanelLabels[chartClickedPeriod.index] ?? monthlyChartData[chartClickedPeriod.index]?.label ?? "Monthly period";
+            if (chartSelection.type === "monthly") {
+              return (
+                monthlyPanelLabels[chartSelection.index] ??
+                monthlyChartData[chartSelection.index]?.label ??
+                "Monthly period"
+              );
             }
-            return yearlyPanelLabels[chartClickedPeriod.index] ?? yearlyChartData[chartClickedPeriod.index]?.label ?? "Year";
+            return (
+              yearlyPanelLabels[chartSelection.index] ??
+              yearlyChartData[chartSelection.index]?.label ??
+              "Year"
+            );
           })();
 
           const list = (() => {
-            if (!fromChart || !chartClickedPeriod) {
+            if (!fromChart || !chartSelection) {
               if (analyticsPanel === "daily") return dailyCustomers;
               if (analyticsPanel === "weekly") return weeklyCustomers;
               if (analyticsPanel === "monthly") return monthlyCustomers;
               return [];
             }
-            if (chartClickedPeriod.type === "daily") return dailyCustomersByBar[chartClickedPeriod.index] ?? [];
-            if (chartClickedPeriod.type === "weekly") return weeklyCustomersByBar[chartClickedPeriod.index] ?? [];
-            if (chartClickedPeriod.type === "monthly") return monthlyCustomersByBar[chartClickedPeriod.index] ?? [];
-            return yearlyCustomersByBar[chartClickedPeriod.index] ?? [];
+            if (chartSelection.type === "daily") {
+              return dailyCustomersByBar[chartSelection.index] ?? [];
+            }
+            if (chartSelection.type === "weekly") {
+              return weeklyCustomersByBar[chartSelection.index] ?? [];
+            }
+            if (chartSelection.type === "monthly") {
+              return monthlyCustomersByBar[chartSelection.index] ?? [];
+            }
+            return yearlyCustomersByBar[chartSelection.index] ?? [];
           })();
           return (
             <div ref={customerPanelRef} className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10">
@@ -595,7 +640,7 @@ export function DashboardContent({
                   type="button"
                   onClick={() => {
                     setAnalyticsPanel(null);
-                    setChartClickedPeriod(null);
+                    setChartSelection(null);
                   }}
                   className="text-stone-400 hover:text-stone-100 text-sm font-medium"
                 >
@@ -634,14 +679,14 @@ export function DashboardContent({
             title="Revenue by day"
             formatINR={formatINR}
             gradientId="revenue-daily"
-            onBarClick={(index) => setChartClickedPeriod({ type: "daily", index })}
+            onBarClick={(index) => handleChartBarClick("daily", index)}
           />
           <RevenueChart
             data={weeklyChartData}
             title="Revenue by week"
             formatINR={formatINR}
             gradientId="revenue-weekly"
-            onBarClick={(index) => setChartClickedPeriod({ type: "weekly", index })}
+            onBarClick={(index) => handleChartBarClick("weekly", index)}
           />
         </div>
 
@@ -652,14 +697,14 @@ export function DashboardContent({
             title="Revenue by month"
             formatINR={formatINR}
             gradientId="revenue-monthly"
-            onBarClick={(index) => setChartClickedPeriod({ type: "monthly", index })}
+            onBarClick={(index) => handleChartBarClick("monthly", index)}
           />
           <RevenueChart
             data={yearlyChartData}
             title="Revenue by year"
             formatINR={formatINR}
             gradientId="revenue-yearly"
-            onBarClick={(index) => setChartClickedPeriod({ type: "yearly", index })}
+            onBarClick={(index) => handleChartBarClick("yearly", index)}
           />
         </div>
       </section>

@@ -1,24 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Trainer } from "@/models/trainer";
+import type { Customer } from "@/models/customer";
+import type { Payment } from "@/models/payment";
+import { CustomerReportModal } from "@/features/admin/CustomerReportModal";
+import { PlanPaymentsModal, type PaymentFormState } from "@/features/admin/PlanPaymentsModal";
+import { TrainerReportModal } from "@/features/admin/TrainerReportModal";
+import type { TrainerReport } from "@/features/admin/trainer-report-types";
+import { buildTrainerReports, formatINR, formatDate } from "@/features/admin/DashboardContent";
 import {
   createTrainer,
   updateTrainer,
   deleteTrainer,
 } from "@app/actions/trainers";
+import { listPlanPayments } from "@app/actions/payments";
 
 
-type Props = { initialTrainers: Trainer[] };
+type Props = { initialTrainers: Trainer[]; customers: Customer[] };
 
 const inputClass =
   "w-full px-3 py-2.5 rounded-xl bg-stone-900/80 border border-white/10 text-stone-100 placeholder:text-stone-500 focus:border-brand-red focus:ring-1 focus:ring-brand-red outline-none text-sm";
 const labelClass = "block text-sm text-stone-400 mb-1.5";
 
-export function TrainersView({ initialTrainers }: Props) {
+export function TrainersView({ initialTrainers, customers }: Props) {
   const router = useRouter();
   const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
   const [formOpen, setFormOpen] = useState(false);
@@ -30,15 +37,102 @@ export function TrainersView({ initialTrainers }: Props) {
   const [image, setImage] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [address, setAddress] = useState("");
-  const [detailsTrainer, setDetailsTrainer] = useState<Trainer | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [selectedTrainerReport, setSelectedTrainerReport] = useState<TrainerReport | null>(null);
+  const [reportCustomer, setReportCustomer] = useState<Customer | null>(null);
+  const [paymentsPlan, setPaymentsPlan] = useState<Customer | null>(null);
+  const [planPayments, setPlanPayments] = useState<Payment[]>([]);
+  const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const { tableScrollRef, topScrollRef, headerRef } = useHorizontalScrollTable(
     [trainers.length],
     { wheelOnBody: true }
   );
 
+  const trainerReports = useMemo(
+    () => buildTrainerReports(customers, trainers),
+    [customers, trainers]
+  );
+  const reportsByName = useMemo(() => new Map(trainerReports.map((report) => [report.name, report])), [trainerReports]);
+
+  const trainerStats = useMemo(() => {
+    const stats = new Map<string, { activeClients: number; totalCommission: number; outstanding: number }>();
+    trainerReports.forEach((report) => {
+      const outstanding = report.plans.reduce((sum, entry) => sum + Number(entry.plan.balance ?? 0), 0);
+      stats.set(report.name, {
+        activeClients: report.plans.length,
+        totalCommission: report.totalCommission,
+        outstanding,
+      });
+    });
+    return stats;
+  }, [trainerReports]);
+
   useEffect(() => {
-    setMounted(true);
+    if (typeof document === "undefined") return;
+    if (!selectedTrainerReport && !reportCustomer) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [selectedTrainerReport, reportCustomer]);
+
+  const openTrainerReport = useCallback(
+    (trainer: Trainer) => {
+      const report = reportsByName.get(trainer.name);
+      setSelectedTrainerReport(
+        report ?? {
+          name: trainer.name,
+          plans: [],
+          totalCommission: 0,
+        }
+      );
+    },
+    [reportsByName]
+  );
+
+  const refreshPlanPayments = useCallback(async (planId: string) => {
+    const data = await listPlanPayments(planId);
+    setPlanPayments(data);
+  }, []);
+
+  const openPlanPaymentsPanel = useCallback(
+    async (plan: Customer) => {
+      setPaymentsPlan(plan);
+      setPlanPayments([]);
+      setPaymentsError(null);
+      setPaymentsModalOpen(true);
+      setPaymentsLoading(true);
+      try {
+        await refreshPlanPayments(plan.id);
+      } catch (err) {
+        setPaymentsError((err as Error)?.message ?? "Failed to load payments.");
+      } finally {
+        setPaymentsLoading(false);
+      }
+    },
+    [refreshPlanPayments]
+  );
+
+  const closePaymentsModal = useCallback(() => {
+    setPaymentsModalOpen(false);
+    setPaymentsPlan(null);
+    setPlanPayments([]);
+    setPaymentsError(null);
+    setPaymentsLoading(false);
+  }, []);
+
+  const handleReadOnlyPaymentSubmit = useCallback(async (form: PaymentFormState) => {
+    void form;
+    return {
+      ok: false as const,
+      error: "Payments can only be managed from the Customers screen.",
+    };
+  }, []);
+
+  const handleReadOnlyDelete = useCallback((payment: Payment) => {
+    void payment;
   }, []);
 
   function openAdd() {
@@ -213,67 +307,6 @@ export function TrainersView({ initialTrainers }: Props) {
         </div>
       )}
 
-      {/* Trainer details card modal */}
-      {detailsTrainer && mounted && typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-            onClick={() => setDetailsTrainer(null)}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="trainer-details-title"
-          >
-            <div
-              className="liquid-glass rounded-2xl border border-white/10 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6 border-b border-white/10 flex items-center justify-between">
-                <h2 id="trainer-details-title" className="text-lg font-bold text-stone-100">
-                  Trainer details
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setDetailsTrainer(null)}
-                  className="p-2 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-white/10"
-                  aria-label="Close"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex gap-4">
-                  <div className="min-w-0">
-                    <p className="text-2xl font-bold text-stone-100">{detailsTrainer.name}</p>
-                  </div>
-                </div>
-                <dl className="grid grid-cols-1 gap-3 text-sm">
-                  <div><dt className="text-stone-500">Phone</dt><dd className="text-stone-100">{detailsTrainer.phone_number ?? "—"}</dd></div>
-                  <div><dt className="text-stone-500">Address</dt><dd className="text-stone-100">{detailsTrainer.address ?? "—"}</dd></div>
-                </dl>
-                <div className="flex gap-2 pt-2 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => { openEdit(detailsTrainer); setDetailsTrainer(null); }}
-                    className="px-4 py-2.5 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm"
-                  >
-                    Edit trainer data
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDetailsTrainer(null)}
-                    className="px-4 py-2.5 rounded-xl border border-white/20 text-stone-400 hover:bg-white/5 text-sm"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
-
       <div className="liquid-glass rounded-2xl overflow-hidden border border-white/10">
         {trainers.length === 0 ? (
           <div className="p-8 text-center text-stone-500 text-sm">
@@ -281,6 +314,9 @@ export function TrainersView({ initialTrainers }: Props) {
           </div>
         ) : (
           <div className="flex flex-col">
+            <p className="px-4 pt-4 text-sm text-stone-400">
+              Click any trainer row to open the PT commission report with payment drill-down.
+            </p>
             <div
               ref={topScrollRef}
               className="overflow-x-auto overflow-y-hidden flex-shrink-0 scrollbar-horizontal-top border-b border-white/10 bg-stone-900/50 py-1.5 px-1"
@@ -299,46 +335,106 @@ export function TrainersView({ initialTrainers }: Props) {
                     <th className="py-3 px-4 text-stone-400 font-medium">Name</th>
                     <th className="py-3 px-4 text-stone-400 font-medium">Phone</th>
                     <th className="py-3 px-4 text-stone-400 font-medium">Address</th>
-                    <th className="py-3 px-4 text-stone-400 font-medium w-28">Action</th>
+                    <th className="py-3 px-4 text-stone-400 font-medium text-center">Active clients</th>
+                    <th className="py-3 px-4 text-stone-400 font-medium text-right">Commission (6-5)</th>
+                    <th className="py-3 px-4 text-stone-400 font-medium text-right">Client dues</th>
+                    <th className="py-3 px-4 text-stone-400 font-medium w-48 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {trainers.map((t) => (
-                    <tr
-                      key={t.id}
-                      className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer"
-                      onClick={() => setDetailsTrainer(t)}
-                    >
-
-                      <td className="py-2.5 px-4 text-stone-100 font-medium">{t.name}</td>
-                      <td className="py-2.5 px-4 text-stone-300">{t.phone_number ?? "—"}</td>
-                      <td className="py-2.5 px-4 text-stone-300 max-w-[200px] truncate">
-                        {t.address ?? "—"}
-                      </td>
-                      <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(t)}
-                          className="text-brand-red hover:underline text-sm mr-2"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(t)}
-                          className="text-stone-500 hover:text-brand-red text-sm"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {trainers.map((t) => {
+                    const stats = trainerStats.get(t.name);
+                    const activeClients = stats?.activeClients ?? 0;
+                    const commissionTotal = stats?.totalCommission ?? 0;
+                    const outstandingDues = stats?.outstanding ?? 0;
+                    return (
+                      <tr
+                        key={t.id}
+                        className="border-b border-white/5 hover:bg-white/[0.04] cursor-pointer"
+                        onClick={() => openTrainerReport(t)}
+                      >
+                        <td className="py-2.5 px-4 text-stone-100 font-medium">{t.name}</td>
+                        <td className="py-2.5 px-4 text-stone-300">{t.phone_number ?? "—"}</td>
+                        <td className="py-2.5 px-4 text-stone-300 max-w-[200px] truncate">
+                          {t.address ?? "—"}
+                        </td>
+                        <td className="py-2.5 px-4 text-center text-stone-100 font-semibold">
+                          {activeClients}
+                        </td>
+                        <td className="py-2.5 px-4 text-right text-emerald-200 font-semibold tabular-nums">
+                          {formatINR(commissionTotal)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right tabular-nums">
+                          <span className={outstandingDues !== 0 ? "text-amber-300 font-semibold" : "text-stone-300"}>
+                            {formatINR(outstandingDues)}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEdit(t)}
+                              className="px-3 py-1 rounded-full text-xs font-semibold border border-white/10 text-stone-200 hover:border-brand-red/60 hover:text-white transition"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(t)}
+                              className="px-3 py-1 rounded-full text-xs font-semibold border border-brand-red/40 text-brand-red hover:bg-brand-red/10 transition"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         )}
       </div>
+      {selectedTrainerReport && (
+        <TrainerReportModal
+          report={selectedTrainerReport}
+          formatCurrency={formatINR}
+          formatDate={formatDate}
+          onClose={() => setSelectedTrainerReport(null)}
+          onOpenPlanPayments={openPlanPaymentsPanel}
+          onOpenCustomerReport={(customer) => {
+            setSelectedTrainerReport(null);
+            setReportCustomer(customer);
+          }}
+        />
+      )}
+
+      {reportCustomer && (
+        <CustomerReportModal
+          customer={reportCustomer}
+          customers={customers}
+          trainers={trainers}
+          formatCurrency={formatINR}
+          onClose={() => setReportCustomer(null)}
+          showActions={false}
+          onViewPayments={openPlanPaymentsPanel}
+        />
+      )}
+
+      <PlanPaymentsModal
+        plan={paymentsPlan}
+        open={paymentsModalOpen}
+        payments={planPayments}
+        loading={paymentsLoading}
+        saving={false}
+        error={paymentsError}
+        formatCurrency={formatINR}
+        onClose={closePaymentsModal}
+        onSubmit={handleReadOnlyPaymentSubmit}
+        onDeleteRequest={handleReadOnlyDelete}
+        allowManage={false}
+      />
     </div>
   );
 }

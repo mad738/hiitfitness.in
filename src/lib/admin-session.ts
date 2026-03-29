@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
 
 const COOKIE_NAME = "admin_session";
-const MAX_AGE = 60 * 5; // 5 minutes
 
 function getSecret(): string {
   const secret = process.env.ADMIN_SESSION_SECRET;
@@ -24,7 +23,8 @@ function sign(payload: string): string {
 export type AdminSessionPayload = {
   username: string;
   role: string;
-  exp: number;
+  /** Optional expiry (in seconds) for future use; undefined = no auto-expiry. */
+  exp?: number;
 };
 
 export function createSessionToken(payload: AdminSessionPayload): string {
@@ -47,7 +47,10 @@ export function verifySessionToken(token: string): AdminSessionPayload | null {
     }
     const payloadStr = Buffer.from(payloadB64, "base64url").toString("utf8");
     const payload = JSON.parse(payloadStr) as AdminSessionPayload;
-    if (typeof payload.exp !== "number" || payload.exp < Date.now() / 1000) {
+    if (
+      payload.exp !== undefined &&
+      (typeof payload.exp !== "number" || payload.exp < Date.now() / 1000)
+    ) {
       return null;
     }
     if (typeof payload.username !== "string" || typeof payload.role !== "string") {
@@ -59,15 +62,13 @@ export function verifySessionToken(token: string): AdminSessionPayload | null {
   }
 }
 
-export async function setAdminSession(payload: Omit<AdminSessionPayload, "exp">) {
+export async function setAdminSession(payload: AdminSessionPayload) {
   const cookieStore = await cookies();
-  const exp = Math.floor(Date.now() / 1000) + MAX_AGE;
-  const token = createSessionToken({ ...payload, exp });
+  const token = createSessionToken(payload);
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: MAX_AGE,
     path: "/",
   });
 }

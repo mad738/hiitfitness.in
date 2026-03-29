@@ -1,8 +1,12 @@
 import { listTrainersInUse } from "@app/actions/trainers";
+import { listCustomers } from "@/repositories/customer_repository";
 import { TrainersView } from "@/features/admin/TrainersView";
 
 export default async function AdminTrainersPage() {
-  const trainers = await listTrainersInUse();
+  const [trainers, customers] = await Promise.all([
+    listTrainersInUse(),
+    listCustomers(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -14,7 +18,7 @@ export default async function AdminTrainersPage() {
           Showing trainers assigned to at least one customer. Add new trainers below; they appear here once assigned to a customer.
         </p>
       </section>
-      <TrainersView initialTrainers={trainers} />
+      <TrainersView initialTrainers={trainers} customers={customers} />
     </div>
   );
 }

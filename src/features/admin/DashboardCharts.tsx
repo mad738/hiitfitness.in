@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Line,
+  type TooltipProps,
 } from "recharts";
 
 export type RevenueChartRow = {
@@ -30,6 +31,27 @@ const barColor = "#EE2A24";
 const lineColor = "#F9DB6D";
 
 export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue", onBarClick }: Props) {
+  const maxRevenue = data.reduce((max, row) => Math.max(max, row.revenue), 0);
+  const hitboxValue = maxRevenue > 0 ? maxRevenue : 1;
+  const chartData: Array<RevenueChartRow & { __hitbox: number }> = data.map((row) => ({
+    ...row,
+    __hitbox: hitboxValue,
+  }));
+  const renderTooltip = (tooltipProps: TooltipProps<number, string>) => {
+    const active = "active" in tooltipProps ? tooltipProps.active : false;
+    const payload = "payload" in tooltipProps ? tooltipProps.payload : undefined;
+    const label = "label" in tooltipProps ? tooltipProps.label : undefined;
+    if (!active || !payload || !Array.isArray(payload) || payload.length === 0) return null;
+    const revenueEntry = payload.find((entry) => entry.dataKey === "revenue");
+    if (!revenueEntry) return null;
+    const value = typeof revenueEntry.value === "number" ? revenueEntry.value : Number(revenueEntry.value ?? 0);
+    return (
+      <div className="rounded-xl border border-white/10 bg-stone-900/95 px-3 py-2 text-sm text-stone-200">
+        <p className="font-medium">{typeof label === "string" ? label : String(label ?? "")}</p>
+        <p className="text-stone-400">Revenue: {formatINR(Number.isFinite(value) ? value : 0)}</p>
+      </div>
+    );
+  };
   const id = gradientId.replace(/\s/g, "-");
   return (
     <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 transition-all duration-300 ease-out hover:border-brand-red/25 hover:shadow-[0_0_24px_rgba(238,42,36,0.1)]">
@@ -37,8 +59,10 @@ export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue
       <div className="h-[260px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
-            data={data}
+            data={chartData}
             margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            barGap={onBarClick ? "-100%" : undefined}
+            barCategoryGap={onBarClick ? "0%" : undefined}
           >
             <defs>
               <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
@@ -64,16 +88,19 @@ export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue
               tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : String(v))}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "rgba(23,23,23,0.95)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "12px",
-              }}
-              labelStyle={{ color: "#d6d3d1" }}
-              formatter={(value: number | undefined) => [formatINR(value ?? 0), "Revenue"]}
-              labelFormatter={(label) => label}
               cursor={{ fill: "rgba(255,255,255,0.05)" }}
+              content={renderTooltip}
             />
+            {onBarClick && (
+              <Bar
+                dataKey="__hitbox"
+                fill="rgba(0,0,0,0)"
+                stroke="rgba(0,0,0,0)"
+                isAnimationActive={false}
+                cursor="pointer"
+                onClick={(_data: unknown, index: number) => onBarClick(index)}
+              />
+            )}
             <Bar
               dataKey="revenue"
               name="Revenue"
