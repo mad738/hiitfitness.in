@@ -385,10 +385,12 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [filterTrainerId, setFilterTrainerId] = useState(() => getStringParam(searchParams, "trainer"));
   const [filterPaymentMode, setFilterPaymentMode] = useState(() => getStringParam(searchParams, "payment_mode"));
   const [filterPaidStatus, setFilterPaidStatus] = useState(() => getStringParam(searchParams, "paid_status"));
+  const [filterCustomerActivity, setFilterCustomerActivity] = useState(() => getStringParam(searchParams, "customer_activity"));
   const [pendingFilterPlan, setPendingFilterPlan] = useState("");
   const [pendingFilterTrainerId, setPendingFilterTrainerId] = useState("");
   const [pendingFilterPaymentMode, setPendingFilterPaymentMode] = useState("");
   const [pendingFilterPaidStatus, setPendingFilterPaidStatus] = useState("");
+  const [pendingFilterCustomerActivity, setPendingFilterCustomerActivity] = useState("");
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
@@ -441,6 +443,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setFilterTrainerId(getStringParam(searchParams, "trainer"));
     setFilterPaymentMode(getStringParam(searchParams, "payment_mode"));
     setFilterPaidStatus(getStringParam(searchParams, "paid_status"));
+    setFilterCustomerActivity(getStringParam(searchParams, "customer_activity"));
   }, [searchParams]);
 
   // When filter dropdown opens, copy current URL params into pending so Apply only affects the new tab
@@ -450,8 +453,9 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       setPendingFilterTrainerId(filterTrainerId);
       setPendingFilterPaymentMode(filterPaymentMode);
       setPendingFilterPaidStatus(filterPaidStatus);
+      setPendingFilterCustomerActivity(filterCustomerActivity);
     }
-  }, [showFilterDropdown, filterPlan, filterTrainerId, filterPaymentMode, filterPaidStatus]);
+  }, [showFilterDropdown, filterPlan, filterTrainerId, filterPaymentMode, filterPaidStatus, filterCustomerActivity]);
 
   useEffect(() => {
     setCustomers(dedupeById(initialCustomers));
@@ -538,11 +542,12 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     searchParams?.has("plan") ||
     searchParams?.has("trainer") ||
     searchParams?.has("payment_mode") ||
-    searchParams?.has("paid_status")
+    searchParams?.has("paid_status") ||
+    searchParams?.has("customer_activity")
   );
 
   const hasFilters =
-    !!filterPlan || !!filterTrainerId || !!filterPaymentMode || !!filterPaidStatus || searchQuery.trim() !== "";
+    !!filterPlan || !!filterTrainerId || !!filterPaymentMode || !!filterPaidStatus || !!filterCustomerActivity || searchQuery.trim() !== "";
 
   const searchLower = searchQuery.trim().toLowerCase();
   const filteredCustomers = customers.filter((c) => {
@@ -551,6 +556,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     if (filterPaymentMode && (c.payment_mode ?? "") !== filterPaymentMode) return false;
     if (filterPaidStatus === "paid" && (c.balance ?? 0) !== 0) return false;
     if (filterPaidStatus === "not_paid" && (c.balance ?? 0) === 0) return false;
+    if (filterPaidStatus === "hold" && !c.active_hold) return false;
     if (searchLower) {
       const nameMatch = (c.name ?? "").toLowerCase().includes(searchLower);
       const mobileMatch = (c.mobile ?? "").toLowerCase().includes(searchLower);
@@ -579,7 +585,33 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     });
   }, [filteredCustomers]);
 
-  const displayCustomers = customerGroups.map((group) => group.primary);
+  const customerActivityByGroupKey = useMemo(() => {
+    const map = new Map<string, boolean>();
+    customers.forEach((plan) => {
+      const key = getCustomerGroupKey(plan);
+      if (!map.has(key)) {
+        map.set(key, isPlanActive(plan));
+        return;
+      }
+      if (!map.get(key) && isPlanActive(plan)) {
+        map.set(key, true);
+      }
+    });
+    return map;
+  }, [customers]);
+
+  const visibleCustomerGroups = useMemo(() => {
+    if (!filterCustomerActivity) return customerGroups;
+    if (filterCustomerActivity === "active") {
+      return customerGroups.filter((group) => customerActivityByGroupKey.get(group.key) === true);
+    }
+    if (filterCustomerActivity === "inactive") {
+      return customerGroups.filter((group) => customerActivityByGroupKey.get(group.key) !== true);
+    }
+    return customerGroups;
+  }, [customerGroups, filterCustomerActivity, customerActivityByGroupKey]);
+
+  const displayCustomers = visibleCustomerGroups.map((group) => group.primary);
   const currentProfileId = editing?.customer_id ?? null;
 
   const friendOptions = useMemo<FriendOption[]>(() => {
@@ -694,6 +726,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     if (pendingFilterTrainerId) params.set("trainer", pendingFilterTrainerId);
     if (pendingFilterPaymentMode) params.set("payment_mode", pendingFilterPaymentMode);
     if (pendingFilterPaidStatus) params.set("paid_status", pendingFilterPaidStatus);
+    if (pendingFilterCustomerActivity) params.set("customer_activity", pendingFilterCustomerActivity);
     const q = params.toString();
     return q ? `${pathname}?${q}` : pathname;
   }
@@ -709,6 +742,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setFilterTrainerId("");
     setFilterPaymentMode("");
     setFilterPaidStatus("");
+    setFilterCustomerActivity("");
     setShowFilterDropdown(false);
     router.push(pathname);
   }
@@ -1013,6 +1047,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     }
     const summary = friendSummaryByCustomerId.get(customer.customer_id) ?? [];
     setFriendViewer({ customer, friends: summary });
+  }
+
+  function openAddFriendsForCustomer(customer: Customer) {
+    setFriendViewer(null);
+    openProfileEdit(customer);
   }
 
   function openCustomerDetails(customer: Customer) {
@@ -1804,7 +1843,14 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
               ))}
             </ul>
           )}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => openAddFriendsForCustomer(friendViewer.customer)}
+              className="px-4 py-2 rounded-xl bg-brand-red text-sm font-semibold text-white hover:opacity-90"
+            >
+              Add friends
+            </button>
             <button
               type="button"
               onClick={() => setFriendViewer(null)}
@@ -1971,6 +2017,19 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                         <option value="">All</option>
                         <option value="paid">Paid (balance = 0)</option>
                         <option value="not_paid">Not paid (balance ≠ 0)</option>
+                        <option value="hold">On hold</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-stone-400 mb-1.5">Customer status</label>
+                      <select
+                        value={pendingFilterCustomerActivity}
+                        onChange={(e) => setPendingFilterCustomerActivity(e.target.value)}
+                        className={filterSelectClass}
+                      >
+                        <option value="">All customers</option>
+                        <option value="active">Active customers</option>
+                        <option value="inactive">Inactive customers</option>
                       </select>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
@@ -2500,20 +2559,22 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 bg-white/[0.04]">
-
+                    <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider w-[100px] h-[50px]">S. No</th>
                     <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider h-[50px]">Name</th>
                     <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider w-[200px] h-[50px]">Phone No</th>
+                    <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider w-[140px] h-[50px]">Status</th>
                     <th className="text-left py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider min-w-[220px] h-[50px]">Active plans</th>
                     <th className="text-center py-4 px-6 font-semibold text-stone-400 uppercase tracking-wider w-[100px] h-[50px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {customerGroups.map((group, i) => {
+                  {visibleCustomerGroups.map((group, i) => {
                     const c = group.primary;
                     const plansForDisplay = getPlansHighlight(group.plans);
                     const remainingCount = Math.max(group.plans.length - plansForDisplay.length, 0);
                     const friendsForCustomer = c.customer_id ? friendSummaryByCustomerId.get(c.customer_id) ?? [] : [];
                     const friendCount = friendsForCustomer.length;
+                    const customerIsActive = customerActivityByGroupKey.get(group.key) === true;
                     return (
                       <tr
                         key={`${group.key}-${c.id}-${i}`}
@@ -2521,12 +2582,27 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                         onClick={() => openCustomerDetails(c)}
                       >
 
+                        <td className="py-3 px-6 text-stone-400 font-medium">
+                          {i + 1}
+                        </td>
+
                         <td className="py-3 px-6">
                           <span className="text-stone-100 font-semibold text-base">{c.name}</span>
                         </td>
 
                         <td className="py-3 px-6 text-stone-300 font-medium">
                           {c.mobile ?? "—"}
+                        </td>
+                        <td className="py-3 px-6">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                              customerIsActive
+                                ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                                : "border-white/15 bg-white/5 text-stone-300"
+                            }`}
+                          >
+                            {customerIsActive ? "Active" : "Inactive"}
+                          </span>
                         </td>
                         <td className="py-3 px-6">
                           {plansForDisplay.length === 0 ? (
