@@ -159,6 +159,22 @@ type PlanHoldPrompt =
   | { mode: "hold"; plan: Customer }
   | { mode: "resume"; plan: Customer };
 
+type CustomerMutationResult =
+  | Awaited<ReturnType<typeof createCustomer>>
+  | Awaited<ReturnType<typeof updateCustomer>>;
+
+type CustomerMutationFailure = Extract<CustomerMutationResult, { ok: false }>;
+
+type CustomerPlanConflict = {
+  existingPlanId: string;
+  customerId: string;
+  planId: string;
+  startDate: string;
+  endDate: string;
+};
+
+type PlanConflictNotice = CustomerPlanConflict & { message: string };
+
 function planSortValue(plan: Customer): number {
   const start = plan.start_date ? Date.parse(plan.start_date) : NaN;
   if (!Number.isNaN(start)) return start;
@@ -301,6 +317,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const [editingLinkedId, setEditingLinkedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [planConflictNotice, setPlanConflictNotice] = useState<PlanConflictNotice | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileCustomer, setProfileCustomer] = useState<Customer | null>(null);
   const [paymentsPlan, setPaymentsPlan] = useState<Customer | null>(null);
@@ -380,6 +397,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const formErrorRef = useRef<HTMLParagraphElement | null>(null);
   const profileErrorRef = useRef<HTMLParagraphElement | null>(null);
+  const planConflictRef = useRef<HTMLDivElement | null>(null);
   useHorizontalScrollTable(
     [customers.length],
     { wheelOnBody: true }
@@ -404,6 +422,18 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       }
     });
   }, [error, formOpen, profileOpen]);
+
+  useEffect(() => {
+    if (!planConflictNotice || !formOpen) return;
+    const target = planConflictRef.current;
+    if (!target) return;
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (typeof target.focus === "function") {
+        target.focus({ preventScroll: true });
+      }
+    });
+  }, [planConflictNotice, formOpen]);
 
   useEffect(() => {
     setSearchQuery(getStringParam(searchParams, "q"));
@@ -626,6 +656,38 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
       .filter((id, index, arr) => id && arr.indexOf(id) === index);
   }
 
+  function isCustomerPlanConflict(value: unknown): value is CustomerPlanConflict {
+    if (!value || typeof value !== "object") return false;
+    const candidate = value as Record<string, unknown>;
+    return (
+      typeof candidate.existingPlanId === "string" &&
+      typeof candidate.customerId === "string" &&
+      typeof candidate.planId === "string" &&
+      typeof candidate.startDate === "string" &&
+      typeof candidate.endDate === "string"
+    );
+  }
+
+  function applyMutationFailure(result: CustomerMutationFailure, fallback: string) {
+    const message = (result.error ?? "").trim() || fallback;
+    if (isCustomerPlanConflict(result.conflict)) {
+      setError(null);
+      setPlanConflictNotice({ ...result.conflict, message });
+      return;
+    }
+    setError(message);
+    setPlanConflictNotice(null);
+  }
+
+  function openConflictPlanHistory(planId: string) {
+    const existingPlan = customers.find((plan) => plan.id === planId);
+    if (!existingPlan) {
+      setError("The conflicting plan exists, but its history is not visible in the current view.");
+      return;
+    }
+    setDetailsCustomer(existingPlan);
+  }
+
   function buildFilterUrlForNewTab(): string {
     const params = new URLSearchParams();
     if (pendingFilterPlan) params.set("plan", pendingFilterPlan);
@@ -721,6 +783,48 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     }
   }
 
+  function clearGtPlanDetails() {
+    setImage(null);
+    setTotalFee(0);
+    setPaidFee(0);
+    setBalance(0);
+    setTrainerId(null);
+    setStartDate("");
+    setEndDate("");
+    setPayDate("");
+    setPaymentMode("");
+    setRemarks("");
+    setDuration("");
+    setStatus(DEFAULT_PLAN_STATUS);
+    setSlotTiming("");
+    setPaidTo("");
+    setFeedback("");
+    setReceipt(false);
+    setError(null);
+    setPlanConflictNotice(null);
+  }
+
+  function clearPtPlanDetails() {
+    setImagePt(null);
+    setTotalFeePt(0);
+    setPaidFeePt(0);
+    setBalancePt(0);
+    setTrainerIdPt(null);
+    setStartDatePt("");
+    setEndDatePt("");
+    setPayDatePt("");
+    setPaymentModePt("");
+    setRemarksPt("");
+    setDurationPt("");
+    setStatusPt(DEFAULT_PLAN_STATUS);
+    setSlotTimingPt("");
+    setPaidToPt("");
+    setFeedbackPt("");
+    setReceiptPt(false);
+    setError(null);
+    setPlanConflictNotice(null);
+  }
+
   function openAdd() {
     if (profileOpen) {
       closeProfileForm();
@@ -769,6 +873,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setFriendDropdownAnchor(null);
     setFormOpen(true);
     setError(null);
+    setPlanConflictNotice(null);
   }
 
   function openAddEntryFromReport(c: Customer) {
@@ -787,6 +892,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
   function openEdit(c: Customer) {
     setError(null);
+    setPlanConflictNotice(null);
     if (profileOpen) {
       closeProfileForm();
     }
@@ -893,6 +999,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setEditing(null);
     setEditingLinkedId(null);
     setError(null);
+    setPlanConflictNotice(null);
     setFriendIds([]);
     setFriendSearch("");
     setFriendDropdownAnchor(null);
@@ -932,6 +1039,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setProfileOpen(false);
     setProfileCustomer(null);
     setError(null);
+    setPlanConflictNotice(null);
     setFriendIds([]);
     setFriendSearch("");
     setFriendDropdownAnchor(null);
@@ -1021,6 +1129,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   async function handleSubmitProfile(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setPlanConflictNotice(null);
     setLoading(true);
     try {
       const normalizedFriendIds = normalizeFriendIdList(friendIds);
@@ -1066,7 +1175,11 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
 
       const results = await Promise.all(promises);
       const failed = results.find(r => !r.ok);
-      if (failed) throw new Error(failed.error ?? "Failed to update profile for some entries.");
+      if (failed) {
+        applyMutationFailure(failed, "Failed to update profile for some entries.");
+        setLoading(false);
+        return;
+      }
 
       closeProfileForm();
       router.refresh();
@@ -1080,6 +1193,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setPlanConflictNotice(null);
     setLoading(true);
     try {
       const normalizedFriendIds = normalizeFriendIdList(friendIds);
@@ -1179,28 +1293,33 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
             const linkedPayloadSource = isGtMain ? sanitizedPt : sanitizedGt;
             if (linkedPayloadSource) {
               const linkedPayload = buildPayload(linkedPayloadSource);
-              await updateCustomer(editingLinkedId, linkedPayload);
+              const linkedUpdate = await updateCustomer(editingLinkedId, linkedPayload);
+              if (!linkedUpdate.ok) {
+                applyMutationFailure(linkedUpdate, "Failed to update linked plan.");
+                setLoading(false);
+                return;
+              }
             }
           } else {
             // If they entered details for the other plan type during edit, create it
             if (isGtMain && hasPtDetails && sanitizedPt) {
               const addPt = await createCustomer(buildPayload(sanitizedPt, editing.customer_id));
               if (!addPt.ok) {
-                setError(addPt.error ?? "Failed to add PT plan.");
+                applyMutationFailure(addPt, "Failed to add PT plan.");
                 setLoading(false);
                 return;
               }
             } else if (!isGtMain && hasGtDetails && sanitizedGt) {
               const addGt = await createCustomer(buildPayload(sanitizedGt, editing.customer_id));
               if (!addGt.ok) {
-                setError(addGt.error ?? "Failed to add GT plan.");
+                applyMutationFailure(addGt, "Failed to add GT plan.");
                 setLoading(false);
                 return;
               }
             }
           }
         } else {
-          setError(res.error);
+          applyMutationFailure(res, "Failed to update this plan.");
           setLoading(false);
           return;
         }
@@ -1295,7 +1414,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           const payloadGt = buildPayload(sanitizedGt!, null, normalizedFriendIds);
           const resGt = await createCustomer(payloadGt);
           if (!resGt.ok) {
-            setError(resGt.error ?? "Failed to add GT.");
+            applyMutationFailure(resGt, "Failed to add GT.");
             setLoading(false);
             return;
           }
@@ -1310,7 +1429,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
           );
           const resPt = await createCustomer(payloadPt);
           if (!resPt.ok) {
-            setError(resPt.error ?? "Failed to add PT.");
+            applyMutationFailure(resPt, "Failed to add PT.");
             setLoading(false);
             return;
           }
@@ -1910,6 +2029,27 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                 {error}
               </p>
             )}
+            {planConflictNotice && (
+              <div
+                ref={planConflictRef}
+                tabIndex={-1}
+                className="rounded border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 space-y-1 focus:outline-none"
+              >
+                <p className="font-medium">
+                  {planConflictNotice.planId.toUpperCase()} already exists in this date range.
+                </p>
+                <p>
+                  Existing plan dates: {formatPromptDate(planConflictNotice.startDate)} to {formatPromptDate(planConflictNotice.endDate)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openConflictPlanHistory(planConflictNotice.existingPlanId)}
+                  className="text-xs font-semibold underline underline-offset-2 hover:text-white"
+                >
+                  View existing plan history
+                </button>
+              </div>
+            )}
             <>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-4 border-b border-white/10">
                 <div>
@@ -2008,7 +2148,18 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
                 {/* Left column: GT — two fields per row */}
                 <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
-                  <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">GT</p>
+                  <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-1.5">
+                    <p className="text-sm font-semibold text-stone-300">GT</p>
+                    {!editing && (
+                      <button
+                        type="button"
+                        onClick={clearGtPlanDetails}
+                        className="px-2.5 py-1 rounded-md border border-white/20 text-[11px] font-medium text-stone-300 hover:bg-white/5"
+                      >
+                        Clear GT
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={labelClass}>Duration <span className="text-brand-red">*</span></label>
@@ -2082,7 +2233,18 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                 </div>
                 {/* Right column: PT — two fields per row */}
                 <div className="border border-white/10 rounded-xl p-4 bg-stone-900/30">
-                  <p className="text-sm font-semibold text-stone-300 border-b border-white/10 pb-1.5 mb-4">PT</p>
+                  <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-1.5">
+                    <p className="text-sm font-semibold text-stone-300">PT</p>
+                    {!editing && (
+                      <button
+                        type="button"
+                        onClick={clearPtPlanDetails}
+                        className="px-2.5 py-1 rounded-md border border-white/20 text-[11px] font-medium text-stone-300 hover:bg-white/5"
+                      >
+                        Clear PT
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={labelClass}>Duration <span className="text-brand-red">*</span></label>

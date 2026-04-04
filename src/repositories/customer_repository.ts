@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { normalizeMobile } from "@/lib/customer-utils";
+import { PlanOverlapError } from "@/lib/plan-overlap-error";
 import type { Customer, CustomerInsert, CustomerUpdate } from "@/models/customer";
 import type { CustomerProfile } from "@/models/customer_profile";
 import type { CustomerPlan } from "@/models/customer_plan";
@@ -13,6 +14,7 @@ const PAYMENT_TABLE = "payments";
 const FRIEND_TABLE = "friends";
 const PLAN_HOLD_TABLE = "plan_holds";
 const PAGE_SIZE = 1000;
+const OVERLAP_RESTRICTED_PLAN_IDS = new Set(["PT", "GT"]);
 
 const PROFILE_COLS =
   "id, name, image, status, mobile, active_plans_count, created_at, updated_at";
@@ -110,6 +112,13 @@ export async function insertCustomer(row: CustomerInsert): Promise<Customer> {
   const supabase = await createServiceRoleClient();
   const profile = await resolveCustomerProfile(supabase, row);
   const planPayload = buildPlanInsertPayload(profile.id, row);
+  await assertNoOverlappingActivePlan(supabase, {
+    customerId: profile.id,
+    planId: typeof planPayload.plan_id === "string" ? planPayload.plan_id : null,
+    startDate: typeof planPayload.start_date === "string" ? planPayload.start_date : null,
+    endDate: typeof planPayload.end_date === "string" ? planPayload.end_date : null,
+    status: typeof planPayload.status === "string" ? planPayload.status : null,
+  });
   const { data: planRow, error } = await supabase
     .from(PLAN_TABLE)
     .insert(planPayload)
@@ -145,6 +154,31 @@ export async function updateCustomer(
   if (!existing) throw new Error("Customer plan not found");
 
   await updateCustomerProfileRecord(supabase, existing.customer_id, updates, existing);
+
+  const hasPlanWindowUpdate =
+    updates.plan !== undefined ||
+    updates.start_date !== undefined ||
+    updates.end_date !== undefined ||
+    updates.status !== undefined;
+  if (hasPlanWindowUpdate) {
+    await assertNoOverlappingActivePlan(supabase, {
+      customerId: existing.customer_id,
+      planId: updates.plan ?? existing.plan,
+      startDate:
+        updates.start_date !== undefined
+          ? sanitizeDate(updates.start_date)
+          : sanitizeDate(existing.start_date),
+      endDate:
+        updates.end_date !== undefined
+          ? sanitizeDate(updates.end_date)
+          : sanitizeDate(existing.end_date),
+      status:
+        updates.status !== undefined
+          ? sanitizeText(updates.status)
+          : sanitizeText(existing.status),
+      excludePlanId: id,
+    });
+  }
 
   const planUpdates = buildPlanUpdatePayload(updates);
   if (Object.keys(planUpdates).length > 0) {
@@ -570,6 +604,71 @@ async function syncPaymentSnapshot(
   }
 }
 
+type PlanOverlapCheckInput = {
+  customerId: string;
+  planId: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: string | null;
+  excludePlanId?: string;
+};
+
+async function assertNoOverlappingActivePlan(
+  supabase: SupabaseClient,
+  input: PlanOverlapCheckInput
+): Promise<void> {
+  const normalizedPlanId = normalizePlanId(input.planId);
+  const normalizedStatus = normalizePlanStatus(input.status);
+  if (
+    !input.customerId ||
+    !normalizedPlanId ||
+    !OVERLAP_RESTRICTED_PLAN_IDS.has(normalizedPlanId) ||
+    normalizedStatus !== "active"
+  ) {
+    return;
+  }
+
+  const startDate = sanitizeDate(input.startDate);
+  const endDate = sanitizeDate(input.endDate);
+  if (!startDate || !endDate) return;
+
+  if (startDate > endDate) {
+    throw new Error(`Start date cannot be after end date for ${normalizedPlanId}.`);
+  }
+
+  let query = supabase
+    .from(PLAN_TABLE)
+    .select("id, customer_id, plan_id, start_date, end_date")
+    .eq("customer_id", input.customerId)
+    .eq("plan_id", normalizedPlanId)
+    .eq("status", "active")
+    .not("start_date", "is", null)
+    .not("end_date", "is", null)
+    .lte("start_date", endDate)
+    .gte("end_date", startDate)
+    .order("start_date", { ascending: true })
+    .limit(1);
+
+  if (input.excludePlanId) {
+    query = query.neq("id", input.excludePlanId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const conflict = data?.[0];
+  if (!conflict) return;
+  if (!conflict.id || !conflict.start_date || !conflict.end_date) return;
+
+  throw new PlanOverlapError({
+    existingPlanId: conflict.id as string,
+    customerId: input.customerId,
+    planId: normalizedPlanId,
+    startDate: conflict.start_date as string,
+    endDate: conflict.end_date as string,
+  });
+}
+
 function mapPlanRowToCustomer(row: CustomerPlanRow): Customer {
   const customer = row.customer;
   const payment = row.payments?.[0] ?? null;
@@ -688,4 +787,12 @@ function sanitizeOptionalNumber(value: number | string | null | undefined): numb
   if (value == null) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function normalizePlanId(value: string | null | undefined): string {
+  return (value ?? "").trim().toUpperCase();
+}
+
+function normalizePlanStatus(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
 }

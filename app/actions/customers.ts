@@ -5,35 +5,65 @@ import { requireAdminSession } from "@app/actions/auth";
 import * as customerRepo from "@/repositories/customer_repository";
 import type { CustomerInsert, CustomerUpdate } from "@/models/customer";
 import { explainError } from "@/lib/error-message";
+import type { PlanOverlapConflict } from "@/lib/plan-overlap-error";
+import { PlanOverlapError } from "@/lib/plan-overlap-error";
 
 const CUSTOMERS_PATH = "/admin/customers";
+
+type CustomerActionFailure = {
+  ok: false;
+  error: string;
+  conflict?: PlanOverlapConflict;
+};
+
+type CreateCustomerResult =
+  | { ok: true; customer: Awaited<ReturnType<typeof customerRepo.insertCustomer>> }
+  | CustomerActionFailure;
+
+type UpdateCustomerResult =
+  | { ok: true }
+  | CustomerActionFailure;
 
 export async function listCustomers() {
   await requireAdminSession();
   return customerRepo.listCustomers();
 }
 
-export async function createCustomer(data: CustomerInsert) {
+export async function createCustomer(data: CustomerInsert): Promise<CreateCustomerResult> {
   try {
     await requireAdminSession();
     const created = await customerRepo.insertCustomer(data);
     revalidatePath(CUSTOMERS_PATH);
     return { ok: true as const, customer: created };
   } catch (e) {
+    if (e instanceof PlanOverlapError) {
+      return {
+        ok: false as const,
+        error: e.message,
+        conflict: e.conflict,
+      };
+    }
     return {
       ok: false as const,
       error: explainError(e, "Unable to add customer. Please review the form and try again."),
-    } satisfies { ok: false; error: string };
+    } satisfies CustomerActionFailure;
   }
 }
 
-export async function updateCustomer(id: string, data: CustomerUpdate) {
+export async function updateCustomer(id: string, data: CustomerUpdate): Promise<UpdateCustomerResult> {
   try {
     await requireAdminSession();
     await customerRepo.updateCustomer(id, data);
     revalidatePath(CUSTOMERS_PATH);
     return { ok: true as const };
   } catch (e) {
+    if (e instanceof PlanOverlapError) {
+      return {
+        ok: false as const,
+        error: e.message,
+        conflict: e.conflict,
+      };
+    }
     return { ok: false as const, error: explainError(e, "Unable to update customer. Please review the changes and try again.") };
   }
 }
