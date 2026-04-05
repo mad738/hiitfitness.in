@@ -122,6 +122,10 @@ type PlanFormValues = {
 };
 
 const DEFAULT_PLAN_STATUS = "active";
+const FILTER_DROPDOWN_WIDTH = 320;
+const FILTER_DROPDOWN_MARGIN = 8;
+const FILTER_DROPDOWN_VERTICAL_OFFSET = 8;
+const FILTER_DROPDOWN_ESTIMATED_HEIGHT = 520;
 
 function isPtPlan(planId: string | null | undefined): boolean {
   return (planId ?? "").trim().toUpperCase() === "PT";
@@ -492,9 +496,30 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   const updateDropdownPosition = useCallback(() => {
     if (filterButtonRef.current) {
       const rect = filterButtonRef.current.getBoundingClientRect();
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      const unclampedLeft = rect.right - FILTER_DROPDOWN_WIDTH;
+      const left = Math.min(
+        Math.max(FILTER_DROPDOWN_MARGIN, unclampedLeft),
+        Math.max(FILTER_DROPDOWN_MARGIN, viewportWidth - FILTER_DROPDOWN_WIDTH - FILTER_DROPDOWN_MARGIN)
+      );
+
+      const belowTop = rect.bottom + FILTER_DROPDOWN_VERTICAL_OFFSET;
+      const aboveTop = rect.top - FILTER_DROPDOWN_ESTIMATED_HEIGHT - FILTER_DROPDOWN_VERTICAL_OFFSET;
+      const preferredTop =
+        belowTop + FILTER_DROPDOWN_ESTIMATED_HEIGHT <= viewportHeight - FILTER_DROPDOWN_MARGIN
+          ? belowTop
+          : aboveTop;
+      const top = Math.min(
+        Math.max(FILTER_DROPDOWN_MARGIN, preferredTop),
+        Math.max(FILTER_DROPDOWN_MARGIN, viewportHeight - FILTER_DROPDOWN_MARGIN - 48)
+      );
+
       setDropdownPosition({
-        top: rect.bottom + 8,
-        left: Math.max(8, rect.right - 320),
+        top,
+        left,
       });
     }
   }, []);
@@ -1974,14 +1999,18 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                 <div
                   ref={filterDropdownRef}
                   className="fixed z-[100] w-80 rounded-2xl border border-white/15 bg-stone-900/95 backdrop-blur-xl shadow-xl shadow-black/40 overflow-hidden"
-                  style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+                  style={{
+                    top: dropdownPosition.top,
+                    left: dropdownPosition.left,
+                    maxHeight: `calc(100vh - ${FILTER_DROPDOWN_MARGIN * 2}px)`,
+                  }}
                 >
                   <div className="border-b border-white/10 bg-white/[0.04] px-4 py-3">
                     <p className="text-stone-300 text-xs font-semibold uppercase tracking-wider">
                       Filter options
                     </p>
                   </div>
-                  <div className="p-4 space-y-4">
+                  <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(100vh-120px)]">
                     <div>
                       <label className="block text-xs font-medium text-stone-400 mb-1.5">Plan</label>
                       <select
