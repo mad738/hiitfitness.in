@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
 import type { Payment } from "@/models/payment";
+import type { AnalyticsPayment } from "@/repositories/payment_repository";
 import { dedupeByMobile, normalizeMobile, isPlanCurrentlyRunning } from "@/lib/customer-utils";
 import { RevenueChart } from "./DashboardCharts";
 import { CustomerReportModal } from "./CustomerReportModal";
@@ -70,6 +71,7 @@ type Props = {
   customers: Customer[];
   trainers: Trainer[];
   adminCount: number;
+  analyticsPayments: AnalyticsPayment[];
 };
 
 /** Business month: starts on 6th, ends on 5th of next month. */
@@ -133,25 +135,35 @@ function getWeekStart(d: Date): Date {
 /** Customers who paid in [periodStart, periodEnd], deduped by mobile, with sum of paid_fee in period. */
 function getCustomersInPeriod(
   customers: Customer[],
+  analyticsPayments: AnalyticsPayment[],
   periodStart: Date,
   periodEnd: Date
 ): CustomerWithAmount[] {
-  const inPeriod = customers.filter((c) => {
-    const pd = parseDashboardDate(c.pay_date);
+  const customerByPlanId = new Map<string, Customer>();
+  customers.forEach((customer) => {
+    if (!customerByPlanId.has(customer.id)) {
+      customerByPlanId.set(customer.id, customer);
+    }
+  });
+
+  const inPeriod = analyticsPayments.filter((payment) => {
+    const pd = parseDashboardDate(payment.payment_date);
     return pd && pd >= periodStart && pd <= periodEnd;
   });
   const byMobile = new Map<string, { customer: Customer; total: number }>();
-  for (const c of inPeriod) {
-    const key = normalizeMobile(c.mobile) || (c.name ?? "").trim() || c.id;
+  for (const payment of inPeriod) {
+    const customer = customerByPlanId.get(payment.customer_plan_id);
+    if (!customer) continue;
+    const key = normalizeMobile(customer.mobile) || (customer.name ?? "").trim() || customer.id;
     const existing = byMobile.get(key);
-    const fee = Number(c.paid_fee ?? 0);
+    const fee = Number(payment.amount ?? 0);
     if (!existing) {
-      byMobile.set(key, { customer: c, total: fee });
+      byMobile.set(key, { customer, total: fee });
     } else {
       existing.total += fee;
-      const cStart = parseDashboardDateMs(c.start_date ?? c.created_at);
+      const cStart = parseDashboardDateMs(customer.start_date ?? customer.created_at);
       const exStart = parseDashboardDateMs(existing.customer.start_date ?? existing.customer.created_at);
-      if (cStart > exStart) existing.customer = c;
+      if (cStart > exStart) existing.customer = customer;
     }
   }
   return Array.from(byMobile.values()).map(({ customer, total }) => ({
@@ -230,6 +242,7 @@ export function DashboardContent({
   customers,
   trainers,
   adminCount,
+  analyticsPayments,
 }: Props) {
   const [selectedTrainer, setSelectedTrainer] = useState<TrainerReport | null>(
     null
@@ -350,7 +363,7 @@ export function DashboardContent({
       date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
     const buildPeriod = (start: Date, end: Date, axisLabel: string, displayLabel: string) => {
-      const customersInPeriod = getCustomersInPeriod(customers, start, end);
+      const customersInPeriod = getCustomersInPeriod(customers, analyticsPayments, start, end);
       const revenue = customersInPeriod.reduce((sum, entry) => sum + entry.amountInPeriod, 0);
       return { axisLabel, displayLabel, revenue, customers: customersInPeriod };
     };
@@ -413,8 +426,8 @@ export function DashboardContent({
     const monthlyCustomers = monthPeriods[0]?.customers ?? [];
 
     // Yearly periods: this calendar year followed by all previous years with data
-    const payDates = customers
-      .map((c) => parseDashboardDate(c.pay_date))
+    const payDates = analyticsPayments
+      .map((p) => parseDashboardDate(p.payment_date))
       .filter((date): date is Date => Boolean(date));
     const years = payDates.length > 0 ? payDates.map((d) => d.getFullYear()) : [now.getFullYear()];
     const minYear = Math.min(...years);
@@ -457,7 +470,7 @@ export function DashboardContent({
       yearlyPanelLabels,
       trainerReports: trainerReportsList,
     };
-  }, [customers, trainers]);
+  }, [customers, trainers, analyticsPayments]);
 
   const handleChartBarClick = useCallback((type: ChartSelection["type"], index: number) => {
     if (index < 0) return;

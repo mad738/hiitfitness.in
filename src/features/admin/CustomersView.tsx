@@ -297,6 +297,12 @@ function monthsFromDateRange(start: string | null | undefined, end: string | nul
   return Math.max(0.25, Math.round((days / 30) * 10) / 10);
 }
 
+function getAutoDurationValue(start: string | null | undefined, end: string | null | undefined): string {
+  const months = monthsFromDateRange(start, end);
+  if (!months) return "";
+  return formatMonthsLabel(months);
+}
+
 function getPrefilledDurationValue(plan: Customer | null): string {
   if (!plan) return "";
   const storedMonths = typeof plan.plan_months === "number" && plan.plan_months > 0 ? plan.plan_months : null;
@@ -470,6 +476,14 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
   useEffect(() => {
     setBalancePt(Number(totalFeePt) - Number(paidFeePt));
   }, [totalFeePt, paidFeePt]);
+
+  useEffect(() => {
+    setDuration(getAutoDurationValue(startDate, endDate));
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    setDurationPt(getAutoDurationValue(startDatePt, endDatePt));
+  }, [startDatePt, endDatePt]);
 
   useEffect(() => {
     setMounted(true);
@@ -2221,11 +2235,6 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelClass}>Duration <span className="text-brand-red">*</span></label>
-                      <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" required={gtFormRequired} aria-required={gtFormRequired} />
-                    </div>
-
-                    <div>
                       <label className={labelClass}>Total fee (₹) <span className="text-brand-red">*</span></label>
                       <input type="number" min={0} value={totalFee || ""} onChange={(e) => setTotalFee(Number(e.target.value) || 0)} onWheel={(e) => (e.target as HTMLElement).blur()} className={inputClass} required={gtFormRequired} aria-required={gtFormRequired} />
                     </div>
@@ -2272,7 +2281,6 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                       <button
                         type="button"
                         onClick={() => {
-                          setDurationPt(duration);
                           setTotalFeePt(totalFee);
                           setPaidFeePt(paidFee);
                           setBalancePt(balance);
@@ -2305,10 +2313,6 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelClass}>Duration <span className="text-brand-red">*</span></label>
-                      <input type="text" value={durationPt} onChange={(e) => setDurationPt(e.target.value)} className={inputClass} placeholder="e.g. 3M, 6M" required={ptFormRequired} aria-required={ptFormRequired} />
-                    </div>
                     <div>
                       <label className={labelClass}>Trainer <span className="text-brand-red">*</span></label>
                       <select value={trainerIdPt ?? ""} onChange={(e) => setTrainerIdPt(e.target.value || null)} className={inputClass} required={ptFormRequired} aria-required={ptFormRequired}>

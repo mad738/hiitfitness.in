@@ -5,6 +5,51 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const PAYMENT_TABLE = "payments";
 const PLAN_TABLE = "customer_plans";
 const DEFAULT_DATE = () => new Date().toISOString().slice(0, 10);
+const ANALYTICS_PAGE_SIZE = 1000;
+
+export type AnalyticsPayment = {
+  customer_plan_id: string;
+  amount: number;
+  payment_date: string;
+};
+
+export async function listAnalyticsPayments(): Promise<AnalyticsPayment[]> {
+  const supabase = await createServiceRoleClient();
+  const all: AnalyticsPayment[] = [];
+  let offset = 0;
+  let pageLength = 0;
+
+  do {
+    const { data, error } = await supabase
+      .from(PAYMENT_TABLE)
+      .select("customer_plan_id, amount, payment_date")
+      .order("payment_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + ANALYTICS_PAGE_SIZE - 1);
+    if (error) throw error;
+
+    const page = (data ?? []) as Array<{
+      customer_plan_id: string | null;
+      amount: number | null;
+      payment_date: string | null;
+    }>;
+    const mapped = page
+      .filter((row): row is { customer_plan_id: string; amount: number; payment_date: string } =>
+        Boolean(row.customer_plan_id && row.payment_date)
+      )
+      .map((row) => ({
+        customer_plan_id: row.customer_plan_id,
+        amount: sanitizeNumber(row.amount),
+        payment_date: row.payment_date,
+      }));
+
+    all.push(...mapped);
+    pageLength = page.length;
+    offset += ANALYTICS_PAGE_SIZE;
+  } while (pageLength === ANALYTICS_PAGE_SIZE);
+
+  return all;
+}
 
 export async function listPlanPayments(planId: string): Promise<Payment[]> {
   const supabase = await createServiceRoleClient();
