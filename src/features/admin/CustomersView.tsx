@@ -32,6 +32,7 @@ import {
   isPlanCurrentlyRunning,
   formatDateForInput,
   ensureDdMmYyyyFormat,
+  parseFlexibleDate,
 } from "@/lib/customer-utils";
 import { PLAN_CATEGORIES } from "@/data/plans";
 import { TRACKER_PAYMENT_MODE_OPTIONS } from "@/config/tracker-options";
@@ -294,8 +295,12 @@ function parseDurationToMonths(value: string | null | undefined): number | null 
 
 function monthsFromDateRange(start: string | null | undefined, end: string | null | undefined): number | null {
   if (!start || !end) return null;
-  const startMs = Date.parse(start);
-  const endMs = Date.parse(end);
+  const startIso = parseFlexibleDate(start) ?? null;
+  const endIso = parseFlexibleDate(end) ?? null;
+  if (!startIso || !endIso) return null;
+
+  const startMs = Date.parse(startIso);
+  const endMs = Date.parse(endIso);
   if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) return null;
   const days = (endMs - startMs) / (1000 * 60 * 60 * 24);
   return Math.max(0.25, Math.round((days / 30) * 10) / 10);
