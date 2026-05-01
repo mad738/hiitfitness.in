@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -7,7 +8,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   Line,
   type TooltipProps,
 } from "recharts";
@@ -31,6 +31,26 @@ const barColor = "#EE2A24";
 const lineColor = "#F9DB6D";
 
 export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue", onBarClick }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      setChartWidth(Math.max(0, Math.floor(container.clientWidth)));
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
   const maxRevenue = data.reduce((max, row) => Math.max(max, row.revenue), 0);
   const hitboxValue = maxRevenue > 0 ? maxRevenue : 1;
   const chartData: Array<RevenueChartRow & { __hitbox: number }> = data.map((row) => ({
@@ -56,9 +76,11 @@ export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue
   return (
     <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/10 transition-all duration-300 ease-out hover:border-brand-red/25 hover:shadow-[0_0_24px_rgba(238,42,36,0.1)]">
       <p className="text-stone-400 text-sm font-medium mb-4">{title}</p>
-      <div className="h-[260px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div ref={containerRef} className="h-[260px] w-full min-w-0">
+        {chartWidth > 0 && (
           <BarChart
+            width={chartWidth}
+            height={260}
             data={chartData}
             margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
             barGap={onBarClick ? "-100%" : undefined}
@@ -118,7 +140,7 @@ export function RevenueChart({ data, title, formatINR, gradientId = "fillRevenue
               activeDot={{ r: 5, stroke: "#fff", strokeWidth: 1.5, fill: lineColor }}
             />
           </BarChart>
-        </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

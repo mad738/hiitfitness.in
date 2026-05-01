@@ -691,7 +691,7 @@ function mapPlanRowToCustomer(row: CustomerPlanRow): Customer {
     plan: row.plan_id,
     total_fee: totalFee,
     paid_fee: paidAmount,
-    balance: sanitizeNumber(row.balance ?? totalFee - paidAmount),
+    balance: sanitizeNumber(totalFee - paidAmount),
     trainer_id: row.trainer_id ?? null,
     start_date: row.start_date,
     end_date: row.end_date,

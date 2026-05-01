@@ -55,6 +55,12 @@ function parseDashboardDateMs(dStr: string | null | undefined): number {
   return d ? d.getTime() : 0;
 }
 
+function getDayStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 /** Sort key for "recent first": start_date > end_date > created_at */
 function getSortDateMs(e: Customer): number {
   const created =
@@ -258,6 +264,7 @@ export function DashboardContent({
   const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
+  const [selectedPlanDetail, setSelectedPlanDetail] = useState<Customer | null>(null);
   const customerPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -265,6 +272,111 @@ export function DashboardContent({
       customerPanelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [chartSelection]);
+
+  const expiringSoonDiagnostics = useMemo(() => {
+    const todayStartMs = getDayStart(new Date()).getTime();
+    const sevenDaysOutMs = getDayStart(new Date(Date.now() + 7 * MS_PER_DAY)).getTime();
+    const dedupedCustomers = dedupeByMobile(customers);
+    const included: Array<{
+      customer: Customer;
+      balance: number;
+      endDayMs: number;
+      daysLeft: number;
+    }> = [];
+    const excluded: Array<{
+      id: string;
+      name: string;
+      endDate: string | null;
+      balance: number;
+      reason: string;
+    }> = [];
+
+    for (const customer of dedupedCustomers) {
+      const endDate = parseDashboardDate(customer.end_date);
+      const balance = Number(customer.balance ?? 0);
+
+      if (!endDate) {
+        excluded.push({
+          id: customer.id,
+          name: customer.name ?? "—",
+          endDate: customer.end_date,
+          balance,
+          reason: "missing or invalid end_date",
+        });
+        continue;
+      }
+
+      const endDayMs = getDayStart(endDate).getTime();
+      if (balance <= 0) {
+        excluded.push({
+          id: customer.id,
+          name: customer.name ?? "—",
+          endDate: customer.end_date,
+          balance,
+          reason: "balance is 0 or negative",
+        });
+        continue;
+      }
+
+      if (endDayMs < todayStartMs || endDayMs > sevenDaysOutMs) {
+        excluded.push({
+          id: customer.id,
+          name: customer.name ?? "—",
+          endDate: customer.end_date,
+          balance,
+          reason: endDayMs < todayStartMs ? "plan already ended" : "plan ends after 7-day window",
+        });
+        continue;
+      }
+
+      included.push({
+        customer,
+        balance,
+        endDayMs,
+        daysLeft: Math.max(0, Math.round((endDayMs - todayStartMs) / MS_PER_DAY)),
+      });
+    }
+
+    return {
+      dedupedCount: dedupedCustomers.length,
+      included,
+      excluded,
+      todayStartMs,
+      sevenDaysOutMs,
+    };
+  }, [customers]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+
+    console.groupCollapsed(
+      `[Dashboard] plans ending soon debug: ${expiringSoonDiagnostics.included.length} included / ${expiringSoonDiagnostics.dedupedCount} deduped`
+    );
+    console.log("window", {
+      todayStart: new Date(expiringSoonDiagnostics.todayStartMs).toISOString(),
+      sevenDaysOut: new Date(expiringSoonDiagnostics.sevenDaysOutMs).toISOString(),
+    });
+    console.table(
+      expiringSoonDiagnostics.included.map((entry) => ({
+        name: entry.customer.name ?? "—",
+        endDate: entry.customer.end_date ?? "—",
+        balance: entry.balance,
+        daysLeft: entry.daysLeft,
+      }))
+    );
+    console.table(
+      expiringSoonDiagnostics.excluded.slice(0, 20).map((entry) => ({
+        name: entry.name,
+        endDate: entry.endDate ?? "—",
+        balance: entry.balance,
+        reason: entry.reason,
+      }))
+    );
+    if (expiringSoonDiagnostics.excluded.length > 20) {
+      console.log(`... ${expiringSoonDiagnostics.excluded.length - 20} more excluded rows not shown`);
+    }
+    console.groupEnd();
+  }, [expiringSoonDiagnostics]);
 
   // Lock body scroll only when a modal overlay is open (not when inline customer profiles panel is open)
   useEffect(() => {
@@ -277,6 +389,14 @@ export function DashboardContent({
   }, [selectedTrainer, reportCustomer]);
 
   const customerCount = useMemo(() => dedupeByMobile(customers).length, [customers]);
+  const expiringSoonPlans = useMemo(() => {
+    return [...expiringSoonDiagnostics.included].sort(
+      (a, b) =>
+        a.endDayMs - b.endDayMs ||
+        b.balance - a.balance ||
+        (a.customer.name ?? "").localeCompare(b.customer.name ?? "")
+    );
+  }, [expiringSoonDiagnostics]);
   const byPlan = useMemo(
     () =>
       customers.reduce(
@@ -291,6 +411,28 @@ export function DashboardContent({
   );
   const gtCount = byPlan["GT"] ?? 0;
   const ptCount = byPlan["PT"] ?? 0;
+  const expiringSoonBalance = useMemo(
+    () => expiringSoonPlans.reduce((sum, entry) => sum + entry.balance, 0),
+    [expiringSoonPlans]
+  );
+
+  type DashboardCard =
+    | {
+        kind: "link";
+        title: string;
+        count: number;
+        href: string;
+        description: string;
+        meta: React.ReactNode;
+      }
+    | {
+        kind: "static";
+        title: string;
+        count: number;
+        description: string;
+        meta: React.ReactNode;
+        items: Array<(typeof expiringSoonPlans)[number]>;
+      };
 
   const refreshPlanPayments = useCallback(async (planId: string) => {
     const data = await listPlanPayments(planId);
@@ -480,6 +622,7 @@ export function DashboardContent({
 
   const cards = [
     {
+      kind: "link" as const,
       title: "Customers",
       count: customerCount,
       href: "/admin/customers",
@@ -491,13 +634,26 @@ export function DashboardContent({
       ),
     },
     {
+      kind: "link" as const,
       title: "Admin users",
       count: adminCount,
       href: "/admin/credentials",
       description: "Usernames and roles.",
       meta: null,
     },
-  ];
+    {
+      kind: "static" as const,
+      title: "Plans ending soon",
+      count: expiringSoonPlans.length,
+      description: "Balances due within the next 7 days.",
+      meta: (
+        <span className="text-base font-normal text-stone-500">
+          Outstanding: {formatINR(expiringSoonBalance)}
+        </span>
+      ),
+      items: expiringSoonPlans,
+    },
+  ] satisfies DashboardCard[];
 
   const reports = trainerReports;
 
@@ -513,27 +669,72 @@ export function DashboardContent({
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="liquid-glass block p-6 rounded-2xl min-h-[140px] transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/40 hover:shadow-[0_0_32px_rgba(238,42,36,0.15)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
-          >
-            <p className="text-stone-400 text-sm font-medium mb-1">
-              {card.title}
-            </p>
-            <p className="text-2xl sm:text-3xl font-bold text-stone-100">
-              {card.count}
-              {card.meta != null && <span className="ml-2">{card.meta}</span>}
-            </p>
-            <p className="text-stone-500 text-sm mt-2 line-clamp-2">
-              {card.description}
-            </p>
-            <span className="inline-block mt-3 text-brand-red text-sm font-semibold">
-              Open →
-            </span>
-          </Link>
-        ))}
+        {cards.map((card) => {
+          if (card.kind === "link") {
+            return (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="liquid-glass block p-6 rounded-2xl min-h-[140px] transition-all duration-300 ease-out hover:scale-[1.02] hover:border-brand-red/40 hover:shadow-[0_0_32px_rgba(238,42,36,0.15)] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-black"
+            >
+              <p className="text-stone-400 text-sm font-medium mb-1">
+                {card.title}
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-stone-100">
+                {card.count}
+                {card.meta != null && <span className="ml-2">{card.meta}</span>}
+              </p>
+              <p className="text-stone-500 text-sm mt-2 line-clamp-2">
+                {card.description}
+              </p>
+              <span className="inline-block mt-3 text-brand-red text-sm font-semibold">
+                Open →
+              </span>
+            </Link>
+            );
+          }
+
+          return (
+            <div
+              key={card.title}
+              className="liquid-glass block p-6 rounded-2xl h-[280px] transition-all duration-300 ease-out hover:border-brand-red/40 hover:shadow-[0_0_32px_rgba(238,42,36,0.15)] flex flex-col"
+            >
+              <p className="text-stone-400 text-sm font-medium mb-1">
+                {card.title}
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-stone-100">
+                {card.count}
+                {card.meta != null && <span className="ml-2">{card.meta}</span>}
+              </p>
+              <p className="text-stone-500 text-sm mt-2 line-clamp-2">
+                {card.description}
+              </p>
+              {card.items.length === 0 ? (
+                <p className="text-stone-500 text-sm mt-3">
+                  No plans ending in the next 7 days with an outstanding balance.
+                </p>
+              ) : (
+                <ul className="mt-3 flex-1 overflow-y-auto scrollbar-theme text-sm">
+                  {card.items.map(({ customer, balance, daysLeft }) => (
+                    <li
+                      key={customer.id}
+                      onClick={() => setSelectedPlanDetail(customer)}
+                      className="flex items-start justify-between gap-3 text-stone-300 p-2 rounded cursor-pointer hover:bg-stone-800/40 transition-colors space-y-2"
+                    >
+                      <div className="min-w-0 truncate">
+                        <div className="font-medium text-stone-100">{customer.name}</div>
+                        <div className="text-xs text-stone-400">{customer.plan} · {formatDate(customer.start_date)} to {formatDate(customer.end_date)}</div>
+                      </div>
+                      <span className="shrink-0 text-right text-stone-400">
+                        {daysLeft === 0 ? "Today" : `${daysLeft}d`} · {formatINR(balance)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </section>
 
       <section className="space-y-6">
@@ -802,6 +1003,18 @@ export function DashboardContent({
           trainers={trainers}
           formatCurrency={formatINR}
           onClose={() => setReportCustomer(null)}
+          showActions={false}
+          onViewPayments={openPlanPaymentsPanel}
+        />
+      )}
+
+      {selectedPlanDetail && (
+        <CustomerReportModal
+          customer={selectedPlanDetail}
+          customers={customers}
+          trainers={trainers}
+          formatCurrency={formatINR}
+          onClose={() => setSelectedPlanDetail(null)}
           showActions={false}
           onViewPayments={openPlanPaymentsPanel}
         />
