@@ -13,6 +13,11 @@ export async function listPlanPayments(planId: string) {
   return paymentRepo.listPlanPayments(planId);
 }
 
+export async function listPaymentHistoryTransactions(startDate: string, endDate: string) {
+  await requireAdminSession();
+  return paymentRepo.listPaymentHistoryTransactions(startDate, endDate);
+}
+
 export async function createPlanPayment(payload: PaymentInsert) {
   try {
     await requireAdminSession();

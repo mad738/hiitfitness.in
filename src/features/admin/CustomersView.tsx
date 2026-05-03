@@ -83,6 +83,16 @@ function formatCurrency(n: number) {
   }).format(n);
 }
 
+function getTodayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getYesterdayIsoDate(): string {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
 function getStringParam(
   params: URLSearchParams | ReadonlyURLSearchParams | null,
   key: string
@@ -498,6 +508,8 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     setMounted(true);
   }, []);
 
+  
+
   const updateDropdownPosition = useCallback(() => {
     if (filterButtonRef.current) {
       const rect = filterButtonRef.current.getBoundingClientRect();
@@ -795,6 +807,7 @@ export function CustomersView({ initialCustomers, initialTrainers }: Props) {
     const data = await listPlanPayments(planId);
     setPlanPayments(data);
   }, []);
+  
 
   async function openPaymentsPanel(plan: Customer) {
     closeFormsForOtherActions();
@@ -1957,6 +1970,7 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
       {planHoldModal}
       {deletePromptModal}
       {friendViewerModal}
+      
       {/* Search bar + filter - sticky so it stays visible when scrolling */}
       <div className="sticky top-0 z-10 rounded-2xl border border-white/10 bg-stone-900/95 backdrop-blur-sm shadow-inner">
         <div className="flex items-stretch gap-0">
@@ -2107,13 +2121,16 @@ function getDeletePromptWarning(prompt: DeletePrompt) {
       </div>
 
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={openAdd}
-          className="px-4 py-2 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm transition"
-        >
-          Add customer
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={openAdd}
+            className="px-4 py-2 rounded-xl bg-brand-red hover:opacity-90 text-white font-semibold text-sm transition"
+          >
+            Add customer
+          </button>
+          
+        </div>
         <p className="text-stone-500 text-sm">
           {hasFilterParamsInUrl
             ? `Showing ${displayCustomers.length} of ${customers.length} customer${customers.length === 1 ? "" : "s"} (one per mobile)`

@@ -9,6 +9,7 @@ import { signOut } from "@app/actions/auth";
 const navLinks = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/customers", label: "Customers" },
+  { href: "/admin/payment-history", label: "Payment history" },
   { href: "/admin/trainers", label: "Trainers" },
   { href: "/admin/plans", label: "Plans" },
   { href: "/admin/subscriptions", label: "Subscriptions" },
