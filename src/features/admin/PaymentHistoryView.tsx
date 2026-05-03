@@ -6,7 +6,7 @@ import { AdminDatePicker } from "@/components/ui/admin-date-picker";
 import { listPaymentHistoryTransactions, listPlanPayments, createPlanPayment, updatePlanPayment, deletePlanPayment } from "@app/actions/payments";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
-import type { Payment } from "@/models/payment";
+import type { Payment, PaymentInsert, PaymentUpdate } from "@/models/payment";
 import { CustomerReportModal } from "@/features/admin/CustomerReportModal";
 import { PlanPaymentsModal, PaymentFormState } from "@/features/admin/PlanPaymentsModal";
 import { normalizeMobile, parseFlexibleDate } from "@/lib/customer-utils";
@@ -99,52 +99,39 @@ export function PaymentHistoryView({ initialCustomers, initialTrainers }: Props)
     return String(raw).toUpperCase();
   }
 
-  function resolveRowPlanType(row: PaymentHistoryTransaction): string {
-    const byPlanId = initialCustomers.find((customer) => customer.id === row.customer_plan_id) ?? null;
-    if (byPlanId) return formatPlanTypeRaw((byPlanId as any).plan_type ?? (byPlanId as any).type ?? (byPlanId as any).plan);
+    function resolveRowPlanType(row: PaymentHistoryTransaction): string {
+      type CustomerPlanLike = Partial<Pick<Customer, "plan">> & { plan_type?: string; type?: string };
+      const byPlanId = initialCustomers.find((customer) => customer.id === row.customer_plan_id) ?? null;
+      if (byPlanId) return formatPlanTypeRaw((byPlanId as CustomerPlanLike).plan_type ?? (byPlanId as CustomerPlanLike).type ?? (byPlanId as CustomerPlanLike).plan);
 
-    const byCustomerId = row.customer_id
-      ? initialCustomers.find((customer) => customer.customer_id === row.customer_id) ?? null
-      : null;
-    if (byCustomerId) return formatPlanTypeRaw((byCustomerId as any).plan_type ?? (byCustomerId as any).type ?? (byCustomerId as any).plan);
+      const byCustomerId = row.customer_id
+        ? initialCustomers.find((customer) => customer.customer_id === row.customer_id) ?? null
+        : null;
+      if (byCustomerId) return formatPlanTypeRaw((byCustomerId as CustomerPlanLike).plan_type ?? (byCustomerId as CustomerPlanLike).type ?? (byCustomerId as CustomerPlanLike).plan);
 
-    if (row.customer_mobile) {
-      const byMobile = initialCustomers.find((customer) => normalizeMobile(customer.mobile) === normalizeMobile(row.customer_mobile)) ?? null;
-      if (byMobile) return formatPlanTypeRaw((byMobile as any).plan_type ?? (byMobile as any).type ?? (byMobile as any).plan);
+      if (row.customer_mobile) {
+        const byMobile = initialCustomers.find((customer) => normalizeMobile(customer.mobile) === normalizeMobile(row.customer_mobile)) ?? null;
+        if (byMobile) return formatPlanTypeRaw((byMobile as CustomerPlanLike).plan_type ?? (byMobile as CustomerPlanLike).type ?? (byMobile as CustomerPlanLike).plan);
+      }
+
+      const maybe = row as unknown as Record<string, unknown>;
+      return formatPlanTypeRaw(maybe.plan_type ?? maybe.plan ?? null);
     }
 
-    return formatPlanTypeRaw((row as any).plan_type ?? (row as any).plan ?? null);
-  }
-
-  function resolveRowBalance(row: PaymentHistoryTransaction): string {
-    const byPlanId = initialCustomers.find((customer) => customer.id === row.customer_plan_id) ?? null;
-    if (byPlanId) return formatCurrency((byPlanId as any).balance ?? 0);
-
-    const byCustomerId = row.customer_id
-      ? initialCustomers.find((customer) => customer.customer_id === row.customer_id) ?? null
-      : null;
-    if (byCustomerId) return formatCurrency((byCustomerId as any).balance ?? 0);
-
-    if (row.customer_mobile) {
-      const byMobile = initialCustomers.find((customer) => normalizeMobile(customer.mobile) === normalizeMobile(row.customer_mobile)) ?? null;
-      if (byMobile) return formatCurrency((byMobile as any).balance ?? 0);
-    }
-
-    return "—";
-  }
+  // resolveRowBalance removed — use `getRowBalanceNumber` + `formatCurrency` when needed
 
   function getRowBalanceNumber(row: PaymentHistoryTransaction): number {
     const byPlanId = initialCustomers.find((customer) => customer.id === row.customer_plan_id) ?? null;
-    if (byPlanId) return (byPlanId as any).balance ?? NaN;
+    if (byPlanId) return Number(byPlanId.balance ?? NaN);
 
     const byCustomerId = row.customer_id
       ? initialCustomers.find((customer) => customer.customer_id === row.customer_id) ?? null
       : null;
-    if (byCustomerId) return (byCustomerId as any).balance ?? NaN;
+    if (byCustomerId) return Number(byCustomerId.balance ?? NaN);
 
     if (row.customer_mobile) {
       const byMobile = initialCustomers.find((customer) => normalizeMobile(customer.mobile) === normalizeMobile(row.customer_mobile)) ?? null;
-      if (byMobile) return (byMobile as any).balance ?? NaN;
+      if (byMobile) return Number(byMobile.balance ?? NaN);
     }
 
     return NaN;
@@ -157,11 +144,7 @@ export function PaymentHistoryView({ initialCustomers, initialTrainers }: Props)
     return "text-stone-300";
   }
 
-  function planTypeClassFor(type: string): string {
-    if (type === "GT") return "text-indigo-300 font-semibold";
-    if (type === "PT") return "text-rose-300 font-semibold";
-    return "text-stone-300";
-  }
+  // planTypeClassFor removed — use `planTypeCellClassFor` for cell styling and inline classes for text
 
   function planTypeCellClassFor(type: string): string {
     if (type === "GT") return "bg-indigo-900/30 text-indigo-300 font-semibold rounded-md";
@@ -264,19 +247,19 @@ export function PaymentHistoryView({ initialCustomers, initialTrainers }: Props)
     setPaymentsSaving(true);
     try {
       if (form.paymentId) {
-        const payload = {
+        const payload: PaymentUpdate = {
           amount: parseFloat(form.amount || "0"),
           payment_date: form.paymentDate,
           payment_mode: form.paymentMode || null,
           paid_to: form.paidTo || null,
           remarks: form.remarks || null,
           receipt_issued: Boolean(form.receipt),
-        } as any;
+        };
         const res = await updatePlanPayment(form.paymentId, payload);
         await refreshHistoryPlanPayments(planId);
         return res;
       } else {
-        const payload = {
+        const payload: PaymentInsert = {
           customer_plan_id: planId,
           amount: parseFloat(form.amount || "0"),
           payment_date: form.paymentDate,
@@ -284,7 +267,7 @@ export function PaymentHistoryView({ initialCustomers, initialTrainers }: Props)
           paid_to: form.paidTo || null,
           remarks: form.remarks || null,
           receipt_issued: Boolean(form.receipt),
-        } as any;
+        };
         const res = await createPlanPayment(payload);
         await refreshHistoryPlanPayments(planId);
         return res;

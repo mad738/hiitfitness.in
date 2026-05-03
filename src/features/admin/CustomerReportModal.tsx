@@ -127,6 +127,38 @@ export function CustomerReportModal({
   onHoldPlan,
   onResumePlan,
 }: Props) {
+  type FriendOption = { id: string; name: string; mobile: string | null; label: string };
+
+  const friendOptions = useMemo<FriendOption[]>(() => {
+    const map = new Map<string, FriendOption>();
+    customers.forEach((plan) => {
+      const profileId = plan.customer_id;
+      if (!profileId || map.has(profileId)) return;
+      const nameValue = (plan.name ?? "").trim() || "Unnamed";
+      const mobileValue = (plan.mobile ?? "").trim() || null;
+      const label = mobileValue ? `${nameValue} • ${mobileValue}` : nameValue;
+      map.set(profileId, { id: profileId, name: nameValue, mobile: mobileValue, label });
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }, [customers]);
+
+  const friendLookup = useMemo(() => new Map(friendOptions.map((o) => [o.id, o])), [friendOptions]);
+
+  const friendSummaryForCustomer = useMemo(() => {
+    const id = customer.customer_id ?? null;
+    if (!id) return [] as FriendOption[];
+    // collect friend_ids from plans belonging to this customer
+    const summaries: FriendOption[] = [];
+    customers.forEach((plan) => {
+      if (plan.customer_id !== id) return;
+      const ids = plan.friend_ids ?? [];
+      ids.forEach((fid) => {
+        const opt = friendLookup.get(fid);
+        if (opt && !summaries.some((s) => s.id === opt.id)) summaries.push(opt);
+      });
+    });
+    return summaries;
+  }, [customer, customers, friendLookup]);
   const mobileKey = normalizeMobile(customer.mobile);
   const nameKey = (customer.name ?? "").trim();
   const history = useMemo(
@@ -194,6 +226,21 @@ export function CustomerReportModal({
               <p className="text-stone-500 text-sm mt-1">
                 {totalEntries} entr{totalEntries === 1 ? "y" : "ies"} · Total paid (all time): {formatCurrency(totalPaidAllTime)}
               </p>
+            </div>
+            <div className="ml-4 min-w-0">
+              <p className="text-xs uppercase tracking-wider text-stone-500">Friends</p>
+              {friendSummaryForCustomer.length === 0 ? (
+                <p className="text-sm text-stone-400">No friends linked</p>
+              ) : (
+                <div className="space-y-1 mt-1">
+                  {friendSummaryForCustomer.map((f) => (
+                    <div key={f.id} className="rounded-md bg-white/5 px-3 py-1">
+                      <p className="text-sm text-stone-100 font-medium">{f.name}</p>
+                      {f.mobile && <p className="text-xs text-stone-400">{f.mobile}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
