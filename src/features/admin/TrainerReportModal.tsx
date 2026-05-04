@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import type { Customer } from "@/models/customer";
 import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import { isPlanCurrentlyRunning } from "@/lib/customer-utils";
-import { getPlanStatusMeta } from "@/lib/status-styles";
 import type { TrainerReport } from "./trainer-report-types";
 
 function formatDateShort(value: string | null, fallback: (value: string | null) => string): string {
@@ -27,6 +26,30 @@ function formatSlot(plan: Customer): string {
   return plan.slot_timing ? plan.slot_timing : "—";
 }
 
+function calculatePlanDuration(startDate: string | null, endDate: string | null): string {
+  if (!startDate || !endDate) return "—";
+  try {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "—";
+    
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs < 0) return "—";
+    
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const weeks = Math.floor(diffDays / 7);
+    const months = Math.floor(diffDays / 30);
+    const years = Math.floor(diffDays / 365);
+    
+    if (years > 0) return `${years}y`;
+    if (months > 0) return `${months}mo`;
+    if (weeks > 0) return `${weeks}w`;
+    return `${diffDays}d`;
+  } catch {
+    return "—";
+  }
+}
+
 type Props = {
   report: TrainerReport;
   formatCurrency: (n: number) => string;
@@ -45,9 +68,26 @@ export function TrainerReportModal({
   onOpenCustomerReport,
 }: Props) {
   const stats = useMemo(() => {
+    // Calculate current month date range
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const isPaymentInCurrentMonth = (payDate: string | null): boolean => {
+      if (!payDate) return false;
+      try {
+        const date = new Date(payDate + "T12:00:00");
+        return date >= currentMonthStart && date <= currentMonthEnd;
+      } catch {
+        return false;
+      }
+    };
+
     const totals = report.plans.reduce(
       (acc, entry) => {
-        acc.totalPaid += Number(entry.plan.paid_fee ?? 0);
+        // Only count paid_fee if payment was in current month
+        const paidInCurrentMonth = isPaymentInCurrentMonth(entry.plan.pay_date) ? Number(entry.plan.paid_fee ?? 0) : 0;
+        acc.totalPaid += paidInCurrentMonth;
         acc.totalBalance += Number(entry.plan.balance ?? 0);
         if (isPlanCurrentlyRunning(entry.plan.start_date, entry.plan.end_date)) {
           acc.active += 1;
@@ -131,7 +171,7 @@ export function TrainerReportModal({
                 <h3 className="text-stone-200 font-semibold">Trainer plans</h3>
                 <p className="text-stone-500 text-xs">Click a row to view detailed payments for that plan.</p>
               </div>
-              <p className="text-sm text-stone-400">Total collected: {formatCurrency(stats.totalPaid)}</p>
+              <p className="text-sm text-stone-400">This month: {formatCurrency(stats.totalPaid)}</p>
             </div>
             <div className="flex flex-col rounded-2xl border border-white/10 overflow-hidden">
               <div
@@ -154,6 +194,7 @@ export function TrainerReportModal({
                       <th className="text-right py-2.5 px-3 font-medium text-stone-400">Paid</th>
                       <th className="text-right py-2.5 px-3 font-medium text-stone-400">Balance</th>
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400">Slot</th>
+                      <th className="text-left py-2.5 px-3 font-medium text-stone-400">Duration</th>
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400">Start</th>
                       <th className="text-left py-2.5 px-3 font-medium text-stone-400">End</th>
                       <th className="text-right py-2.5 px-3 font-medium text-stone-400">Commission</th>
@@ -165,12 +206,20 @@ export function TrainerReportModal({
                       const plan = entry.plan;
                       const contributes = entry.commissionAmount > 0;
                       const active = isPlanCurrentlyRunning(plan.start_date, plan.end_date);
-                      const statusMeta = getPlanStatusMeta(plan.status ?? (active ? "active" : "inactive"));
-                      const rowHighlightClass = statusMeta?.isActive
-                        ? "bg-emerald-950/40 ring-1 ring-inset ring-emerald-500/30"
-                        : statusMeta?.isInactive
-                          ? "bg-rose-950/30 ring-1 ring-inset ring-rose-500/25"
-                          : "";
+                      
+                      // Color hierarchy: Green (active + commissioned) > Yellow (active only) > Red (inactive)
+                      let rowHighlightClass = "";
+                      if (!active) {
+                        // Inactive - Red
+                        rowHighlightClass = "bg-rose-950/30 ring-1 ring-inset ring-rose-500/25";
+                      } else if (contributes) {
+                        // Active + Commissioned - Green
+                        rowHighlightClass = "bg-emerald-950/40 ring-1 ring-inset ring-emerald-500/30";
+                      } else {
+                        // Active but not commissioned - Bright Yellow
+                        rowHighlightClass = "bg-yellow-900/40 ring-1 ring-inset ring-yellow-400/40";
+                      }
+                      
                       return (
                         <tr
                           key={plan.id}
@@ -178,7 +227,7 @@ export function TrainerReportModal({
                           className={`border-b border-white/5 transition-colors cursor-pointer ${rowHighlightClass} ${
                             rowHighlightClass ? "" : "hover:bg-white/5"
                           }`}
-                          title={statusMeta?.isInactive ? "Inactive plan – click to view payment history" : "Click to view payment history"}
+                          title={!active ? "Inactive plan – click to view payment history" : contributes ? "Active with commission – click to view payment history" : "Active but no commission – click to view payment history"}
                         >
                           <td className="py-2.5 px-3 text-stone-200 font-medium">
                             <span className="inline-flex flex-col">
@@ -189,14 +238,30 @@ export function TrainerReportModal({
                           <td className="py-2.5 px-3 text-stone-300">
                             <span className="inline-flex items-center gap-2">
                               {plan.plan ?? "PT"}
-                              {statusMeta && (
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${statusMeta.className}`}>
-                                  {statusMeta.label}
-                                </span>
-                              )}
-                              {contributes && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-400/20 text-emerald-200 uppercase">Commission</span>
-                              )}
+                              {(() => {
+                                if (!active) {
+                                  // Inactive - Red
+                                  return (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-rose-400/20 text-rose-200">
+                                      Inactive
+                                    </span>
+                                  );
+                                } else if (contributes) {
+                                  // Active + Commissioned - Green
+                                  return (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-emerald-400/20 text-emerald-200">
+                                      Active • Commission
+                                    </span>
+                                  );
+                                } else {
+                                  // Active but not commissioned - Bright Yellow
+                                  return (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-400/30 text-yellow-100">
+                                      Active
+                                    </span>
+                                  );
+                                }
+                              })()}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-right text-stone-200 tabular-nums">{formatCurrency(Number(plan.total_fee ?? 0))}</td>
@@ -207,6 +272,9 @@ export function TrainerReportModal({
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-stone-300">{formatSlot(plan)}</td>
+                          <td className="py-2.5 px-3 text-stone-300 whitespace-nowrap font-medium">
+                            {calculatePlanDuration(plan.start_date, plan.end_date)}
+                          </td>
                           <td className="py-2.5 px-3 text-stone-300 whitespace-nowrap">
                             {formatDateShort(plan.start_date, formatDate)}
                           </td>
