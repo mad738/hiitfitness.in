@@ -70,6 +70,7 @@ export function PaymentHistoryView({ initialCustomers, initialTrainers }: Props)
   const [combinedTab, setCombinedTab] = useState<"customer" | "plan">("customer");
   const [paymentsSaving, setPaymentsSaving] = useState(false);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const selectedDetailPlan = useMemo(() => {
     if (!paymentHistoryDetail) return null;
@@ -310,12 +311,38 @@ export function PaymentHistoryView({ initialCustomers, initialTrainers }: Props)
             <button
               key={filter}
               type="button"
-              onClick={() => setPaymentHistoryFilter(filter)}
+              onClick={() => setPaymentHistoryFilter((prev) => (prev === filter ? "recent" : filter))}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${paymentHistoryFilter === filter ? "border-brand-red/60 bg-brand-red/15 text-white" : "border-white/15 text-stone-300 hover:border-brand-red/40 hover:text-white"}`}
             >
               {filter === "today" ? "Today" : filter === "yesterday" ? "Yesterday" : "Custom Date Range"}
             </button>
           ))}
+
+          <div className="ml-4 flex-1 min-w-[180px] md:min-w-[280px]">
+            <div className="relative">
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name or phone"
+                aria-label="Search payments by name or phone"
+                className="w-full px-3 py-2 pl-9 rounded-xl bg-stone-900/50 border border-white/20 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-brand-red/60 focus:ring-1 focus:ring-brand-red/40 transition"
+              />
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-500 pointer-events-none"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         {paymentHistoryFilter === "custom" && (
@@ -356,7 +383,18 @@ export function PaymentHistoryView({ initialCustomers, initialTrainers }: Props)
                     </tr>
                 </thead>
                 <tbody>
-                  {paymentHistoryRows.map((row) => (
+                  {/** Apply client-side search over loaded rows (name / phone) */}
+                  {(() => {
+                    const q = searchQuery.trim().toLowerCase();
+                    const rowsToRender = q
+                      ? paymentHistoryRows.filter((row) => {
+                          const name = (row.customer_name ?? "").toLowerCase();
+                          const phoneNorm = (normalizeMobile(row.customer_mobile ?? "") || "").toLowerCase();
+                          const rawPhone = (row.customer_mobile ?? "").toLowerCase();
+                          return name.includes(q) || phoneNorm.includes(q) || rawPhone.includes(q);
+                        })
+                      : paymentHistoryRows;
+                    return rowsToRender.map((row) => (
                     <tr
                       key={row.payment_id}
                       onClick={() => void openPaymentHistoryDetail(row)}
@@ -372,7 +410,8 @@ export function PaymentHistoryView({ initialCustomers, initialTrainers }: Props)
                       <td className={`py-2.5 px-4 ${balanceClassForNumber(getRowBalanceNumber(row))}`}>{Number.isFinite(getRowBalanceNumber(row)) ? formatCurrency(getRowBalanceNumber(row)) : "—"}</td>
                       <td className="py-2.5 px-4 text-stone-300">{row.payment_mode ?? "—"}</td>
                     </tr>
-                  ))}
+                  ));
+                    })()}
                 </tbody>
               </table>
             </div>

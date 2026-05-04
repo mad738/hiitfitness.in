@@ -7,7 +7,7 @@ import { useHorizontalScrollTable } from "@/hooks/useHorizontalScrollTable";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { ReadonlyURLSearchParams } from "next/navigation";
 import { CustomerReportModal } from "./CustomerReportModal";
-import { PlanPaymentsModal, type PaymentFormState } from "./PlanPaymentsModal";
+import { PlanPaymentsModal, type PaymentFormState } from "@/features/admin/PlanPaymentsModal";
 import type { Customer } from "@/models/customer";
 import type { Trainer } from "@/models/trainer";
 import type { Payment } from "@/models/payment";
