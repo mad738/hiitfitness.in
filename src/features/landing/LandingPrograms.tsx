@@ -38,12 +38,12 @@ export function LandingPrograms() {
                     </p>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 justify-items-center max-w-3xl mx-auto">
                     {programs.map((p) => (
-                        <div key={p.title} className="flex justify-center md:block w-full">
-                            <MobileInViewHover className="w-full max-w-md md:max-w-none p-3 md:p-0">
+                        <div key={p.title} className="w-full max-w-[280px] sm:max-w-xs">
+                            <MobileInViewHover className="w-full p-2 md:p-0">
                                 <article
-                                    className="bg-black overflow-hidden rounded-2xl shadow-lg border border-stone-800 transition-all duration-300 ease-out hover:-translate-y-2 hover:border-white/20 hover:shadow-2xl group"
+                                    className="bg-black overflow-hidden rounded-xl shadow-md border border-stone-800 transition-all duration-300 ease-out hover:-translate-y-2 hover:border-white/20 hover:shadow-xl group"
                                 >
                                     <div className="relative aspect-[4/3] bg-stone-900 overflow-hidden">
                                         <Image
@@ -54,11 +54,11 @@ export function LandingPrograms() {
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                                     </div>
-                                    <div className="p-6 relative -mt-10">
-                                        <h3 className="text-xl font-bold text-white mb-2">
+                                    <div className="p-4 relative -mt-8">
+                                        <h3 className="text-base font-bold text-white mb-1.5">
                                             {p.title}
                                         </h3>
-                                        <p className="text-stone-300 text-sm leading-relaxed">
+                                        <p className="text-stone-300 text-[11px] leading-relaxed">
                                             {p.description}
                                         </p>
                                     </div>

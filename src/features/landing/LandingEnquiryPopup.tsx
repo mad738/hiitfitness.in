@@ -6,7 +6,7 @@ import Link from "next/link";
 
 export function LandingEnquiryPopup() {
     const [isOpen, setIsOpen] = useState(false);
-    const phoneNumber = "+918111977114";
+    const phoneNumber = "+919996667714";
     const message = "Hi! I'm interested in joining HIIT Fitness. Can you share more details?";
     const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
 

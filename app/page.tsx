@@ -2,6 +2,7 @@ import { LandingHero } from "@/features/landing/LandingHero";
 import { LandingFacilities } from "@/features/landing/LandingFacilities";
 import { LandingServices } from "@/features/landing/LandingServices";
 import { LandingPlans } from "@/features/landing/LandingPlans";
+import { LandingBranches } from "@/features/landing/LandingBranches";
 import { LandingContact } from "@/features/landing/LandingContact";
 import { LandingFooter } from "@/features/landing/LandingFooter";
 import { LandingMobileHeaderWrapper } from "@/features/landing/LandingMobileHeaderWrapper";
@@ -31,6 +32,7 @@ export default function HomePage() {
         <LandingChallenge />
         <LandingPlans />
         <LandingTestimonials />
+        <LandingBranches />
         <LandingContact />
       </main>
       <LandingFooter />

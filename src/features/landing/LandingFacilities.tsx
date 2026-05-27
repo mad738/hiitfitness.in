@@ -42,12 +42,12 @@ export function LandingFacilities() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 justify-items-center max-w-3xl mx-auto">
           {facilities.map((f) => (
-            <div key={f.title} className="flex justify-center md:block w-full">
-              <MobileInViewHover className="w-full max-w-md md:max-w-none p-3 md:p-0">
+            <div key={f.title} className="w-full max-w-[280px] sm:max-w-xs">
+              <MobileInViewHover className="w-full p-2 md:p-0">
                 <article
-                  className="bg-white overflow-hidden rounded-2xl shadow-lg border border-red-100 transition-all duration-300 ease-out hover:scale-[1.04] hover:border-[#EE2A24] hover:shadow-xl"
+                  className="bg-white overflow-hidden rounded-xl shadow-md border border-red-100 transition-all duration-300 ease-out hover:scale-[1.04] hover:border-[#EE2A24] hover:shadow-xl"
                 >
                   <div className="relative aspect-[16/10] bg-stone-100">
                     <Image
@@ -59,11 +59,11 @@ export function LandingFacilities() {
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   </div>
-                  <div className="p-6 border-t border-stone-100">
-                    <h3 className="text-lg font-bold text-black mb-2">
+                  <div className="p-4 border-t border-stone-100">
+                    <h3 className="text-base font-bold text-black mb-1.5 leading-tight">
                       {f.title}
                     </h3>
-                    <p className="text-stone-600 text-sm leading-relaxed">
+                    <p className="text-stone-600 text-[11px] leading-relaxed">
                       {f.description}
                     </p>
                   </div>

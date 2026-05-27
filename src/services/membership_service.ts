@@ -1,12 +1,107 @@
-import { unstable_noStore as noStore } from "next/cache";
-import * as planRepo from "@/repositories/membership_plan_repository";
+import { type MembershipPlan } from "@/models/membership_plan";
 
-/** Plans from Supabase membership_plans table only. Returns [] when empty or on error. */
-export async function getPublicPlans() {
-  noStore();
-  try {
-    return await planRepo.listActivePlans();
-  } catch {
-    return [];
-  }
+export async function getPublicPlans(): Promise<MembershipPlan[]> {
+  const now = new Date().toISOString();
+  
+  return [
+    {
+      id: "gt-1",
+      name: "General - 1 Month",
+      description: null,
+      price_monthly: 4000,
+      duration_days: 30,
+      total_fee: 4000,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "gt-3",
+      name: "General - 3 Months",
+      description: null,
+      price_monthly: 2667,
+      duration_days: 90,
+      total_fee: 8000,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "gt-6",
+      name: "General - 6 Months",
+      description: null,
+      price_monthly: 2167,
+      duration_days: 180,
+      total_fee: 13000,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "gt-12",
+      name: "General - 12 Months",
+      description: null,
+      price_monthly: 1500,
+      duration_days: 365,
+      total_fee: 18000,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "pt-1",
+      name: "Personal - 1 Month",
+      description: null,
+      price_monthly: 10000,
+      duration_days: 30,
+      total_fee: 10000,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "pt-3",
+      name: "Personal - 3 Months",
+      description: null,
+      price_monthly: 7667,
+      duration_days: 90,
+      total_fee: 23000,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "pt-6",
+      name: "Personal - 6 Months",
+      description: null,
+      price_monthly: 7167,
+      duration_days: 180,
+      total_fee: 43000,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "pt-12",
+      name: "Personal - 12 Months",
+      description: null,
+      price_monthly: 5667,
+      duration_days: 365,
+      total_fee: 68000,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "ft-1",
+      name: "Functional - 1 Month",
+      description: null,
+      price_monthly: 2500,
+      duration_days: 30,
+      total_fee: 2500,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    }
+  ];
 }

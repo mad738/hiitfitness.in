@@ -8,15 +8,10 @@
     "dev:4000": "next dev -p 4000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "eslint .",
-    "update-from-sheet": "node scripts/update-customers-from-sheet.js",
-    "import-from-sheet": "node scripts/import-trail-tracker-to-customers-trainers.js"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.47.10",
-    "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "embla-carousel-react": "^8.6.0",
@@ -32,7 +27,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
-    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -42,7 +36,6 @@
     "postcss": "^8.4.49",
     "shadcn": "^3.8.3",
     "tailwindcss": "^3.4.16",
-    "typescript": "^5.7.2",
-    "xlsx": "^0.18.5"
+    "typescript": "^5.7.2"
   }
 }

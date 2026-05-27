@@ -14,6 +14,7 @@ export function LandingNav() {
         { id: "facilities", label: "Facilities" },
         { id: "programs", label: "Programs" },
         { id: "plans", label: "Plans" },
+        { id: "branches", label: "Branches" },
         { id: "contact", label: "Contact" },
       ] as const,
     []
@@ -84,12 +85,7 @@ export function LandingNav() {
               )}
             </a>
           ))}
-          <Link
-            href="/admin/login"
-            className="text-white/80 hover:text-white text-base"
-          >
-            Admin
-          </Link>
+
 
           <div className="flex items-center gap-4 ml-6 pl-6 border-l border-stone-800">
             <a

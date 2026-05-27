@@ -37,11 +37,11 @@ export default function RootLayout({
         className={`${inter.variable} ${ethnocentric.variable} antialiased font-sans text-stone-100 min-h-screen`}
       >
         <InteractiveGridPattern
-          cellSize={50}
-          glowColor="rgba(255, 0, 0, 0.35)"
-          borderColor="rgba(255, 255, 255, 0.12)"
-          proximity={120}
-          className="bg-black"
+          cellSize={24} // Decreased cell size for a denser, more high-tech grid
+          glowColor="rgba(238, 42, 36, 0.8)" // High-intensity brand red
+          borderColor="rgba(255, 255, 255, 0.1)" // Crisp white grid lines
+          proximity={180} // Larger glow radius
+          className="bg-[#050505]" // Deep futuristic black
         />
         <div className="relative z-10 min-h-screen">
           {children}

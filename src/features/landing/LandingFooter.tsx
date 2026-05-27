@@ -93,11 +93,7 @@ export function LandingFooter() {
           <p className="text-stone-500 text-sm font-medium text-center sm:text-left">
             © {new Date().getFullYear()} HIIT Fitness. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
-            <Link href="/admin/login" className="text-stone-500 hover:text-[#EE2A24] text-sm font-medium transition-colors">
-              Admin Portal
-            </Link>
-          </div>
+
         </div>
       </AnimateOnScroll>
     </footer>

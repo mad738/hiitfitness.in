@@ -10,14 +10,3 @@ export type MembershipPlan = {
   created_at: string;
   updated_at: string;
 };
-
-export type MembershipPlanInsert = Omit<
-  MembershipPlan,
-  "id" | "created_at" | "updated_at"
-> & {
-  id?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type MembershipPlanUpdate = Partial<MembershipPlanInsert>;

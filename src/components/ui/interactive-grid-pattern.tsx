@@ -219,22 +219,53 @@ export function InteractiveGridPattern({
         ))}
       </div>
 
-      {/* Center ambient glow */}
+      <style>
+        {`
+          @keyframes scanline {
+            0% { transform: translateY(-100vh); }
+            100% { transform: translateY(100vh); }
+          }
+        `}
+      </style>
+
+      {/* Center ambient red glow (Cyber Core) */}
       <div
-        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-20"
+        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-40 mix-blend-screen"
         style={{
-          width: "60vmin",
-          height: "60vmin",
-          background: `radial-gradient(circle, ${glowColor.replace(/[\d.]+\)$/, "0.3)")} 0%, transparent 70%)`,
+          width: "80vmin",
+          height: "80vmin",
+          background: `radial-gradient(circle, ${glowColor.replace(/[\d.]+\)$/, "0.5)")} 0%, transparent 70%)`,
         }}
       />
+      
+      {/* Intense White Tech Core Glow */}
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-10 mix-blend-screen animate-pulse"
+        style={{
+          width: "30vmin",
+          height: "30vmin",
+          background: `radial-gradient(circle, rgba(255,255,255,1) 0%, transparent 50%)`,
+        }}
+      />
+
+      {/* Futuristic Scanning Line */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden mix-blend-screen">
+        <div 
+           className="absolute top-0 left-0 w-full h-[2px] opacity-30"
+           style={{
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)",
+              boxShadow: "0 0 15px 2px rgba(238,42,36,0.8)",
+              animation: "scanline 6s linear infinite"
+           }}
+        />
+      </div>
 
       {/* Vignette */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at center, transparent 0%, transparent 30%, rgba(10,10,10,0.8) 100%)",
+            "radial-gradient(ellipse at center, transparent 0%, transparent 40%, rgba(5,5,5,0.9) 100%)",
         }}
       />
 

@@ -36,16 +36,16 @@ export function LandingServices() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 max-w-2xl mx-auto justify-items-center">
           {servicesList.map((service, i) => (
             <div
               key={i}
-              className="flex items-center gap-4 bg-[#EE2A24] p-4 sm:p-5 rounded-xl hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(238,42,36,0.3)] transition-all duration-300 min-h-[90px] cursor-pointer"
+              className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 sm:gap-3 bg-[#EE2A24] p-3 rounded-lg hover:-translate-y-1 hover:shadow-[0_8px_15px_rgba(238,42,36,0.3)] transition-all duration-300 min-h-[50px] cursor-pointer w-full max-w-[200px]"
             >
-              <div className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full border-[3px] border-white flex items-center justify-center shrink-0 shadow-sm">
+              <div className="w-8 h-8 min-w-[32px] min-h-[32px] rounded-full border-2 border-white flex items-center justify-center shrink-0 shadow-sm">
                 {service.icon}
               </div>
-              <span className="text-white font-extrabold text-sm sm:text-base leading-snug">
+              <span className="text-white font-extrabold text-[10px] sm:text-xs leading-snug">
                 {service.title}
               </span>
             </div>
