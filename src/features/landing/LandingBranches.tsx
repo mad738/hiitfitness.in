@@ -8,15 +8,15 @@ import { useBranch, BranchId } from "./BranchContext";
 const BRANCHES = [
   {
     id: "kanuru",
-    name: "Kanuru HQ",
+    name: "Currency Nagar branch",
     address: "2nd Floor, Sri Anuja Balaji Square, vi Seshadri street, 3rd Ln, opp. Currency Nagar, Ramavarapadu, Kanuru, Andhra Pradesh 521108",
     phones: ["999 666 7714", "999 666 5573"],
     hours: {
-      weekdays: "5:00 AM - 10:30 AM, 5:00 PM - 9:00 PM (Wed till 10:00 PM)",
-      sunday: "5:00 AM - 11:00 AM"
+      weekdays: "5:00 AM - 10:30 AM, 5:00 PM - 9:00 PM",
+      sunday: "6:00 AM - 11:00 AM"
     },
     googleMapsDirectionsUrl: "https://www.google.com/maps/dir//16.5215298,80.6783943",
-    image: "/images/HIIT_GYM3.jpg",
+    image: "/images/currency_nagar_branch.png",
     status: "Active HQ"
   },
   {
@@ -25,11 +25,11 @@ const BRANCHES = [
     address: "76-14-165, Bhavanipuram Housing Board Road, Crombway Road, Bhavanipuram, V D Puram, Vijayawada - 520012, Andhra Pradesh, India",
     phones: ["999 666 4188", "999 666 4288"],
     hours: {
-      weekdays: "5:00 AM - 10:30 AM, 5:00 PM - 9:00 PM (Wed till 10:00 PM)",
-      sunday: "5:00 AM - 11:00 AM"
+      weekdays: "5:00 AM - 10:30 AM, 5:00 PM - 9:00 PM",
+      sunday: "6:00 AM - 11:00 AM"
     },
     googleMapsDirectionsUrl: "https://maps.app.goo.gl/U5coN7fPwEJLxxRr8",
-    image: "/images/HIIT_GYM4.jpg",
+    image: "/images/bhavanipuram_branch.jpg",
     status: "New Branch"
   }
 ];
@@ -44,9 +44,6 @@ export function LandingBranches() {
           <h2 className="text-3xl md:text-4xl font-extrabold text-[#EE2A24] mb-4 uppercase tracking-tight">
             Our Branches
           </h2>
-          <p className="text-stone-300 max-w-2xl mx-auto font-medium text-sm sm:text-base">
-            Find the closest HIIT Fitness headquarters near you. Click on a branch to select it.
-          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -68,9 +65,9 @@ export function LandingBranches() {
                   src={branch.image}
                   alt={`HIIT Fitness ${branch.name}`}
                   fill
-                  className="object-cover opacity-60 group-hover:opacity-100 transition-transform duration-700 group-hover:scale-105"
+                  className="object-cover transition-transform duration-700 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
                 <div className="absolute bottom-4 left-4 flex items-center gap-2">
                   <span className="flex h-3 w-3 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#EE2A24] opacity-75"></span>

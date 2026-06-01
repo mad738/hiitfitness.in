@@ -36,8 +36,8 @@ const BRANCHES_DATA = {
     lng: 80.6783943,
     googleMapsDirectionsUrl: "https://www.google.com/maps/dir//16.5215298,80.6783943",
     timings: {
-      weekdays: "5 AM – 10:30 AM, 5 PM – 9 PM (Wed till 10 PM)",
-      sunday: "5 AM – 11 AM"
+      weekdays: "5 AM – 10:30 AM, 5 PM – 9 PM",
+      sunday: "6 AM – 11 AM"
     }
   },
   bhavanipuram: {
@@ -51,8 +51,8 @@ const BRANCHES_DATA = {
     lng: 80.6014375,
     googleMapsDirectionsUrl: "https://maps.app.goo.gl/U5coN7fPwEJLxxRr8",
     timings: {
-      weekdays: "5 AM – 10:30 AM, 5 PM – 9 PM (Wed till 10 PM)",
-      sunday: "5 AM – 11 AM"
+      weekdays: "5 AM – 10:30 AM, 5 PM – 9 PM",
+      sunday: "6 AM – 11 AM"
     }
   }
 };
@@ -66,52 +66,13 @@ export function LandingContact() {
   return (
     <section id="contact" className="py-16 sm:py-24 px-4 sm:px-6 scroll-mt-[var(--header-height)] bg-stone-50">
       <AnimateOnScroll className="max-w-6xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-10 items-start">
-          {/* Contact Info */}
-          <div className="w-full">
-            <h2 className="text-3xl md:text-4xl font-extrabold text-[#EE2A24] mb-4 uppercase">
-              Start Your Journey
-            </h2>
-            <p className="text-stone-600 text-base sm:text-lg leading-relaxed mb-8">
-              Ready to train? Claim your free trial today. Drop in, ask about memberships, or get a quick tour.
-            </p>
-
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="bg-white border border-stone-200 shadow-sm p-4 rounded-xl flex-1 min-w-[200px]">
-                <p className="text-[#EE2A24] font-bold mb-1 flex items-center gap-2">
-                  <PhoneIcon />
-                  Phone
-                </p>
-                <div className="flex flex-col">
-                  {gym.phones.map((p) => (
-                    <a key={p.tel} href={p.tel} className="text-stone-900 font-semibold hover:text-[#EE2A24] transition">
-                      {p.display}
-                    </a>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-white border border-stone-200 shadow-sm p-4 rounded-xl flex-1 min-w-[200px]">
-                <p className="text-[#EE2A24] font-bold mb-2 flex items-center gap-2">
-                  <ClockIcon />
-                  Gym timings
-                </p>
-                <div className="text-sm text-stone-600">
-                  <p>Mon–Sat: <span className="font-semibold text-stone-900">{gym.timings.weekdays}</span></p>
-                  <p>Sun: <span className="font-semibold text-stone-900">{gym.timings.sunday}</span></p>
-                </div>
-              </div>
-            </div>
-          </div>
-
+        <div className="flex flex-col items-center max-w-4xl mx-auto w-full">
           {/* Map Feature with switcher inside header */}
           <div className="w-full min-w-0 flex justify-center">
             <div className="bg-white rounded-3xl overflow-hidden w-full max-w-md lg:max-w-xl shadow border border-stone-200 h-full flex flex-col">
               <div className="p-6 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[#EE2A24] font-extrabold text-xl mb-1 uppercase">Visit the gym</p>
-                  <p className="text-stone-500 text-sm break-words">
-                    {gym.address}
-                  </p>
+                  <p className="text-[#EE2A24] font-extrabold text-xl uppercase">Visit the gym</p>
                 </div>
                 {/* Branch Switcher on the right side */}
                 <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200 shrink-0 self-start sm:self-auto">
@@ -123,7 +84,7 @@ export function LandingContact() {
                         : "text-stone-600 hover:text-stone-900"
                     }`}
                   >
-                    Kanuru HQ
+                    Currency Nagar branch
                   </button>
                   <button
                     onClick={() => setSelectedBranch("bhavanipuram")}

@@ -15,9 +15,6 @@ export async function LandingPlans() {
           <h2 className="text-3xl md:text-4xl font-bold text-[#EE2A24] mb-4">
             Membership plans
           </h2>
-          <p className="text-stone-700 max-w-xl mx-auto">
-            Compare plans and choose what fits your goals. No hidden fees, cancel anytime.
-          </p>
         </div>
         {plans.length > 0 ? (
           <PlanGroups plans={plans} />

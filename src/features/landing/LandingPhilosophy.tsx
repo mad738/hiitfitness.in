@@ -29,9 +29,6 @@ export function LandingPhilosophy() {
                     <h2 className="text-3xl md:text-4xl font-extrabold text-[#EE2A24] mb-4">
                         Built on discipline. Driven by results.
                     </h2>
-                    <p className="text-stone-700 max-w-2xl mx-auto">
-                        Our philosophy is simple: we lay the foundation, you put in the work. Here is what we stand for.
-                    </p>
                 </div>
 
                 <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">

@@ -8,29 +8,39 @@ import { X } from "lucide-react";
 const videos = [
     {
         id: "v1",
-        title: "High Intensity Training",
+        title: "Trek Video",
         src: "/videos/v1.mp4"
     },
     {
         id: "v2",
-        title: "Strength Conditioning",
+        title: "Client Workout 1",
         src: "/videos/v2.mp4"
     },
     {
         id: "v3",
-        title: "Functional Fitness",
+        title: "Client Workout 2",
         src: "/videos/v3.mp4"
     },
     {
         id: "v4",
-        title: "HIIT Fitness Reel",
+        title: "Client Workout 3",
         src: "/videos/v4.mp4"
+    },
+    {
+        id: "v5",
+        title: "Client Workout 4",
+        src: "/videos/v5.mp4"
+    },
+    {
+        id: "v6",
+        title: "Client Workout 5",
+        src: "/videos/v6.mp4"
     }
 ];
 
 function VideoCard({ vid, onClick }: { vid: typeof videos[0]; onClick: () => void }) {
     return (
-        <div 
+        <div
             onClick={onClick}
             className="relative cursor-pointer aspect-[3/4] sm:aspect-[9/16] rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(238,42,36,0.2)] border border-stone-800 transition-all duration-500 hover:-translate-y-2 hover:border-[#EE2A24] group bg-stone-900 flex items-center justify-center"
         >
@@ -48,10 +58,10 @@ function VideoCard({ vid, onClick }: { vid: typeof videos[0]; onClick: () => voi
                 loop
                 playsInline
             />
-            
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent sm:from-black/80 sm:via-transparent sm:to-black/20 z-20 pointer-events-none opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            
-            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-6 z-30 translate-y-0 sm:translate-y-4 opacity-100 sm:opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent sm:from-black/80 sm:via-transparent sm:to-black/20 z-20 pointer-events-none opacity-100 transition-opacity duration-300" />
+
+            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-6 z-30 translate-y-0 transition-all duration-300 pointer-events-none">
                 <p className="text-white font-bold text-xs sm:text-lg leading-tight drop-shadow-md">
                     {vid.title}
                 </p>
@@ -90,26 +100,26 @@ export function LandingVideos() {
         <>
             {/* Video Player Modal */}
             {activeVideo && activeVidData && (
-                <div 
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 sm:p-8" 
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 sm:p-8"
                     onClick={() => setActiveVideo(null)}
                 >
-                    <button 
+                    <button
                         className="absolute top-4 right-4 sm:top-8 sm:right-8 text-white hover:text-[#EE2A24] transition-colors z-[110] bg-black/50 p-2 rounded-full backdrop-blur-sm"
                         onClick={() => setActiveVideo(null)}
                         aria-label="Close video"
                     >
                         <X className="w-6 h-6 sm:w-8 sm:h-8" />
                     </button>
-                    
-                    <div 
+
+                    <div
                         className="relative w-full max-w-[400px] sm:max-w-4xl aspect-[9/16] sm:aspect-video rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(238,42,36,0.2)] bg-black/50 border border-stone-800"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <video 
-                            src={activeVidData.src} 
-                            autoPlay 
-                            controls 
+                        <video
+                            src={activeVidData.src}
+                            autoPlay
+                            controls
                             playsInline
                             className="w-full h-full object-contain"
                         />
@@ -123,9 +133,6 @@ export function LandingVideos() {
                         <h2 className="text-3xl md:text-5xl font-extrabold text-[#EE2A24] mb-3 tracking-tight uppercase">
                             Shorts & Reels
                         </h2>
-                        <p className="text-white/80 text-base sm:text-lg md:text-xl font-medium max-w-2xl mx-auto px-4">
-                            Quick glimpses into our high-energy environment. Watch our community put in the work.
-                        </p>
                     </div>
 
                     {/* Constrained max-width on mobile to prevent videos from becoming too oversized */}

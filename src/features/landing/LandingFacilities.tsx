@@ -16,7 +16,7 @@ const facilities = [
     title: "Functional training station",
     description:
       "Multi-station cable machine with adjustable pulleys and weight stacks. Versatile for rows, presses, and cable work — plus on-machine exercise guides so you train right.",
-    imageSrc: "/images/HIIT_GYM3.jpg",
+    imageSrc: "/images/functional_station_generated.png",
     alt: "Functional trainer cable machine with pulleys and weight stacks in modern gym",
   },
   {
@@ -36,10 +36,6 @@ export function LandingFacilities() {
           <h2 className="text-3xl md:text-4xl font-extrabold text-[#EE2A24] mb-4">
             Infrastructure that hits different
           </h2>
-          <p className="text-stone-700 max-w-2xl mx-auto">
-            Bright, focused layout with top-tier equipment. Cardio zones, cable
-            stations, and a full free-weights floor — serious kit, no excuses.
-          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 justify-items-center max-w-3xl mx-auto">

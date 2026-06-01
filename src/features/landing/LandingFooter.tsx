@@ -8,7 +8,7 @@ import { useBranch } from "./BranchContext";
 
 const BRANCHES_FOOTER_DATA = {
   kanuru: {
-    name: "Kanuru HQ",
+    name: "Currency Nagar branch",
     address: "2nd Floor, Sri Anuja Balaji Square, vi Seshadri street, 3rd Ln, opp. Currency Nagar, Ramavarapadu, Kanuru, Andhra Pradesh 521108",
     phones: [
       { display: "999 666 7714", tel: "tel:+919996667714" },
@@ -34,7 +34,7 @@ export function LandingFooter() {
       <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-[#EE2A24]/5 blur-[120px] rounded-full pointer-events-none" />
 
       <AnimateOnScroll className="max-w-7xl mx-auto relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
           
           {/* Brand Info */}
           <div className="col-span-1 md:col-span-2 lg:col-span-1">
@@ -83,38 +83,7 @@ export function LandingFooter() {
             </ul>
           </div>
 
-          {/* Contact Details */}
-          <div className="col-span-1 md:col-span-2 lg:col-span-2">
-            <h3 className="text-white font-bold mb-6 uppercase tracking-wider text-sm border-l-2 border-[#EE2A24] pl-3">Contact Us</h3>
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div className="flex items-start gap-4 sm:col-span-2">
-                <div className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-[#EE2A24] shrink-0 hover:scale-110 transition-transform">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-white font-semibold text-sm mb-1.5 break-words">{BRANCHES_FOOTER_DATA[selectedBranch].name}</h4>
-                  <p className="text-stone-400 text-xs leading-relaxed pr-2">
-                    {BRANCHES_FOOTER_DATA[selectedBranch].address}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 sm:col-span-2">
-                <div className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-[#EE2A24] shrink-0 hover:scale-110 transition-transform">
-                  <Phone className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-white font-semibold text-sm mb-1.5">Phone Call</h4>
-                  <div className="flex gap-4">
-                    {BRANCHES_FOOTER_DATA[selectedBranch].phones.map((p) => (
-                      <a key={p.tel} href={p.tel} className="text-stone-400 hover:text-white text-sm font-medium transition-colors">
-                        {p.display}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+
         </div>
 
         {/* Bottom Bar */}

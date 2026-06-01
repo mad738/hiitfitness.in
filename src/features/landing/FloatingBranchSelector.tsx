@@ -41,38 +41,38 @@ export function FloatingBranchSelector() {
         top: headerHidden
           ? `${visualViewportTop + 56 + 12}px`
           : `${visualViewportTop + 56 + 56 + 12}px`,
-        right: "0px",
+        left: "0px",
       }
     : undefined;
 
   return (
     <div
       style={mobileTopStyle}
-      className={`z-50 flex items-center gap-1.5 bg-black/90 backdrop-blur-md border border-stone-800 p-1.5 shadow-2xl hover:border-stone-700 transition-all duration-300 ${
+      className={`z-50 flex items-center gap-1 bg-black/90 backdrop-blur-md border border-stone-800 p-1 shadow-2xl hover:border-stone-700 transition-all duration-300 fixed rounded-r-xl rounded-l-none border-l-0 ${
         isMobile
-          ? "fixed transition-[top] ease-out rounded-l-2xl rounded-r-none border-r-0 pl-2.5 pr-4"
-          : "fixed bottom-6 left-0 rounded-r-2xl rounded-l-none border-l-0 pl-4 pr-1.5 hover:pl-5"
+          ? "transition-[top] ease-out pl-2 pr-3"
+          : "bottom-6 left-0 pl-3 pr-1.5 hover:pl-4"
       }`}
     >
-      <div className="flex items-center gap-1.5 pl-3 pr-1 text-stone-400">
-        <MapPin className="w-4 h-4 text-[#EE2A24] animate-pulse" />
-        <span className="text-[10px] font-bold tracking-widest uppercase hidden md:inline">Branch:</span>
+      <div className="flex items-center gap-1 pl-2 pr-1 text-stone-400">
+        <MapPin className="w-3.5 h-3.5 text-[#EE2A24] animate-pulse" />
+        <span className="text-[9px] font-bold tracking-widest uppercase hidden md:inline">Branch:</span>
       </div>
       <button
         onClick={() => setSelectedBranch("kanuru")}
-        className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
+        className={`px-2 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${
           selectedBranch === "kanuru"
-            ? "bg-[#EE2A24] text-white shadow-lg shadow-[#EE2A24]/30"
+            ? "bg-[#EE2A24] text-white shadow-md shadow-[#EE2A24]/30"
             : "text-stone-400 hover:text-white hover:bg-stone-900"
         }`}
       >
-        Kanuru HQ
+        Currency Nagar
       </button>
       <button
         onClick={() => setSelectedBranch("bhavanipuram")}
-        className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
+        className={`px-2 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${
           selectedBranch === "bhavanipuram"
-            ? "bg-[#EE2A24] text-white shadow-lg shadow-[#EE2A24]/30"
+            ? "bg-[#EE2A24] text-white shadow-md shadow-[#EE2A24]/30"
             : "text-stone-400 hover:text-white hover:bg-stone-900"
         }`}
       >

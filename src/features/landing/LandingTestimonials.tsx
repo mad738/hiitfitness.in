@@ -46,7 +46,7 @@ export function LandingTestimonials() {
 
         const interval = setInterval(() => {
             api.scrollNext();
-        }, 4000);
+        }, 6000);
 
         return () => clearInterval(interval);
     }, [api]);
@@ -58,12 +58,9 @@ export function LandingTestimonials() {
                     <h2 className="text-2xl md:text-3xl font-extrabold text-[#EE2A24] mb-2 uppercase tracking-tight">
                         Member Testimonials
                     </h2>
-                    <p className="text-stone-300 max-w-2xl mx-auto font-medium text-xs sm:text-sm">
-                        Real results and experiences from our dedicated community members.
-                    </p>
                 </div>
 
-                <div className="max-w-xl mx-auto px-4 relative">
+                <div className="max-w-6xl mx-auto relative px-4 sm:px-6">
                     <Carousel
                         setApi={setApi}
                         opts={{
@@ -72,32 +69,34 @@ export function LandingTestimonials() {
                         }}
                         className="w-full"
                     >
-                        <CarouselContent>
+                        <CarouselContent className="-ml-2 sm:-ml-4">
                             {testimonials.map((t) => (
-                                <CarouselItem key={t.name} className="flex justify-center p-1">
-                                    <div className="w-full bg-stone-900/30 backdrop-blur-sm border border-stone-850 rounded-xl p-4 sm:p-6 relative hover:border-[#EE2A24] transition-all group shadow-xl hover:shadow-[0_0_20px_rgba(238,42,36,0.06)] flex flex-col items-center text-center">
-                                        <span className="text-4xl text-[#EE2A24] opacity-30 font-serif leading-none mb-2 select-none">
-                                            &ldquo;
-                                        </span>
-                                        <p className="text-stone-200 text-xs sm:text-sm italic mb-4 relative z-10 leading-relaxed font-medium">
-                                            {t.review}
-                                        </p>
-                                        <div className="flex flex-col items-center gap-2 border-t border-stone-800/80 pt-4 w-full max-w-xs justify-center">
-                                            <div className="w-8 h-8 bg-stone-800 rounded-full flex items-center justify-center font-bold text-xs uppercase border border-[#EE2A24] shadow-[0_0_10px_rgba(238,42,36,0.2)] text-white">
+                                <CarouselItem key={t.name} className="pl-2 sm:pl-4 md:basis-1/2 lg:basis-1/3">
+                                    <div className="h-full bg-stone-900/40 backdrop-blur-md border border-stone-800 rounded-2xl p-6 sm:p-8 relative hover:border-[#EE2A24]/60 transition-all duration-300 group shadow-lg flex flex-col justify-between">
+                                        <div>
+                                            <span className="text-6xl text-[#EE2A24] opacity-30 font-serif leading-none absolute top-4 left-4 select-none">
+                                                &ldquo;
+                                            </span>
+                                            <p className="text-stone-300 text-sm sm:text-base italic mb-6 relative z-10 leading-relaxed font-medium mt-6">
+                                                {t.review}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-4 pt-5 border-t border-stone-800/80 mt-auto w-full">
+                                            <div className="w-12 h-12 bg-gradient-to-br from-stone-800 to-stone-900 rounded-full flex items-center justify-center font-bold text-lg uppercase border border-[#EE2A24]/40 shadow-inner text-white shrink-0 group-hover:scale-110 transition-transform duration-300">
                                                 {t.name.charAt(0)}
                                             </div>
                                             <div>
-                                                <h4 className="font-extrabold text-xs text-white tracking-wide leading-none">{t.name}</h4>
-                                                <div className="text-[#EE2A24] text-[9px] font-bold uppercase tracking-wider mt-1">Member</div>
+                                                <h4 className="font-extrabold text-sm text-white tracking-wide">{t.name}</h4>
+                                                <div className="text-[#EE2A24] text-[10px] font-bold uppercase tracking-wider mt-1">Verified Member</div>
                                             </div>
                                         </div>
                                     </div>
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
-                        <div className="flex justify-center gap-3 mt-4">
-                            <CarouselPrevious className="static translate-y-0 h-8 w-8 border-stone-800 hover:border-[#EE2A24]/50 hover:bg-[#EE2A24]/10 text-white hover:text-white" />
-                            <CarouselNext className="static translate-y-0 h-8 w-8 border-stone-800 hover:border-[#EE2A24]/50 hover:bg-[#EE2A24]/10 text-white hover:text-white" />
+                        <div className="flex justify-center gap-4 mt-8">
+                            <CarouselPrevious className="static translate-y-0 h-10 w-10 border-stone-700 bg-stone-900 hover:border-[#EE2A24] hover:bg-[#EE2A24] text-white transition-colors" />
+                            <CarouselNext className="static translate-y-0 h-10 w-10 border-stone-700 bg-stone-900 hover:border-[#EE2A24] hover:bg-[#EE2A24] text-white transition-colors" />
                         </div>
                     </Carousel>
                 </div>

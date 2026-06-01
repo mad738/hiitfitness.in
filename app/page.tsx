@@ -8,7 +8,6 @@ import { LandingFooter } from "@/features/landing/LandingFooter";
 import { LandingMobileHeaderWrapper } from "@/features/landing/LandingMobileHeaderWrapper";
 import { LandingEnquiryPopup } from "@/features/landing/LandingEnquiryPopup";
 import { LandingPhilosophy } from "@/features/landing/LandingPhilosophy";
-import { LandingPrograms } from "@/features/landing/LandingPrograms";
 import { LandingChallenge } from "@/features/landing/LandingChallenge";
 import { LandingTestimonials } from "@/features/landing/LandingTestimonials";
 import { LandingVideos } from "@/features/landing/LandingVideos";
@@ -35,7 +34,6 @@ export default function HomePage() {
           <LandingFacilities />
           <LandingServices />
           <LandingVideos />
-          <LandingPrograms />
           <LandingChallenge />
           <LandingPlans />
           <LandingTestimonials />
