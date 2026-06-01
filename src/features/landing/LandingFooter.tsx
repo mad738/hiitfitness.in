@@ -17,7 +17,7 @@ const BRANCHES_FOOTER_DATA = {
   },
   bhavanipuram: {
     name: "Bhavanipuram Branch",
-    address: "76-14-165, Bhavanipuram Housing Board Road, Crombway Road, Bhavanipuram, V D Puram, Vijayawada - 520012, Andhra Pradesh, India",
+    address: "2nd floor, 76-13-1/A, Royal Enfield showroom building, Joji Nagar, Bhavanipuram, Vijayawada - 520012",
     phones: [
       { display: "999 666 4188", tel: "tel:+919996664188" },
       { display: "999 666 4288", tel: "tel:+919996664288" }

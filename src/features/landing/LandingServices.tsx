@@ -2,15 +2,16 @@
 
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
 import {
-  User, Dumbbell, HeartPulse, Users, Activity
+  User, Dumbbell, HeartPulse, Users, Activity, Flame
 } from "lucide-react";
 
 const servicesList = [
-  { title: "Personal Training (1-1)", icon: <User className="w-6 h-6 text-white" /> },
+  { title: <>Personal Training <span className="whitespace-nowrap">(1-1)</span></>, icon: <User className="w-6 h-6 text-white" /> },
   { title: "Strength Training", icon: <Dumbbell className="w-6 h-6 text-white" /> },
   { title: "Weight Loss Program", icon: <HeartPulse className="w-6 h-6 text-white" /> },
   { title: "Functional Training", icon: <Activity className="w-6 h-6 text-white" /> },
   { title: "Group Training (HIIT)", icon: <Users className="w-6 h-6 text-white" /> },
+  { title: "Cardio Training", icon: <Flame className="w-6 h-6 text-white" /> },
   { title: "Fully Equipped Weight Training Area", icon: <Dumbbell className="w-6 h-6 text-white" /> },
 ];
 

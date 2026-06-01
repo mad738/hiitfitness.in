@@ -38,7 +38,7 @@ export function LandingHero() {
   }, []);
 
   return (
-    <section className="relative min-h-[100dvh] flex items-end justify-center px-4 sm:px-6 pb-24 md:items-center md:pb-0 pt-[calc(var(--header-height)+var(--header-content-gap)+3.25rem)] md:pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden bg-black text-center">
+    <section className="relative min-h-[100dvh] flex items-end justify-center px-4 sm:px-6 pb-24 md:pb-24 pt-[calc(var(--header-height)+var(--header-content-gap)+3.25rem)] md:pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden bg-black text-center">
       {/* Background Images Crossfade Slideshow */}
       {BACKGROUND_IMAGES.map((img, idx) => (
         <div
@@ -58,7 +58,7 @@ export function LandingHero() {
             href={`https://wa.me/${waNumber}?text=Hi!%20I'm%20interested%20in%20joining%20the%20community%20at%20HIIT%20Fitness.`}
             target="_blank"
             rel="noopener noreferrer"
-            className="group relative flex-1 inline-flex items-center justify-center min-h-[2.75rem] sm:min-h-[3rem] px-6 rounded-sm text-xs sm:text-sm font-black transition-all uppercase tracking-[0.15em] text-white bg-[#EE2A24] border border-[#EE2A24] overflow-hidden shadow-[0_0_15px_rgba(238,42,36,0.4)] hover:shadow-[0_0_30px_rgba(238,42,36,0.8)] hover:scale-[1.02]"
+            className="group relative flex-1 inline-flex items-center justify-center min-h-[2.75rem] sm:min-h-[3rem] px-6 rounded-sm text-xs sm:text-sm font-black transition-all uppercase tracking-[0.15em] text-white bg-[#EE2A24] border border-[#EE2A24] overflow-hidden shadow-[0_0_15px_rgba(238,42,36,0.4)] hover:shadow-[0_0_30px_rgba(238,42,36,0.8)] hover:scale-[1.02] order-1 sm:order-2"
           >
             {/* Shimmer effect */}
             <span className="absolute inset-0 w-[200%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
@@ -70,7 +70,7 @@ export function LandingHero() {
 
           <button
             onClick={() => setIsGalleryOpen(true)}
-            className="group relative flex-1 inline-flex items-center justify-center min-h-[2.75rem] sm:min-h-[3rem] px-6 rounded-sm text-xs sm:text-sm font-black transition-all uppercase tracking-[0.15em] text-white bg-white/20 backdrop-blur-md border border-white/50 hover:border-white hover:bg-white/30 overflow-hidden shadow-[0_0_10px_rgba(255,255,255,0.2)] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)] hover:scale-[1.02]"
+            className="group relative flex-1 inline-flex items-center justify-center min-h-[2.75rem] sm:min-h-[3rem] px-6 rounded-sm text-xs sm:text-sm font-black transition-all uppercase tracking-[0.15em] text-white bg-white/20 backdrop-blur-md border border-white/50 hover:border-white hover:bg-white/30 overflow-hidden shadow-[0_0_10px_rgba(255,255,255,0.2)] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)] hover:scale-[1.02] order-2 sm:order-1"
           >
             <span className="relative z-10 flex items-center gap-2">
               VIEW GALLERY
@@ -79,7 +79,7 @@ export function LandingHero() {
 
           <Link
             href="#videos"
-            className="group relative flex-1 inline-flex items-center justify-center min-h-[2.75rem] sm:min-h-[3rem] px-6 rounded-sm text-xs sm:text-sm font-black transition-all uppercase tracking-[0.15em] text-[#EE2A24] bg-black/60 backdrop-blur-md border border-[#EE2A24]/60 hover:border-[#EE2A24] hover:text-white overflow-hidden shadow-[0_0_10px_rgba(0,0,0,0.5)] hover:shadow-[0_0_20px_rgba(238,42,36,0.4)] hover:scale-[1.02]"
+            className="group relative flex-1 inline-flex items-center justify-center min-h-[2.75rem] sm:min-h-[3rem] px-6 rounded-sm text-xs sm:text-sm font-black transition-all uppercase tracking-[0.15em] text-[#EE2A24] bg-black/60 backdrop-blur-md border border-[#EE2A24]/60 hover:border-[#EE2A24] hover:text-white overflow-hidden shadow-[0_0_10px_rgba(0,0,0,0.5)] hover:shadow-[0_0_20px_rgba(238,42,36,0.4)] hover:scale-[1.02] order-3 sm:order-3"
           >
             {/* Slide fill effect */}
             <span className="absolute inset-0 bg-[#EE2A24] origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out z-0" />

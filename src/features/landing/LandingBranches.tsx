@@ -22,7 +22,7 @@ const BRANCHES = [
   {
     id: "bhavanipuram",
     name: "Bhavanipuram Branch",
-    address: "76-14-165, Bhavanipuram Housing Board Road, Crombway Road, Bhavanipuram, V D Puram, Vijayawada - 520012, Andhra Pradesh, India",
+    address: "2nd floor, 76-13-1/A, Royal Enfield showroom building, Joji Nagar, Bhavanipuram, Vijayawada - 520012",
     phones: ["999 666 4188", "999 666 4288"],
     hours: {
       weekdays: "5:00 AM - 10:30 AM, 5:00 PM - 9:00 PM",
