@@ -10,8 +10,12 @@ import {
   type PlanCategory,
 } from "@/data/plans";
 import { MobileInViewHover } from "@/components/ui/mobile-in-view-hover";
+import { useBranch } from "./BranchContext";
 
-const CONTACT_PHONE = { display: "999 666 7714", tel: "tel:+919996667714" };
+const BRANCH_PHONES = {
+  kanuru: { display: "999 666 7714", tel: "tel:+919996667714" },
+  bhavanipuram: { display: "999 666 4188", tel: "tel:+919996664188" },
+};
 
 type GroupedPlans = Record<PlanCategory, MembershipPlan[]>;
 
@@ -57,6 +61,8 @@ const CheckIcon = () => (
 type Props = { plans: MembershipPlan[] };
 
 export function PlanGroups({ plans }: Props) {
+  const { selectedBranch } = useBranch();
+  const contactPhone = BRANCH_PHONES[selectedBranch];
   const [showCallPrompt, setShowCallPrompt] = useState(false);
   const grouped = groupPlans(plans);
   const categoriesToShow = PLAN_CATEGORIES.filter((c) => grouped[c].length > 0);
@@ -69,8 +75,8 @@ export function PlanGroups({ plans }: Props) {
 
   const handleCallNow = useCallback(() => {
     setShowCallPrompt(false);
-    window.location.href = CONTACT_PHONE.tel;
-  }, []);
+    window.location.href = contactPhone.tel;
+  }, [contactPhone.tel]);
 
   const handleViewContact = useCallback(() => {
     setShowCallPrompt(false);
@@ -177,11 +183,11 @@ export function PlanGroups({ plans }: Props) {
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <a
-                href={CONTACT_PHONE.tel}
+                href={contactPhone.tel}
                 onClick={handleCallNow}
                 className="flex-1 text-center py-3 rounded-xl font-semibold text-sm bg-[#EE2A24] text-white hover:bg-red-700 transition"
               >
-                Call {CONTACT_PHONE.display}
+                Call {contactPhone.display}
               </a>
               <button
                 type="button"

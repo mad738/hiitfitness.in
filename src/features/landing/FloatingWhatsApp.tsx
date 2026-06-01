@@ -1,7 +1,15 @@
 "use client";
 
+import { useBranch } from "./BranchContext";
+
+const BRANCH_WHATSAPP = {
+  kanuru: "919996667714",
+  bhavanipuram: "919996664188"
+};
+
 export function FloatingWhatsApp() {
-    const phoneNumber = "919996667714"; // Default gym number based on contact info
+    const { selectedBranch } = useBranch();
+    const phoneNumber = BRANCH_WHATSAPP[selectedBranch];
     const message = "Hi HIIT Fitness, I'm interested in joining the gym!";
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
 

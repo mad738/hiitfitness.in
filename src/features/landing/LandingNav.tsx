@@ -89,7 +89,7 @@ export function LandingNav() {
 
           <div className="flex items-center gap-4 ml-6 pl-6 border-l border-stone-800">
             <a
-              href="https://www.instagram.com/"
+              href="https://www.instagram.com/hiitfitness01?igsh=MWt5Y29ueXM5bDMwcw=="
               target="_blank"
               rel="noopener noreferrer"
               className="text-white/80 hover:text-[#EE2A24] transition-colors"
@@ -98,7 +98,7 @@ export function LandingNav() {
               <Instagram className="w-5 h-5" />
             </a>
             <a
-              href="https://www.youtube.com/"
+              href="https://youtube.com/@hiit_fitness?si=P0vvcx4SiFozU5QH"
               target="_blank"
               rel="noopener noreferrer"
               className="text-white/80 hover:text-[#EE2A24] transition-colors"
@@ -152,7 +152,7 @@ export function LandingNav() {
             {/* Mobile Social Links */}
             <div className="flex items-center gap-6 mt-4 pt-4 border-t border-stone-800 px-3">
               <a
-                href="https://www.instagram.com/"
+                href="https://www.instagram.com/hiitfitness01?igsh=MWt5Y29ueXM5bDMwcw=="
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 text-white/80 hover:text-[#EE2A24] transition-colors"
@@ -161,7 +161,7 @@ export function LandingNav() {
                 <span className="font-semibold">Instagram</span>
               </a>
               <a
-                href="https://www.youtube.com/"
+                href="https://youtube.com/@hiit_fitness?si=P0vvcx4SiFozU5QH"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 text-white/80 hover:text-[#EE2A24] transition-colors"

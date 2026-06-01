@@ -3,18 +3,25 @@
 import { useState, useEffect } from "react";
 import { X, MessageCircle } from "lucide-react";
 import Link from "next/link";
+import { useBranch } from "./BranchContext";
+
+const BRANCH_PHONES = {
+  kanuru: "+919996667714",
+  bhavanipuram: "+919996664188"
+};
 
 export function LandingEnquiryPopup() {
+    const { selectedBranch } = useBranch();
     const [isOpen, setIsOpen] = useState(false);
-    const phoneNumber = "+919996667714";
+    const phoneNumber = BRANCH_PHONES[selectedBranch];
     const message = "Hi! I'm interested in joining HIIT Fitness. Can you share more details?";
     const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
 
     useEffect(() => {
-        // Small delay before showing the popup
+        // Show popup 5 seconds after the 3-second logo loader fades out (total 8 seconds)
         const timer = setTimeout(() => {
             setIsOpen(true);
-        }, 1000);
+        }, 8000);
         return () => clearTimeout(timer);
     }, []);
 

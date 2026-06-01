@@ -13,30 +13,39 @@ import { LandingChallenge } from "@/features/landing/LandingChallenge";
 import { LandingTestimonials } from "@/features/landing/LandingTestimonials";
 import { LandingVideos } from "@/features/landing/LandingVideos";
 import { FloatingWhatsApp } from "@/features/landing/FloatingWhatsApp";
+import { BranchProvider } from "@/features/landing/BranchContext";
+import { FloatingBranchSelector } from "@/features/landing/FloatingBranchSelector";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+import { LoaderProvider } from "@/features/landing/LoaderContext";
+import { BrandLoader } from "@/features/landing/BrandLoader";
+
 export default function HomePage() {
   return (
-    <>
-      <LandingMobileHeaderWrapper />
-      <LandingEnquiryPopup />
-      <main>
-        <LandingHero />
-        <LandingPhilosophy />
-        <LandingFacilities />
-        <LandingServices />
-        <LandingVideos />
-        <LandingPrograms />
-        <LandingChallenge />
-        <LandingPlans />
-        <LandingTestimonials />
-        <LandingBranches />
-        <LandingContact />
-      </main>
-      <LandingFooter />
-      <FloatingWhatsApp />
-    </>
+    <BranchProvider>
+      <LoaderProvider>
+        <BrandLoader />
+        <LandingMobileHeaderWrapper />
+        <LandingEnquiryPopup />
+        <main>
+          <LandingHero />
+          <LandingPhilosophy />
+          <LandingFacilities />
+          <LandingServices />
+          <LandingVideos />
+          <LandingPrograms />
+          <LandingChallenge />
+          <LandingPlans />
+          <LandingTestimonials />
+          <LandingBranches />
+          <LandingContact />
+        </main>
+        <LandingFooter />
+        <FloatingWhatsApp />
+        <FloatingBranchSelector />
+      </LoaderProvider>
+    </BranchProvider>
   );
 }

@@ -1,6 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 
 const testimonials = [
     {
@@ -26,79 +35,71 @@ const testimonials = [
     {
         name: "chenna clinical",
         review: "I have been going to HIIT FITNESS currency nagar from past 3 Months. I am completely new to the gym workouts. I do a desk job where I need to sit for hours together, so gradually my body feels much better.",
-    },
-    {
-        name: "V G Sankar Sai Pasupuleti",
-        review: "I've been a member of HIIT FITNESS for 2 Months and I can confidently say it's one of the best gyms I've ever been to!",
-    },
-    {
-        name: "RAMAVATH SIDDHARDHA",
-        review: "One of the best gyms in the area! The equipment is well-maintained, trainers are very supportive (specially SANDEEP BRO & LOKESH BRO), and the environment is super motivating. Perfect place for beginners as well as regular lifters.",
-    },
-    {
-        name: "Sharon Perla",
-        review: "This gym is awesome and has top and advanced equipment with great environment and the trainers are well qualified. “Your body is your weapon keep it strong”. So, burn and sharpen your weapon in HIIT FITNESS.",
-    },
-    {
-        name: "Poojitha Tadikonda",
-        review: "HIIT Fitness Gym is one of the best gyms with great facilities and motivating atmosphere. Mr.KK is an amazing trainer who guides with perfect techniques and pushes you to achieve your goals.",
-    },
-    {
-        name: "Adithya Alajangi",
-        review: "This is honestly the best gym I’ve been to! The equipment is well-maintained, the trainers are highly supportive, and the atmosphere is always motivating. It’s a really good place for both beginners and advanced fitness enthusiasts.",
-    },
-    {
-        name: "Suresh Chavitlo",
-        review: "Joining personal training with Trainer Manoj was one of the best decisions I’ve made. The sessions are focused, fun, and perfectly suited to my fitness level.",
-    },
-    {
-        name: "pullarao Kanneganti",
-        review: "The equipment is perfect and always in working order. The gym is very neat and spacious, which makes for a great workout.",
-    },
-    {
-        name: "Grandhi M",
-        review: "KK is an outstanding trainer who truly cares about his clients’ progress. His guidance is clear, motivating, and tailored to individual needs.",
-    },
-    {
-        name: "SYAM PEDDIPAGA",
-        review: "Well place to workout. HIIT fitness Ramavarappadu. Certified trainers are available in the gym, nice equipments. My trainer Lokesh pushed me to start Fitness Journey tq Trainer and HIIT Fitness 💥",
     }
 ];
 
 export function LandingTestimonials() {
+    const [api, setApi] = useState<CarouselApi>();
+
+    useEffect(() => {
+        if (!api) return;
+
+        const interval = setInterval(() => {
+            api.scrollNext();
+        }, 4000);
+
+        return () => clearInterval(interval);
+    }, [api]);
+
     return (
-        <section id="testimonials" className="py-16 sm:py-24 px-4 sm:px-6 bg-black text-white scroll-mt-[var(--header-height)] border-b border-[#EE2A24]">
-            <AnimateOnScroll className="max-w-7xl mx-auto">
-                <div className="text-center mb-10 sm:mb-16">
-                    <h2 className="text-3xl md:text-4xl font-extrabold text-[#EE2A24] mb-4 uppercase tracking-tight">
+        <section id="testimonials" className="py-8 sm:py-12 px-4 sm:px-6 bg-black text-white scroll-mt-[var(--header-height)] border-b border-[#EE2A24]">
+            <AnimateOnScroll className="max-w-5xl mx-auto">
+                <div className="text-center mb-6 sm:mb-8">
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-[#EE2A24] mb-2 uppercase tracking-tight">
                         Member Testimonials
                     </h2>
-                    <p className="text-stone-300 max-w-2xl mx-auto font-medium">
+                    <p className="text-stone-300 max-w-2xl mx-auto font-medium text-xs sm:text-sm">
                         Real results and experiences from our dedicated community members.
                     </p>
                 </div>
 
-                {/* Using a columns layout for a masonry effect with varying heights */}
-                <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 sm:gap-6 space-y-4 sm:space-y-6 max-w-6xl mx-auto">
-                    {testimonials.map((t) => (
-                        <div key={t.name} className="break-inside-avoid w-full bg-stone-900/50 border border-stone-800 rounded-xl p-5 relative hover:border-[#EE2A24] transition-all group shadow-sm hover:shadow-[0_0_20px_rgba(238,42,36,0.15)]">
-                            <span className="absolute -top-3 -left-1 text-4xl text-[#EE2A24] opacity-30 font-serif leading-none group-hover:opacity-60 transition-opacity">
-                                &quot;
-                            </span>
-                            <p className="text-stone-300 text-sm italic mb-5 relative z-10 leading-relaxed">
-                                {t.review}
-                            </p>
-                            <div className="flex items-center gap-3 border-t border-stone-800/50 pt-4">
-                                <div className="w-10 h-10 bg-stone-800 rounded-full flex items-center justify-center font-bold text-sm uppercase border border-[#EE2A24] shrink-0 shadow-[0_0_10px_rgba(238,42,36,0.2)] text-white">
-                                    {t.name.charAt(0)}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-sm text-white leading-none">{t.name}</h4>
-                                    <div className="text-[#EE2A24] text-[10px] font-bold uppercase tracking-wider mt-1">Member</div>
-                                </div>
-                            </div>
+                <div className="max-w-xl mx-auto px-4 relative">
+                    <Carousel
+                        setApi={setApi}
+                        opts={{
+                            align: "start",
+                            loop: true,
+                        }}
+                        className="w-full"
+                    >
+                        <CarouselContent>
+                            {testimonials.map((t) => (
+                                <CarouselItem key={t.name} className="flex justify-center p-1">
+                                    <div className="w-full bg-stone-900/30 backdrop-blur-sm border border-stone-850 rounded-xl p-4 sm:p-6 relative hover:border-[#EE2A24] transition-all group shadow-xl hover:shadow-[0_0_20px_rgba(238,42,36,0.06)] flex flex-col items-center text-center">
+                                        <span className="text-4xl text-[#EE2A24] opacity-30 font-serif leading-none mb-2 select-none">
+                                            &ldquo;
+                                        </span>
+                                        <p className="text-stone-200 text-xs sm:text-sm italic mb-4 relative z-10 leading-relaxed font-medium">
+                                            {t.review}
+                                        </p>
+                                        <div className="flex flex-col items-center gap-2 border-t border-stone-800/80 pt-4 w-full max-w-xs justify-center">
+                                            <div className="w-8 h-8 bg-stone-800 rounded-full flex items-center justify-center font-bold text-xs uppercase border border-[#EE2A24] shadow-[0_0_10px_rgba(238,42,36,0.2)] text-white">
+                                                {t.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-extrabold text-xs text-white tracking-wide leading-none">{t.name}</h4>
+                                                <div className="text-[#EE2A24] text-[9px] font-bold uppercase tracking-wider mt-1">Member</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                        <div className="flex justify-center gap-3 mt-4">
+                            <CarouselPrevious className="static translate-y-0 h-8 w-8 border-stone-800 hover:border-[#EE2A24]/50 hover:bg-[#EE2A24]/10 text-white hover:text-white" />
+                            <CarouselNext className="static translate-y-0 h-8 w-8 border-stone-800 hover:border-[#EE2A24]/50 hover:bg-[#EE2A24]/10 text-white hover:text-white" />
                         </div>
-                    ))}
+                    </Carousel>
                 </div>
             </AnimateOnScroll>
         </section>

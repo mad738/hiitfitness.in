@@ -1,9 +1,32 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
-import { Instagram, Facebook, MapPin, Phone } from "lucide-react";
+import { Instagram, Facebook, MapPin, Phone, Youtube } from "lucide-react";
+import { useBranch } from "./BranchContext";
+
+const BRANCHES_FOOTER_DATA = {
+  kanuru: {
+    name: "Kanuru HQ",
+    address: "2nd Floor, Sri Anuja Balaji Square, vi Seshadri street, 3rd Ln, opp. Currency Nagar, Ramavarapadu, Kanuru, Andhra Pradesh 521108",
+    phones: [
+      { display: "999 666 7714", tel: "tel:+919996667714" },
+      { display: "999 666 5573", tel: "tel:+919996665573" }
+    ]
+  },
+  bhavanipuram: {
+    name: "Bhavanipuram Branch",
+    address: "76-14-165, Bhavanipuram Housing Board Road, Crombway Road, Bhavanipuram, V D Puram, Vijayawada - 520012, Andhra Pradesh, India",
+    phones: [
+      { display: "999 666 4188", tel: "tel:+919996664188" },
+      { display: "999 666 4288", tel: "tel:+919996664288" }
+    ]
+  }
+};
 
 export function LandingFooter() {
+  const { selectedBranch } = useBranch();
   return (
     <footer className="bg-black border-t border-[#EE2A24]/30 pt-16 pb-8 px-4 sm:px-6 relative overflow-hidden">
       {/* Decorative top glow */}
@@ -36,11 +59,14 @@ export function LandingFooter() {
               Elite facility offering functional training, strength conditioning, MMA, boxing, and high-intensity group workouts designed to push your limits.
             </p>
             <div className="flex gap-4">
-              <a href="https://instagram.com" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-400 hover:text-white hover:border-[#EE2A24] hover:bg-[#EE2A24]/10 transition-all">
+              <a href="https://www.instagram.com/hiitfitness01?igsh=MWt5Y29ueXM5bDMwcw==" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-400 hover:text-white hover:border-[#EE2A24] hover:bg-[#EE2A24]/10 transition-all">
                 <Instagram className="w-5 h-5" />
               </a>
               <a href="https://facebook.com" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-400 hover:text-white hover:border-[#EE2A24] hover:bg-[#EE2A24]/10 transition-all">
                 <Facebook className="w-5 h-5" />
+              </a>
+              <a href="https://youtube.com/@hiit_fitness?si=P0vvcx4SiFozU5QH" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-400 hover:text-white hover:border-[#EE2A24] hover:bg-[#EE2A24]/10 transition-all">
+                <Youtube className="w-5 h-5" />
               </a>
             </div>
           </div>
@@ -61,26 +87,29 @@ export function LandingFooter() {
           <div className="col-span-1 md:col-span-2 lg:col-span-2">
             <h3 className="text-white font-bold mb-6 uppercase tracking-wider text-sm border-l-2 border-[#EE2A24] pl-3">Contact Us</h3>
             <div className="grid sm:grid-cols-2 gap-6">
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-4 sm:col-span-2">
                 <div className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-[#EE2A24] shrink-0 hover:scale-110 transition-transform">
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-white font-semibold text-sm mb-1.5 break-words">Location</h4>
-                  <p className="text-stone-400 text-sm leading-relaxed pr-2">
-                    2nd Floor, Sri Anuja Balaji Square, vi Seshadri street, 3rd Ln, opp. Currency Nagar, Ramavarapadu, Kanuru, Andhra Pradesh 521108
+                  <h4 className="text-white font-semibold text-sm mb-1.5 break-words">{BRANCHES_FOOTER_DATA[selectedBranch].name}</h4>
+                  <p className="text-stone-400 text-xs leading-relaxed pr-2">
+                    {BRANCHES_FOOTER_DATA[selectedBranch].address}
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col gap-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-[#EE2A24] shrink-0 hover:scale-110 transition-transform">
-                    <Phone className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-white font-semibold text-sm mb-1.5">Phone Call</h4>
-                    <a href="tel:+919996667714" className="block text-stone-400 hover:text-white text-sm font-medium transition-colors mb-1">999 666 7714</a>
-                    <a href="tel:+919996665573" className="block text-stone-400 hover:text-white text-sm font-medium transition-colors">999 666 5573</a>
+              <div className="flex items-start gap-4 sm:col-span-2">
+                <div className="w-10 h-10 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-[#EE2A24] shrink-0 hover:scale-110 transition-transform">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold text-sm mb-1.5">Phone Call</h4>
+                  <div className="flex gap-4">
+                    {BRANCHES_FOOTER_DATA[selectedBranch].phones.map((p) => (
+                      <a key={p.tel} href={p.tel} className="text-stone-400 hover:text-white text-sm font-medium transition-colors">
+                        {p.display}
+                      </a>
+                    ))}
                   </div>
                 </div>
               </div>

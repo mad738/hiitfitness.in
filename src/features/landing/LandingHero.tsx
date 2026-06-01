@@ -1,28 +1,59 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AnimateOnScroll } from "@/components/ui/animate-on-scroll";
+import { useBranch } from "./BranchContext";
+
+const BRANCH_WHATSAPP = {
+  kanuru: "919996667714",
+  bhavanipuram: "919996664188"
+};
+
+const BACKGROUND_IMAGES = [
+  "/gallery/SnapInsta.to_657471662_18158979148441242_3958703957107308221_n.jpg",
+  "/gallery/SnapInsta.to_658670209_18138759595444895_4923670017808512640_n.jpg",
+  "/gallery/SnapInsta.to_658859738_17999106524867630_6602969736954030008_n.jpg",
+  "/gallery/SnapInsta.to_659795511_18080987057628091_2049472422370424467_n.jpg",
+  "/gallery/SnapInsta.to_662734728_18310153678272460_6065853207444644703_n.jpg",
+  "/gallery/SnapInsta.to_670194894_18069879743392552_585200093872474835_n.jpg",
+  "/gallery/SnapInsta.to_670539509_18000536549744703_8281401298258446520_n.jpg",
+  "/gallery/SnapInsta.to_670549867_18145322566435077_1378904094156786920_n.jpg",
+  "/gallery/SnapInsta.to_670923159_18064505939364788_7035871039556836138_n.jpg",
+  "/gallery/SnapInsta.to_671115999_18062607005400113_7178394530742367817_n.jpg"
+];
 
 export function LandingHero() {
-  return (
-    <section className="relative min-h-[100dvh] flex items-center justify-center px-4 sm:px-6 pt-[calc(var(--header-height)+var(--header-content-gap)+3.25rem)] md:pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden bg-black text-center">
-      {/* Background Image & Overlay */}
-      <div
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url('/images/HIIT_GYM3.jpg')` }}
-      />
-      <div className="absolute inset-0 z-[1] bg-black/70" />
+  const { selectedBranch } = useBranch();
+  const waNumber = BRANCH_WHATSAPP[selectedBranch];
+  const [currentIdx, setCurrentIdx] = useState(0);
 
-      <AnimateOnScroll rootMargin="0px 0px -20px 0px" className="relative z-10 w-full max-w-5xl mx-auto flex flex-col items-center justify-center pt-10">
-        <h1 className="font-display text-5xl sm:text-7xl md:text-[90px] lg:text-[110px] font-black tracking-tighter mb-10 leading-[0.85] sm:leading-[0.9] uppercase text-[#EE2A24] drop-shadow-md">
-          EARN YOUR <br />
-          NEXT PR <br />
-          EVERY <br />
-          SESSION
-        </h1>
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIdx((prev) => (prev + 1) % BACKGROUND_IMAGES.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <section className="relative min-h-[100dvh] flex items-end justify-center px-4 sm:px-6 pb-24 md:items-center md:pb-0 pt-[calc(var(--header-height)+var(--header-content-gap)+3.25rem)] md:pt-[calc(var(--header-height)+var(--header-content-gap))] overflow-hidden bg-black text-center">
+      {/* Background Images Crossfade Slideshow */}
+      {BACKGROUND_IMAGES.map((img, idx) => (
+        <div
+          key={img}
+          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000 ease-in-out"
+          style={{
+            backgroundImage: `url('${img}')`,
+            opacity: idx === currentIdx ? 1 : 0,
+          }}
+        />
+      ))}
+      <div className="absolute inset-0 z-[1] bg-black/75" />
+
+      <AnimateOnScroll rootMargin="0px 0px -20px 0px" className="relative z-10 w-full max-w-5xl mx-auto flex flex-col items-center justify-center pt-10 md:pt-0">
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 justify-center w-full max-w-md mx-auto">
           <Link
-            href="https://wa.me/919996667714?text=Hi!%20I'm%20interested%20in%20joining%20the%20community%20at%20HIIT%20Fitness."
+            href={`https://wa.me/${waNumber}?text=Hi!%20I'm%20interested%20in%20joining%20the%20community%20at%20HIIT%20Fitness.`}
             target="_blank"
             rel="noopener noreferrer"
             className="group relative flex-1 inline-flex items-center justify-center min-h-[2.75rem] sm:min-h-[3rem] px-6 rounded-sm text-xs sm:text-sm font-black transition-all uppercase tracking-[0.15em] text-white bg-[#EE2A24] border border-[#EE2A24] overflow-hidden shadow-[0_0_15px_rgba(238,42,36,0.4)] hover:shadow-[0_0_30px_rgba(238,42,36,0.8)] hover:scale-[1.02]"
